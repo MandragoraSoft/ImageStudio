@@ -14,9 +14,23 @@ public sealed record ModelPricing(
 // Publiczny rynek cen: bez klucza API, bo to inny host niż api.uberllm.dev
 public sealed class MarketService : IDisposable
 {
-    private readonly HttpClient _http = new()
+    private HttpClient _http;
+
+    public MarketService(string marketUrl)
     {
-        BaseAddress = new Uri("https://uberllm.dev"),
+        _http = CreateClient(marketUrl);
+    }
+
+    // Po zmianie adresu rynku w ustawieniach
+    public void Reconfigure(string marketUrl)
+    {
+        _http.Dispose();
+        _http = CreateClient(marketUrl);
+    }
+
+    private static HttpClient CreateClient(string marketUrl) => new()
+    {
+        BaseAddress = new Uri(marketUrl),
         Timeout = TimeSpan.FromSeconds(30)
     };
 

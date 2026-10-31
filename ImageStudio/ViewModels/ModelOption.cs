@@ -10,6 +10,9 @@ public sealed record ModelOption(
     IReadOnlyList<string> InputModalities,
     ModelPricing? Pricing)
 {
+    // Atrybut zgodny z filtrem "Przyjmuje obraz" i ikoną w szablonie
+    public bool AcceptsImage => InputModalities.Contains("image");
+
     // Cena wyrównywana do prawej w dropdownie (szablon w App.xaml)
     public string PriceText => Pricing is null
         ? "—"

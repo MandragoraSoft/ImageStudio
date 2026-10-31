@@ -1,19 +1,24 @@
+using System.Linq;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ImageStudio.Configuration;
+using ImageStudio.ViewModels;
+using ImageStudio.Views;
 using Microsoft.Win32;
 
 namespace ImageStudio.Services;
 
 public sealed class WpfDialogService : IDialogService
 {
-    public string? PickImageFile()
+    public string[]? PickImageFiles()
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Wybierz obraz do edycji",
-            Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.webp"
+            Title = "Wybierz obrazy referencyjne",
+            Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.webp",
+            Multiselect = true
         };
-        return dialog.ShowDialog() == true ? dialog.FileName : null;
+        return dialog.ShowDialog() == true ? dialog.FileNames : null;
     }
 
     public string? ChooseSaveFile(string suggestedFileName)
@@ -28,4 +33,41 @@ public sealed class WpfDialogService : IDialogService
     }
 
     public void CopyImage(BitmapSource image) => Clipboard.SetImage(image);
+
+    // Modalne okno ustawień, właścicielem jest główne okno
+    public SettingsResult? ShowSettings(SettingsResult current)
+    {
+        var viewModel = new SettingsViewModel(current);
+        var window = new SettingsWindow
+        {
+            DataContext = viewModel,
+            Owner = Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Application.Current.MainWindow
+        };
+
+        return window.ShowDialog() == true
+            ? new SettingsResult(viewModel.BaseUrl.Trim(), viewModel.MarketUrl.Trim(), viewModel.MaxSide,
+                                 viewModel.ApiKey.Trim(), viewModel.SelectedTheme)
+            : null;
+    }
+
+    public PresetDraft? ShowSavePreset(string defaultName)
+    {
+        var viewModel = new PresetSaveViewModel(defaultName);
+        var window = new PresetSaveWindow { DataContext = viewModel, Owner = OwnerWindow() };
+        return window.ShowDialog() == true
+            ? new PresetDraft(viewModel.Name.Trim(), viewModel.Description.Trim())
+            : null;
+    }
+
+    public Preset? ShowPresets()
+    {
+        var viewModel = new PresetsViewModel();
+        var window = new PresetsWindow { DataContext = viewModel, Owner = OwnerWindow() };
+        viewModel.CloseRequested += window.Close;
+        window.ShowDialog();
+        return viewModel.ChosenPreset;
+    }
+
+    private static Window? OwnerWindow() =>
+        Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Application.Current.MainWindow;
 }

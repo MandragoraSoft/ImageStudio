@@ -1,0 +1,38 @@
+<UserControl x:Class="ImageStudio.Views.EnhancerPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ImageStudio.ViewModels">
+    <Border Style="{StaticResource Panel}">
+        <StackPanel>
+            <TextBlock Text="Model AI do ulepszania promptu" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
+            <ComboBox ItemsSource="{Binding EnhancerModels}" SelectedItem="{Binding SelectedEnhancerModel}"/>
+
+            <TextBlock Text="Instrukcja dla modelu" Style="{StaticResource SectionHeader}"/>
+            <TextBox Text="{Binding EnhancerInstruction, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True" TextWrapping="Wrap" Height="70" VerticalScrollBarVisibility="Auto"/>
+
+            <TextBlock Text="Parametry modelu (włączone są wysyłane)" Style="{StaticResource SectionHeader}"/>
+            <ItemsControl ItemsSource="{Binding EnhancerParameters}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:ModelParameter}">
+                        <Grid Margin="0,4,0,0" ToolTip="{Binding Hint}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <Slider Grid.Column="2" Minimum="{Binding Min}" Maximum="{Binding Max}"
+                                    Value="{Binding Value}" IsEnabled="{Binding Enabled}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="{Binding Display}" TextAlignment="Right" VerticalAlignment="Center"
+                                       Style="{StaticResource MutedTextBlock}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

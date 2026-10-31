@@ -1,0 +1,39 @@
+<Window x:Class="ImageStudio.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:ImageStudio.Views"
+        Style="{StaticResource WindowBase}"
+        Title="Ustawienia" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="16">
+        <TextBlock Text="Adres API (api.uberllm.dev)" Style="{StaticResource SectionHeader}"/>
+        <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Adres rynku cen (publiczny)" Style="{StaticResource SectionHeader}"/>
+        <TextBox Text="{Binding MarketUrl, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Maksymalny długi bok obrazu źródłowego (px)" Style="{StaticResource SectionHeader}"/>
+        <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>
+
+        <TextBlock Text="Motyw" Style="{StaticResource SectionHeader}"/>
+        <ComboBox ItemsSource="{Binding Themes}" SelectedValuePath="Code" SelectedValue="{Binding SelectedTheme}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Label}"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <TextBlock Text="Klucz API" Style="{StaticResource SectionHeader}"/>
+        <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Klucz jest szyfrowany (DPAPI) dla bieżącego konta Windows. Nie trafia do plików projektu ani do repozytorium."
+                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
+                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <Button Content="Zapisz" IsDefault="True" Width="90" Click="Save_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

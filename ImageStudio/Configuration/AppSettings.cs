@@ -1,63 +1,41 @@
 using System.IO;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace ImageStudio.Configuration;
 
-// Klucz i adres upstreamu z zmiennych środowiskowych albo z pliku .env.
-// Zmienne z środowiska mają pierwszeństwo przed .env.
-public sealed class AppSettings
+// Ustawienia: appsettings.json (domyślne, w katalogu aplikacji) + settings.json użytkownika (nadpisuje)
+// Klucz API: zmienna UBERLLM_API_KEY (ma pierwszeństwo) albo SecretStore.
+public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme)
 {
-    public const string DefaultBaseUrl = "https://api.uberllm.dev";
-
-    public string ApiKey { get; }
-    public string BaseUrl { get; }
-
-    private AppSettings(string apiKey, string baseUrl)
-    {
-        ApiKey = apiKey;
-        BaseUrl = baseUrl;
-    }
+    private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
     public static AppSettings Load()
     {
-        var file = FindEnvFile(AppContext.BaseDirectory);
-        var fileValues = file is null ? new Dictionary<string, string>() : ParseEnv(File.ReadAllLines(file));
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonFile(UserSettingsPath, optional: true)
+            .Build();
 
-        string Get(string key) =>
-            Environment.GetEnvironmentVariable(key)
-            ?? (fileValues.TryGetValue(key, out var v) ? v : "");
+        var apiKey = Environment.GetEnvironmentVariable("UBERLLM_API_KEY") ?? SecretStore.Load() ?? "";
 
-        var baseUrl = Get("UBERLLM_BASE_URL");
         return new AppSettings(
-            Get("UBERLLM_API_KEY"),
-            string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl);
+            BaseUrl: config["Uberllm:BaseUrl"]!,
+            MarketUrl: config["Uberllm:MarketUrl"]!,
+            MaxSide: int.Parse(config["Uberllm:MaxSide"]!),
+            ApiKey: apiKey,
+            Theme: config["Ui:Theme"] ?? "system");
     }
 
-    // Idzie w górę od katalogu aplikacji, aż znajdzie .env (w dev: katalog projektu nad ImageStudio\)
-    private static string? FindEnvFile(string start)
+    // Adresy, limit wymiarów i motyw trafiają do settings.json użytkownika, klucz do sekretów
+    public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme)
     {
-        for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, ".env");
-            if (File.Exists(candidate)) return candidate;
-        }
-        return null;
-    }
-
-    private static Dictionary<string, string> ParseEnv(IEnumerable<string> lines)
-    {
-        var values = new Dictionary<string, string>();
-        foreach (var raw in lines)
-        {
-            var line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith('#')) continue;
-
-            var eq = line.IndexOf('=');
-            if (eq <= 0) continue;
-
-            var key = line[..eq].Trim();
-            var value = line[(eq + 1)..].Trim().Trim('"', '\'');
-            values[key] = value;
-        }
-        return values;
+        Directory.CreateDirectory(AppPaths.UserDataDir);
+        var json = JsonSerializer.Serialize(
+            new { Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide }, Ui = new { Theme = theme } },
+            new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(UserSettingsPath, json);
+        SecretStore.Save(apiKey);
     }
 }

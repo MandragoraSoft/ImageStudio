@@ -5,6 +5,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
@@ -13,20 +14,70 @@
             <Button DockPanel.Dock="Right" Content="Kopiuj" Width="90" Margin="8,0,0,0"
                     Command="{Binding CopyImageCommand}"/>
             <Button DockPanel.Dock="Right" Content="100%" Width="60" Margin="8,0,0,0"
-                    Command="{Binding ResetZoomCommand}"/>
-            <TextBlock Text="{Binding Zoom, StringFormat='Skala: {0:P0}'}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    Command="{Binding ResetZoomCommand}" ToolTip="Rzeczywisty rozmiar"/>
+            <Button DockPanel.Dock="Right" Content="Dopasuj" Width="80" Margin="8,0,0,0"
+                    Command="{Binding FitImageCommand}" ToolTip="Dopasuj obraz do okna"/>
+            <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" Margin="0,0,12,0" Width="170"/>
             <Slider Minimum="0.1" Maximum="4" Value="{Binding Zoom}" VerticalAlignment="Center"/>
         </DockPanel>
 
-        <Border Grid.Row="1" BorderBrush="{StaticResource BorderSoftBrush}" BorderThickness="1" CornerRadius="6"
-                Background="{StaticResource SurfaceBrush}">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <Image Source="{Binding Image}" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Image.LayoutTransform>
-                        <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}"/>
-                    </Image.LayoutTransform>
-                </Image>
-            </ScrollViewer>
+        <Border Grid.Row="1" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="6"
+                Background="{DynamicResource SurfaceBrush}" ClipToBounds="True">
+            <Grid>
+                <!-- Obraz: tryb dopasowania i tryb ręczny -->
+                <Grid Visibility="{Binding ShowImage, Converter={StaticResource BoolToVis}}">
+                    <Image Source="{Binding Image}" Stretch="Uniform" Margin="8"
+                           Visibility="{Binding FitToWindow, Converter={StaticResource BoolToVis}}"/>
+
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding IsZoomed, Converter={StaticResource BoolToVis}}">
+                        <Image Source="{Binding Image}" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Image.LayoutTransform>
+                                <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}"/>
+                            </Image.LayoutTransform>
+                        </Image>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- Wideo: odtwarzanie od razu po wczytaniu -->
+                <MediaElement Source="{Binding VideoSource}" LoadedBehavior="Play" UnloadedBehavior="Manual"
+                              Stretch="Uniform" Margin="8"
+                              Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}"/>
+            </Grid>
         </Border>
+
+        <!-- Galeria: zwijana; każdy wynik z promptem i kosztem, kliknięcie pokazuje obraz lub wideo -->
+        <Expander Grid.Row="2" Header="{Binding GalleryTotalLabel}" IsExpanded="False" Margin="0,8,0,0">
+            <Grid Margin="0,6,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Button HorizontalAlignment="Right" Content="Wyczyść galerię" Padding="10,2"
+                        Command="{Binding ClearGalleryCommand}"/>
+                <ListBox Grid.Row="1" Margin="0,6,0,0" Height="140"
+                         ItemsSource="{Binding Gallery}" SelectedItem="{Binding SelectedGalleryEntry}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Width="132" Margin="0,0,8,0" ToolTip="{Binding Prompt}">
+                                <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                                        BorderThickness="1" CornerRadius="6" Height="96" Padding="4">
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                </Border>
+                                <TextBlock Text="{Binding CostLabel}" FontFamily="Consolas" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding KindLabel}" Style="{StaticResource MutedTextBlock}"/>
+                                <TextBlock Text="{Binding Prompt}" TextTrimming="CharacterEllipsis" Style="{StaticResource MutedTextBlock}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Expander>
     </Grid>
 </UserControl>
