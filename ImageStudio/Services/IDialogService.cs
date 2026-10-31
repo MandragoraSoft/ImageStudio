@@ -15,6 +15,7 @@ public interface IDialogService
     string[]? PickImageFiles();
     string? ChooseSaveFile(string suggestedFileName);
     void CopyImage(BitmapSource image);
+    BitmapSource? GetClipboardImage();
     SettingsResult? ShowSettings(SettingsResult current);
     PresetDraft? ShowSavePreset(string defaultName);
 

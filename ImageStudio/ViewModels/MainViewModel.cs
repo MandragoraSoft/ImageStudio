@@ -665,6 +665,46 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    // Wklejenie obrazu ze schowka (np. zrzutu ekranu) jako źródła edycji
+    [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
+    private void PasteReference()
+    {
+        var path = PasteClipboardImage();
+        if (path is null) return;
+
+        References.Add(new ReferenceItem(path, $"Schowek {DateTime.Now:HH:mm:ss}", "schowek"));
+        if (SourceImage is null) LoadPrimary();
+        Status = $"Dodano obraz ze schowka. Referencje: {References.Count}";
+    }
+
+    // Zapisuje obraz ze schowka jako PNG w katalogu referencji; null, gdy schowka nie ma obrazu
+    private string? PasteClipboardImage()
+    {
+        try
+        {
+            var image = _dialogs.GetClipboardImage();
+            if (image is null)
+            {
+                Status = "Schowek nie zawiera obrazu.";
+                return null;
+            }
+
+            var dir = Path.Combine(AppPaths.UserDataDir, "refs");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"{Guid.NewGuid():N}.png");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using (var file = File.Create(path))
+                encoder.Save(file);
+            return path;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Nie udało się wkleić obrazu: {ex.Message}";
+            return null;
+        }
+    }
+
     [RelayCommand]
     private void RemoveReference(ReferenceItem? item)
     {
@@ -944,6 +984,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void ClearVideoAttachments() => VideoAttachments.Clear();
+
+    [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
+    private void PasteVideoAttachment()
+    {
+        var path = PasteClipboardImage();
+        if (path is null) return;
+
+        VideoAttachments.Add(new ReferenceItem(path, $"Schowek {DateTime.Now:HH:mm:ss}", "schowek"));
+        Status = $"Załączniki wideo: {VideoAttachments.Count}";
+    }
 
     private static string MimeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {

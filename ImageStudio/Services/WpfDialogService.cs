@@ -34,6 +34,9 @@ public sealed class WpfDialogService : IDialogService
 
     public void CopyImage(BitmapSource image) => Clipboard.SetImage(image);
 
+    // Obraz ze schowka (np. zrzut ekranu); null, gdy schowek nie zawiera obrazu
+    public BitmapSource? GetClipboardImage() => Clipboard.ContainsImage() ? Clipboard.GetImage() : null;
+
     // Modalne okno ustawień, właścicielem jest główne okno
     public SettingsResult? ShowSettings(SettingsResult current)
     {

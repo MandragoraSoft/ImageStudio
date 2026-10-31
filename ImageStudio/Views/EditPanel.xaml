@@ -8,7 +8,9 @@
                 <StackPanel Margin="0,4,0,0">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Button Content="Dodaj..." Width="90" Margin="0,0,6,0" Command="{Binding AddReferencesCommand}"/>
-                        <Button Content="Wyczyść" Width="90" Command="{Binding ClearReferencesCommand}"/>
+                        <Button Content="Wyczyść" Width="90" Margin="0,0,6,0" Command="{Binding ClearReferencesCommand}"/>
+                        <Button Content="Wklej ze schowka" Padding="10,6" Command="{Binding PasteReferenceCommand}"
+                                ToolTip="Wkleja obraz ze schowka (np. zrzut ekranu)"/>
                     </StackPanel>
 
                     <DockPanel Margin="0,0,0,6">

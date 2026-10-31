@@ -11,7 +11,9 @@
                 <StackPanel Margin="0,4,0,0">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Button Content="Dodaj..." Width="90" Margin="0,0,6,0" Command="{Binding AddVideoAttachmentsCommand}"/>
-                        <Button Content="Wyczyść" Width="90" Command="{Binding ClearVideoAttachmentsCommand}"/>
+                        <Button Content="Wyczyść" Width="90" Margin="0,0,6,0" Command="{Binding ClearVideoAttachmentsCommand}"/>
+                        <Button Content="Wklej ze schowka" Padding="10,6" Command="{Binding PasteVideoAttachmentCommand}"
+                                ToolTip="Wkleja obraz ze schowka jako załącznik wideo"/>
                     </StackPanel>
                     <ListBox ItemsSource="{Binding VideoAttachments}" Height="110">
                         <ListBox.ItemTemplate>
