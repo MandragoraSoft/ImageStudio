@@ -147,13 +147,13 @@ public sealed class ImageGenerationService : IDisposable
         return parts;
     }
 
-    private const string SplitFormat =
+    internal const string SplitFormat =
         "Split the input into two parts and reply with JSON only, no code fences: " +
         "{\"system\": \"...\", \"concept\": \"...\"}. " +
         "\"system\" = technical configuration (style, lighting, camera, quality, format, constraints), keep existing system text. " +
         "\"concept\" = what the user wants depicted, improved and vivid. Keep the input language.";
 
-    private static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)
+    internal static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)
     {
         var json = content.Trim();
         if (json.StartsWith("```"))

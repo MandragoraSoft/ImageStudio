@@ -27,8 +27,7 @@ public sealed partial class MainViewModel : ObservableObject
         ("1:1", 1.0), ("4:3", 4.0 / 3), ("3:2", 1.5), ("16:9", 16.0 / 9), ("9:16", 9.0 / 16),
     ];
 
-    private readonly ImageGenerationService _service;
-    private readonly MarketService _market;
+    private IAiProvider _provider;
     private readonly IDialogService _dialogs;
     private readonly ImageDownloadService _downloads;
     private readonly UserState _state;
@@ -167,11 +166,10 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _hideNsfw;
 
-    public MainViewModel(ImageGenerationService service, MarketService market, IDialogService dialogs,
+    public MainViewModel(IAiProvider provider, IDialogService dialogs,
                          ImageDownloadService downloads, AppSettings settings)
     {
-        _service = service;
-        _market = market;
+        _provider = provider;
         _dialogs = dialogs;
         _downloads = downloads;
         _settings = settings;
@@ -307,7 +305,7 @@ public sealed partial class MainViewModel : ObservableObject
         Status = "Pobieranie listy modeli i cen...";
         try
         {
-            var models = await _service.GetImageModelsAsync();
+            var models = await _provider.GetImageModelsAsync();
             var pricing = await LoadPricingAsync();
 
             Replace(Models, models.Generation, pricing);
@@ -320,7 +318,7 @@ public sealed partial class MainViewModel : ObservableObject
                                 ?? EditModels.FirstOrDefault(m => m.Id == DefaultEdit)
                                 ?? EditModels.FirstOrDefault();
 
-            Replace(VideoModels, await _service.GetVideoModelsAsync(), pricing);
+            Replace(VideoModels, await _provider.GetVideoModelsAsync(), pricing);
             SelectedVideoModel ??= VideoModels.FirstOrDefault(m => m.Pricing is not null) ?? VideoModels.FirstOrDefault();
 
             Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
@@ -340,7 +338,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            var chat = await _service.GetChatModelsAsync();
+            var chat = await _provider.GetChatModelsAsync();
             _chatModels.Clear();
             foreach (var model in chat) _chatModels[model.Id] = model;
             ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
@@ -402,7 +400,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            return await _market.GetMediaPricingAsync();
+            return await _provider.GetPricingAsync();
         }
         catch (Exception ex)
         {
@@ -417,15 +415,19 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task OpenSettingsAsync()
     {
         var current = new SettingsResult(_settings.BaseUrl, _settings.MarketUrl, _settings.MaxSide,
-                                         _settings.ApiKey, _settings.Theme);
+                                         _settings.ApiKey, _settings.Theme, _settings.ProviderId, _settings.OpenRouterKey,
+                                         _settings.OpenAiBaseUrl, _settings.OpenAiKey);
         var result = _dialogs.ShowSettings(current);
         if (result is null) return;
 
-        AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme);
+        AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
+                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
         ThemeService.Apply(result.Theme);
-        _service.Reconfigure(result.BaseUrl, result.ApiKey);
-        _market.Reconfigure(result.MarketUrl);
-        _settings = new AppSettings(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme);
+        _settings = new AppSettings(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
+                                    result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
+        // Nowe ustawienia (także inny provider) = nowa instancja providera; stara zostaje zwolniona
+        _provider.Dispose();
+        _provider = ProviderRegistry.Create(result.ProviderId, _settings);
         await InitializeAsync();
     }
 
@@ -776,7 +778,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             var instruction = string.IsNullOrWhiteSpace(EnhancerInstruction) ? DefaultInstruction : EnhancerInstruction;
-            var parts = await _service.EnhancePromptAsync(SelectedEnhancerModel!, instruction, system, concept, EnhancerParameterValues());
+            var parts = await _provider.EnhancePromptAsync(SelectedEnhancerModel!, instruction, system, concept, EnhancerParameterValues());
             keepOriginal(new PromptParts(system, concept));
             apply(parts);
             Status = $"Prompt rozdzielony i ulepszony ({SelectedEnhancerModel}): konfiguracja + koncept";
@@ -810,7 +812,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         SaveState();
         var prompt = Compose(GenerateSystemPrompt, GeneratePrompt);
-        return RunAsync(() => _service.GenerateAsync(SelectedModel!.Id, prompt, Size, CurrentImageOptions()),
+        return RunAsync(() => _provider.GenerateImageAsync(SelectedModel!.Id, prompt, Size, CurrentImageOptions()),
                         prompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PriceNow);
     }
 
@@ -820,7 +822,7 @@ public sealed partial class MainViewModel : ObservableObject
         SaveState();
         return RunAsync(async () =>
         {
-            var edited = await _service.EditAsync(SelectedEditModel!.Id, Compose(EditSystemPrompt, EditPrompt),
+            var edited = await _provider.EditImageAsync(SelectedEditModel!.Id, Compose(EditSystemPrompt, EditPrompt),
                                                   References.Select(r => r.Path).ToList());
             // Endpoint edycji nie respektuje rozmiaru, więc wynik dopasowujemy do wybranych proporcji lokalnie
             return edited with { Bytes = ImageFitter.FitTo(edited.Bytes, Width, Height) };
@@ -1036,7 +1038,7 @@ public sealed partial class MainViewModel : ObservableObject
                 .Select(a => (Bytes: File.ReadAllBytes(a.Path), Mime: MimeOf(a.Path)))
                 .ToList();
 
-            var result = await _service.GenerateVideoAsync(model.Id, VideoPrompt, VideoDuration, VideoAspect,
+            var result = await _provider.GenerateVideoAsync(model.Id, VideoPrompt, VideoDuration, VideoAspect,
                                                            attachments, s => Status = $"Wideo: {s}...");
 
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ImageStudio");

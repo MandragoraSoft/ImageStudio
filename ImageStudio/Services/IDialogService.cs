@@ -4,7 +4,9 @@ using ImageStudio.Configuration;
 namespace ImageStudio.Services;
 
 // Ustawienia edytowane w oknie Settings (wejście i wynik); null jako wynik = anulowano
-public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme);
+public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
+                                   string ProviderId = "uberllm", string OpenRouterKey = "",
+                                   string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "");
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);

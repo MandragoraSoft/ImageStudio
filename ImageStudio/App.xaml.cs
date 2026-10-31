@@ -22,10 +22,9 @@ public partial class App : Application
 
         var settings = AppSettings.Load();
         ThemeService.Apply(settings.Theme);
-        var service = new ImageGenerationService(settings.BaseUrl, settings.ApiKey);
-        var market = new MarketService(settings.MarketUrl);
+        var provider = ProviderRegistry.Create(settings.ProviderId, settings);
         var downloads = new ImageDownloadService();
-        var viewModel = new MainViewModel(service, market, new WpfDialogService(), downloads, settings);
+        var viewModel = new MainViewModel(provider, new WpfDialogService(), downloads, settings);
         _viewModel = viewModel;
         var window = new MainWindow { DataContext = viewModel };
         window.Loaded += async (_, _) => await viewModel.InitializeAsync();

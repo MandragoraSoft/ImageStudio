@@ -48,8 +48,10 @@ public sealed class WpfDialogService : IDialogService
         };
 
         return window.ShowDialog() == true
-            ? new SettingsResult(viewModel.BaseUrl.Trim(), viewModel.MarketUrl.Trim(), viewModel.MaxSide,
-                                 viewModel.ApiKey.Trim(), viewModel.SelectedTheme)
+            ? new SettingsResult(viewModel.UberLlm.BaseUrl.Trim(), viewModel.UberLlm.MarketUrl.Trim(), viewModel.MaxSide,
+                                 viewModel.UberLlm.ApiKey.Trim(), viewModel.SelectedTheme, viewModel.SelectedProvider,
+                                 viewModel.OpenRouter.ApiKey.Trim(), viewModel.OpenAi.BaseUrl.Trim(),
+                                 viewModel.OpenAi.ApiKey.Trim())
             : null;
     }
 

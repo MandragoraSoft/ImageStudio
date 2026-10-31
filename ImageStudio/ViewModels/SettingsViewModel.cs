@@ -8,34 +8,45 @@ public sealed record ThemeOption(string Code, string Label);
 
 public sealed partial class SettingsViewModel : ObservableObject
 {
-    public static IReadOnlyList<ThemeOption> Themes { get; } =
+    public IReadOnlyList<ThemeOption> Themes { get; } =
     [
         new(ThemeService.System, "Systemowy"),
         new(ThemeService.Light, "Jasny"),
         new(ThemeService.Dark, "Ciemny"),
     ];
 
-    [ObservableProperty]
-    private string _baseUrl;
+    public IReadOnlyList<ProviderRegistry.ProviderInfo> Providers { get; } = ProviderRegistry.Available;
 
-    [ObservableProperty]
-    private string _marketUrl;
-
+    // Ustawienia ogólne (nie zależą od providera)
     [ObservableProperty]
     private int _maxSide;
 
     [ObservableProperty]
-    private string _apiKey;
-
-    [ObservableProperty]
     private string _selectedTheme;
+
+    // Wybór providera przełącza komponent konfiguracji pod dropdownem
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActiveProvider))]
+    private string _selectedProvider;
+
+    public UberLlmSettingsViewModel UberLlm { get; }
+    public OpenRouterSettingsViewModel OpenRouter { get; }
+    public OpenAiSettingsViewModel OpenAi { get; }
+
+    public ProviderSettingsViewModel ActiveProvider => SelectedProvider switch
+    {
+        OpenRouterProvider.Identifier => OpenRouter,
+        OpenAiProvider.Identifier => OpenAi,
+        _ => UberLlm,
+    };
 
     public SettingsViewModel(SettingsResult current)
     {
-        _baseUrl = current.BaseUrl;
-        _marketUrl = current.MarketUrl;
         _maxSide = current.MaxSide;
-        _apiKey = current.ApiKey;
         _selectedTheme = current.Theme;
+        _selectedProvider = current.ProviderId;
+        UberLlm = new UberLlmSettingsViewModel(current.BaseUrl, current.MarketUrl, current.ApiKey);
+        OpenRouter = new OpenRouterSettingsViewModel(current.OpenRouterKey);
+        OpenAi = new OpenAiSettingsViewModel(current.OpenAiBaseUrl, current.OpenAiKey);
     }
 }

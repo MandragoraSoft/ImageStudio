@@ -6,7 +6,9 @@ namespace ImageStudio.Configuration;
 
 // Ustawienia: appsettings.json (domyślne, w katalogu aplikacji) + settings.json użytkownika (nadpisuje)
 // Klucz API: zmienna UBERLLM_API_KEY (ma pierwszeństwo) albo SecretStore.
-public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme)
+public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
+                                 string ProviderId = "uberllm", string OpenRouterKey = "",
+                                 string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "")
 {
     private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
@@ -25,17 +27,31 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             MarketUrl: config["Uberllm:MarketUrl"]!,
             MaxSide: int.Parse(config["Uberllm:MaxSide"]!),
             ApiKey: apiKey,
-            Theme: config["Ui:Theme"] ?? "system");
+            Theme: config["Ui:Theme"] ?? "system",
+            ProviderId: config["Ai:Provider"] ?? "uberllm",
+            OpenRouterKey: Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? SecretStore.Load("openrouter") ?? "",
+            OpenAiBaseUrl: config["OpenAi:BaseUrl"] ?? "https://api.openai.com",
+            OpenAiKey: Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? SecretStore.Load("openai") ?? "");
     }
 
-    // Adresy, limit wymiarów i motyw trafiają do settings.json użytkownika, klucz do sekretów
-    public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme)
+    // Adresy, limit wymiarów, motyw i provider trafiają do settings.json użytkownika, klucz do sekretów
+    public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,
+                            string providerId = "uberllm", string openRouterKey = "",
+                            string openAiBaseUrl = "https://api.openai.com", string openAiKey = "")
     {
         Directory.CreateDirectory(AppPaths.UserDataDir);
         var json = JsonSerializer.Serialize(
-            new { Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide }, Ui = new { Theme = theme } },
+            new
+            {
+                Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide },
+                Ui = new { Theme = theme },
+                Ai = new { Provider = providerId },
+                OpenAi = new { BaseUrl = openAiBaseUrl },
+            },
             new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(UserSettingsPath, json);
         SecretStore.Save(apiKey);
+        SecretStore.Save(openRouterKey, "openrouter");
+        SecretStore.Save(openAiKey, "openai");
     }
 }
