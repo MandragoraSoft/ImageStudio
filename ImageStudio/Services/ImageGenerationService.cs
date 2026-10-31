@@ -21,6 +21,9 @@ public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
 // Opcjonalne parametry generowania; null = nie wysyłamy (API odrzuca nieznane klucze)
 public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality);
 
+// Prompt rozdzielony: System = konfiguracja (styl, technika), Concept = treść wskazana przez użytkownika
+public sealed record PromptParts(string System, string Concept);
+
 public sealed class ImageGenerationService : IDisposable
 {
     private const string GenerationPath = "/v1/images/generations";
@@ -114,17 +117,18 @@ public sealed class ImageGenerationService : IDisposable
             .ToList();
     }
 
-    // Ulepszenie promptu przez model czatu; parametry są dokładane tylko te włączone przez użytkownika
-    public async Task<string> EnhancePromptAsync(string model, string instruction, string prompt,
-                                                 IReadOnlyDictionary<string, object> parameters, CancellationToken ct = default)
+    // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).
+    // Model zwraca JSON; przy błędzie parsowania koncept to surowa odpowiedź, a system zostaje bez zmian.
+    public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
+                                                      IReadOnlyDictionary<string, object> parameters, CancellationToken ct = default)
     {
         var body = new Dictionary<string, object>
         {
             ["model"] = model,
             ["messages"] = new[]
             {
-                new { role = "system", content = instruction },
-                new { role = "user", content = prompt },
+                new { role = "system", content = $"{instruction}\n\n{SplitFormat}" },
+                new { role = "user", content = $"SYSTEM (config):\n{system}\n\nCONCEPT:\n{concept}" },
             },
         };
         foreach (var (key, value) in parameters) body[key] = value;
@@ -136,12 +140,45 @@ public sealed class ImageGenerationService : IDisposable
 
         using var doc = JsonDocument.Parse(text);
         var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
-            .GetProperty("content").GetString();
-        var improved = content?.Trim().Trim('"');
-        if (string.IsNullOrWhiteSpace(improved))
+            .GetProperty("content").GetString() ?? "";
+        var parts = ParseSplit(content, system, concept);
+        if (string.IsNullOrWhiteSpace(parts.Concept))
             throw new InvalidOperationException("Model nie zwrócił promptu.");
-        return improved;
+        return parts;
     }
+
+    private const string SplitFormat =
+        "Split the input into two parts and reply with JSON only, no code fences: " +
+        "{\"system\": \"...\", \"concept\": \"...\"}. " +
+        "\"system\" = technical configuration (style, lighting, camera, quality, format, constraints), keep existing system text. " +
+        "\"concept\" = what the user wants depicted, improved and vivid. Keep the input language.";
+
+    private static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)
+    {
+        var json = content.Trim();
+        if (json.StartsWith("```"))
+            json = json.Trim('`').Trim();
+        if (json.StartsWith("json", StringComparison.OrdinalIgnoreCase))
+            json = json[4..].Trim();
+
+        try
+        {
+            using var parsed = JsonDocument.Parse(json);
+            var root = parsed.RootElement;
+            var system = root.TryGetProperty("system", out var s) && s.ValueKind == JsonValueKind.String
+                ? s.GetString()!.Trim()
+                : fallbackSystem.Trim();
+            var concept = root.TryGetProperty("concept", out var c) && c.ValueKind == JsonValueKind.String
+                ? c.GetString()!.Trim()
+                : "";
+            return new PromptParts(system, concept);
+        }
+        catch (JsonException)
+        {
+            return new PromptParts(fallbackSystem.Trim(), content.Trim().Trim('"'));
+        }
+    }
+
 
     public async Task<ImageResult> GenerateAsync(string model, string prompt, string size, ImageOptions? options = null,
                                             CancellationToken ct = default)

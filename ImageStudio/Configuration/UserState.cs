@@ -15,6 +15,8 @@ public sealed class UserState
     // Ostatnio wpisane prompty (przywracane po starcie); zestawy zapisane osobno jako Preset
     public string? GeneratePrompt { get; set; }
     public string? EditPrompt { get; set; }
+    public string? GenerateSystemPrompt { get; set; }
+    public string? EditSystemPrompt { get; set; }
     public string? GenerationModel { get; set; }
     public string? EditModel { get; set; }
     public string? EnhancerModel { get; set; }

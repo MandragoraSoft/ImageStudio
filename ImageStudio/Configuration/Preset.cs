@@ -15,7 +15,9 @@ public sealed class Preset
     public string Kind { get; set; } = "generate";
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
+    // Koncept (treść wskazana przez użytkownika) i konfiguracja (prompt systemowy) osobno
     public string Prompt { get; set; } = "";
+    public string SystemPrompt { get; set; } = "";
     public string? Model { get; set; }
     public int Width { get; set; } = 1024;
     public int Height { get; set; } = 1024;

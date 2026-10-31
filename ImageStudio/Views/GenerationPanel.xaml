@@ -4,7 +4,14 @@
              xmlns:views="clr-namespace:ImageStudio.Views">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <TextBlock Text="Prompt" Style="{StaticResource SectionHeader}"/>
+            <Expander Header="Konfiguracja (prompt systemowy: styl, technika, format)" IsExpanded="True">
+                <TextBox Text="{Binding GenerateSystemPrompt, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="70" Margin="0,4,0,0"
+                         VerticalScrollBarVisibility="Auto"
+                         ToolTip="Część techniczna. AI wypełnia ją automatycznie przy ulepszaniu."/>
+            </Expander>
+
+            <TextBlock Text="Koncept (co ma być na obrazie)" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding GeneratePrompt, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True" TextWrapping="Wrap" Height="110"
                      VerticalScrollBarVisibility="Auto"/>

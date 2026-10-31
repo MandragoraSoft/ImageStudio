@@ -15,8 +15,8 @@ public sealed partial class MainViewModel : ObservableObject
 {
     public const string AllProviders = "Wszyscy";
     public const string DefaultInstruction =
-        "Rewrite the user's image generation prompt so it is more vivid and detailed. " +
-        "Keep the same language, subject and intent. Reply with the improved prompt only, without quotes or commentary.";
+        "You improve image generation prompts. Make the concept vivid and detailed, " +
+        "keep the same language, subject and intent.";
 
     private const string DefaultEnhancer = "venice/uncensored";
     private const string DefaultGeneration = "venice/z-image-turbo";
@@ -39,8 +39,8 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _ready;
 
     // Tekst sprzed ulepszenia; "Cofnij" przywraca go, dopóki nie zostanie użyty ponownie
-    private string? _undoGenerate;
-    private string? _undoEdit;
+    private PromptParts? _undoGenerate;
+    private PromptParts? _undoEdit;
 
     // Surowe bajty wyniku: zapis zachowuje oryginalny format (PNG/JPEG), bez ponownego kodowania
     private byte[]? _imageBytes;
@@ -53,6 +53,10 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EnhanceGeneratePromptCommand))]
     private string _generatePrompt = "";
+
+    // Część konfiguracyjna promptu (styl, technika); dołączana przed konceptem
+    [ObservableProperty]
+    private string _generateSystemPrompt = "";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
@@ -84,6 +88,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(EnhanceEditPromptCommand))]
     private string _editPrompt = "";
+
+    [ObservableProperty]
+    private string _editSystemPrompt = "";
 
     // Adres obrazu referencyjnego do pobrania
     [ObservableProperty]
@@ -172,7 +179,9 @@ public sealed partial class MainViewModel : ObservableObject
         // Ostatnio wpisane prompty i wybory wracają po uruchomieniu
         _state = UserState.Load();
         GeneratePrompt = _state.GeneratePrompt ?? "";
+        GenerateSystemPrompt = _state.GenerateSystemPrompt ?? "";
         EditPrompt = _state.EditPrompt ?? "";
+        EditSystemPrompt = _state.EditSystemPrompt ?? "";
         EnhancerInstruction = string.IsNullOrWhiteSpace(_state.EnhancerInstruction) ? DefaultInstruction : _state.EnhancerInstruction;
         SeedText = _state.SeedText ?? "";
         NegativePrompt = _state.NegativePrompt ?? "";
@@ -219,6 +228,8 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedQualityChanged(string value) => OnPresetInputChanged();
     partial void OnGeneratePromptChanged(string value) => OnPresetInputChanged();
     partial void OnEditPromptChanged(string value) => OnPresetInputChanged();
+    partial void OnGenerateSystemPromptChanged(string value) => OnPresetInputChanged();
+    partial void OnEditSystemPromptChanged(string value) => OnPresetInputChanged();
 
     partial void OnSelectedEnhancerModelChanged(string? value)
     {
@@ -371,7 +382,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (!_ready) return;
 
         _state.GeneratePrompt = GeneratePrompt;
+        _state.GenerateSystemPrompt = GenerateSystemPrompt;
         _state.EditPrompt = EditPrompt;
+        _state.EditSystemPrompt = EditSystemPrompt;
         _state.GenerationModel = SelectedModel?.Id ?? _state.GenerationModel;
         _state.EditModel = SelectedEditModel?.Id ?? _state.EditModel;
         _state.EnhancerModel = SelectedEnhancerModel ?? _state.EnhancerModel;
@@ -456,6 +469,7 @@ public sealed partial class MainViewModel : ObservableObject
         Description = draft.Description,
         Kind = ActiveTab == 1 ? "edit" : "generate",
         Prompt = CurrentPromptForTab(),
+        SystemPrompt = ActiveTab == 1 ? EditSystemPrompt : GenerateSystemPrompt,
         Model = ActiveTab == 1 ? SelectedEditModel?.Id : SelectedModel?.Id,
         Width = Width,
         Height = Height,
@@ -474,11 +488,13 @@ public sealed partial class MainViewModel : ObservableObject
         if (isEdit)
         {
             EditPrompt = preset.Prompt;
+            EditSystemPrompt = preset.SystemPrompt;
             SelectedEditModel = EditModels.FirstOrDefault(m => m.Id == preset.Model) ?? SelectedEditModel;
         }
         else
         {
             GeneratePrompt = preset.Prompt;
+            GenerateSystemPrompt = preset.SystemPrompt;
             SelectedModel = Models.FirstOrDefault(m => m.Id == preset.Model) ?? SelectedModel;
             SeedText = preset.SeedText ?? "";
             NegativePrompt = preset.NegativePrompt ?? "";
@@ -688,15 +704,17 @@ public sealed partial class MainViewModel : ObservableObject
     // --- Ulepszanie promptu ---
 
     [RelayCommand(CanExecute = nameof(CanEnhanceGenerate))]
-    private Task EnhanceGeneratePromptAsync() => EnhancePromptAsync(GeneratePrompt, v => _undoGenerate = v, v => GeneratePrompt = v);
+    private Task EnhanceGeneratePromptAsync() => EnhancePromptAsync(GenerateSystemPrompt, GeneratePrompt,
+        v => _undoGenerate = v, v => ApplyParts(v, s => GenerateSystemPrompt = s, c => GeneratePrompt = c));
 
     [RelayCommand(CanExecute = nameof(CanEnhanceEdit))]
-    private Task EnhanceEditPromptAsync() => EnhancePromptAsync(EditPrompt, v => _undoEdit = v, v => EditPrompt = v);
+    private Task EnhanceEditPromptAsync() => EnhancePromptAsync(EditSystemPrompt, EditPrompt,
+        v => _undoEdit = v, v => ApplyParts(v, s => EditSystemPrompt = s, c => EditPrompt = c));
 
     [RelayCommand(CanExecute = nameof(CanUndoGenerate))]
     private void UndoEnhanceGeneratePrompt()
     {
-        GeneratePrompt = _undoGenerate!;
+        ApplyParts(_undoGenerate!, s => GenerateSystemPrompt = s, c => GeneratePrompt = c);
         _undoGenerate = null;
         UndoEnhanceGeneratePromptCommand.NotifyCanExecuteChanged();
     }
@@ -704,23 +722,24 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanUndoEdit))]
     private void UndoEnhanceEditPrompt()
     {
-        EditPrompt = _undoEdit!;
+        ApplyParts(_undoEdit!, s => EditSystemPrompt = s, c => EditPrompt = c);
         _undoEdit = null;
         UndoEnhanceEditPromptCommand.NotifyCanExecuteChanged();
     }
 
     // Ulepszony tekst zastępuje pole; oryginał zostaje do cofnięcia
-    private async Task EnhancePromptAsync(string prompt, Action<string> keepOriginal, Action<string> apply)
+    // AI rozdziela tekst na konfigurację (system) i koncept, a koncept ulepsza; oryginał zostaje do cofnięcia
+    private async Task EnhancePromptAsync(string system, string concept, Action<PromptParts> keepOriginal, Action<PromptParts> apply)
     {
         IsBusy = true;
-        Status = "Ulepszanie promptu...";
+        Status = "Rozdzielanie i ulepszanie promptu...";
         try
         {
             var instruction = string.IsNullOrWhiteSpace(EnhancerInstruction) ? DefaultInstruction : EnhancerInstruction;
-            var improved = await _service.EnhancePromptAsync(SelectedEnhancerModel!, instruction, prompt, EnhancerParameterValues());
-            keepOriginal(prompt);
-            apply(improved);
-            Status = $"Prompt ulepszony ({SelectedEnhancerModel})";
+            var parts = await _service.EnhancePromptAsync(SelectedEnhancerModel!, instruction, system, concept, EnhancerParameterValues());
+            keepOriginal(new PromptParts(system, concept));
+            apply(parts);
+            Status = $"Prompt rozdzielony i ulepszony ({SelectedEnhancerModel}): konfiguracja + koncept";
         }
         catch (Exception ex)
         {
@@ -734,14 +753,25 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    // Prompt wysyłany do modelu: najpierw konfiguracja, potem koncept
+    private static string Compose(string system, string concept) =>
+        string.IsNullOrWhiteSpace(system) ? concept.Trim() : $"{system.Trim()}\n\n{concept.Trim()}";
+
+    private static void ApplyParts(PromptParts parts, Action<string> setSystem, Action<string> setConcept)
+    {
+        setSystem(parts.System);
+        setConcept(parts.Concept);
+    }
+
     // --- Komendy generowania / zapisu ---
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
     private Task GenerateAsync()
     {
         SaveState();
-        return RunAsync(() => _service.GenerateAsync(SelectedModel!.Id, GeneratePrompt, Size, CurrentImageOptions()),
-                        GeneratePrompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PriceNow);
+        var prompt = Compose(GenerateSystemPrompt, GeneratePrompt);
+        return RunAsync(() => _service.GenerateAsync(SelectedModel!.Id, prompt, Size, CurrentImageOptions()),
+                        prompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PriceNow);
     }
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
@@ -750,10 +780,11 @@ public sealed partial class MainViewModel : ObservableObject
         SaveState();
         return RunAsync(async () =>
         {
-            var edited = await _service.EditAsync(SelectedEditModel!.Id, EditPrompt, References.Select(r => r.Path).ToList());
+            var edited = await _service.EditAsync(SelectedEditModel!.Id, Compose(EditSystemPrompt, EditPrompt),
+                                                  References.Select(r => r.Path).ToList());
             // Endpoint edycji nie respektuje rozmiaru, więc wynik dopasowujemy do wybranych proporcji lokalnie
             return edited with { Bytes = ImageFitter.FitTo(edited.Bytes, Width, Height) };
-        }, EditPrompt, SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PriceNow);
+        }, Compose(EditSystemPrompt, EditPrompt), SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PriceNow);
     }
 
     // Seed i negative prompt tylko gdy podane; jakość "auto" = nie wysyłamy

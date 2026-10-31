@@ -41,7 +41,14 @@
                 </StackPanel>
             </Expander>
 
-            <TextBlock Text="Prompt edycji" Style="{StaticResource SectionHeader}"/>
+            <Expander Header="Konfiguracja (prompt systemowy: styl, technika, format)" IsExpanded="True">
+                <TextBox Text="{Binding EditSystemPrompt, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="70" Margin="0,4,0,0"
+                         VerticalScrollBarVisibility="Auto"
+                         ToolTip="Część techniczna. AI wypełnia ją automatycznie przy ulepszaniu."/>
+            </Expander>
+
+            <TextBlock Text="Koncept edycji (co ma się zmienić)" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding EditPrompt, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True" TextWrapping="Wrap" Height="90"
                      VerticalScrollBarVisibility="Auto"/>
