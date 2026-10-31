@@ -1,0 +1,31 @@
+<UserControl x:Class="ImageStudio.Views.SizePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Text="Proporcje wyjścia" Style="{StaticResource SectionHeader}"/>
+        <WrapPanel Margin="0,0,0,6">
+            <Button Content="1:1"  Command="{Binding SetAspectCommand}" CommandParameter="1:1"  Margin="0,0,6,6"/>
+            <Button Content="4:3"  Command="{Binding SetAspectCommand}" CommandParameter="4:3"  Margin="0,0,6,6"/>
+            <Button Content="3:2"  Command="{Binding SetAspectCommand}" CommandParameter="3:2"  Margin="0,0,6,6"/>
+            <Button Content="16:9" Command="{Binding SetAspectCommand}" CommandParameter="16:9" Margin="0,0,6,6"/>
+            <Button Content="9:16" Command="{Binding SetAspectCommand}" CommandParameter="9:16" Margin="0,0,6,6"/>
+            <Button Content="Z obrazu" Command="{Binding ApplySourceAspectCommand}" Margin="0,0,6,6"/>
+        </WrapPanel>
+
+        <Grid Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Szer." VerticalAlignment="Center" Margin="0,0,6,0" Style="{StaticResource MutedTextBlock}"/>
+            <TextBox Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Grid.Column="2" Text="Wys." VerticalAlignment="Center" Margin="10,0,6,0" Style="{StaticResource MutedTextBlock}"/>
+            <TextBox Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}"/>
+        </Grid>
+
+        <CheckBox Content="Zachowaj proporcje (blokada W/H)" IsChecked="{Binding KeepAspect}" Margin="0,0,0,4"/>
+        <TextBlock Text="{Binding Size, StringFormat='Rozmiar wysyłany: {0}'}" Style="{StaticResource MutedTextBlock}"/>
+    </StackPanel>
+</UserControl>

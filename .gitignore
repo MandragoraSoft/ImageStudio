@@ -1,0 +1,11 @@
+# Sekrety: klucz API użytkownika
+.env
+
+# Artefakty buildu
+bin/
+obj/
+.vs/
+*.user
+
+# Lokalny obraz testowy (dane użytkownika)
+/747614082_18057541964770098_7004108407124322667_n.jpg

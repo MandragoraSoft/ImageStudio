@@ -1,0 +1,61 @@
+<Window x:Class="ImageStudio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:ImageStudio.Views"
+        Title="ImageStudio" Height="800" Width="1220" MinHeight="560" MinWidth="860">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="390"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- INPUT: zakładki z opcjami, metryczka modelu pod nimi -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TabControl Grid.Row="0" SelectedIndex="{Binding ActiveTab}">
+                    <TabItem Header="Generowanie">
+                        <views:GenerationPanel/>
+                    </TabItem>
+                    <TabItem Header="Edycja">
+                        <views:EditPanel/>
+                    </TabItem>
+                </TabControl>
+
+                <views:ModelMetricsPanel Grid.Row="1" Margin="0,8,0,0"/>
+            </Grid>
+
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext" Background="{StaticResource BorderSoftBrush}"/>
+
+            <!-- OUTPUT: wynik z zachowaniem proporcji -->
+            <views:OutputPanel Grid.Column="2"/>
+        </Grid>
+
+        <!-- Pasek stanu -->
+        <Grid Grid.Row="1" Margin="12,0,12,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="200"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis"
+                       Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Column="1" IsIndeterminate="True" Height="6"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+        </Grid>
+    </Grid>
+</Window>
