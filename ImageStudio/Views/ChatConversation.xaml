@@ -62,6 +62,12 @@
                 <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" Padding="12">
                     <ItemsControl ItemsSource="{Binding Messages}"/>
                 </ScrollViewer>
+                <!-- Znacznik sesji incognito: rozmowa nie jest zapisywana -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="8,3" CornerRadius="10" IsHitTestVisible="False"
+                        Background="{DynamicResource AccentSoftBrush}"
+                        Visibility="{Binding IsIncognito, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Incognito: bez zapisu" FontSize="11"/>
+                </Border>
                 <TextBlock Text="Napisz wiadomość poniżej, aby zacząć rozmowę. Obrazy możesz dodać przyciskiem, wkleić (Ctrl+V) albo przeciągnąć na panel."
                            TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
@@ -113,8 +119,22 @@
                         <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding SendCommand}"/>
                     </TextBox.InputBindings>
                 </TextBox>
+                <!-- W trakcie odpowiedzi "Wyślij" ustępuje miejsca "Stop" (przerywa żądanie; napłynięty tekst zostaje) -->
                 <Button Grid.Column="1" Content="Wyślij" Width="90" Margin="8,0,0,0" VerticalAlignment="Stretch"
-                        Command="{Binding SendCommand}" ToolTip="Ctrl+Enter"/>
+                        Command="{Binding SendCommand}" ToolTip="Ctrl+Enter">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSending}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Grid.Column="1" Content="Stop" Width="90" Margin="8,0,0,0" VerticalAlignment="Stretch"
+                        Command="{Binding StopCommand}" Visibility="{Binding IsSending, Converter={StaticResource BoolToVis}}"
+                        ToolTip="Przerywa odpowiedź modelu"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">

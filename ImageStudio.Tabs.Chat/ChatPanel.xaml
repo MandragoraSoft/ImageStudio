@@ -29,11 +29,33 @@
                      AcceptsReturn="True" TextWrapping="Wrap" Height="120" VerticalScrollBarVisibility="Auto"
                      ToolTip="Wysyłana na początku każdej rozmowy, np. rola lub styl odpowiedzi"/>
 
-            <Button Content="Nowa rozmowa" Margin="0,12,0,0" Command="{Binding NewChatCommand}"/>
+            <!-- Sesje: zapisywane na dysku po każdej odpowiedzi; incognito nie jest zapisywana -->
+            <TextBlock Text="Sesje" Style="{StaticResource SectionHeader}" Margin="0,12,0,4"/>
+            <TextBlock Text="{Binding SessionLabel}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+            <UniformGrid Columns="2" Margin="0,6,0,0">
+                <Button Content="Nowa sesja" Margin="0,0,4,0" Command="{Binding NewChatCommand}"
+                        ToolTip="Zaczyna nową rozmowę; poprzednia zostaje zapisana"/>
+                <Button Content="Incognito" Command="{Binding NewIncognitoChatCommand}"
+                        ToolTip="Nowa rozmowa bez zapisu: nic z niej nie trafia na dysk"/>
+            </UniformGrid>
+            <ListBox ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Height="150" Margin="0,6,0,0"
+                     IsEnabled="{Binding CanChangeSession}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding UpdatedLabel}" Margin="8,0,0,0"
+                                       Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <Button Content="Usuń sesję" Margin="0,6,0,0" Command="{Binding DeleteSessionCommand}"
+                    Style="{StaticResource SecondaryButton}" ToolTip="Usuwa zaznaczoną sesję z dysku"/>
 
             <local:ToolsPanel DataContext="{Binding Tools}"/>
 
-            <TextBlock Text="Historia rozmowy jest tylko w pamięci i znika po zamknięciu aplikacji. Ctrl+Enter wysyła wiadomość."
+            <TextBlock Text="Sesje są zapisywane po każdej odpowiedzi; sesja incognito nie jest zapisywana i znika po zamknięciu. Ctrl+Enter wysyła wiadomość."
                        TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,12,0,0"/>
         </StackPanel>
     </ScrollViewer>

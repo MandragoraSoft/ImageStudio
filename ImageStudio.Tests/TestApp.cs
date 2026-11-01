@@ -27,6 +27,25 @@ internal sealed class MemoryGalleryStore : IGalleryStore
     }
 }
 
+internal sealed class MemoryChatSessionStore : IChatSessionStore
+{
+    public Dictionary<string, ChatSessionData> Sessions { get; } = [];
+    public int SaveCalls { get; private set; }
+
+    public IReadOnlyList<ChatSessionInfo> List() =>
+        Sessions.Values.OrderByDescending(s => s.UpdatedUtc).Select(s => new ChatSessionInfo(s.Id, s.Title, s.UpdatedUtc)).ToList();
+
+    public ChatSessionData? Load(string id) => Sessions.GetValueOrDefault(id);
+
+    public void Save(ChatSessionData session)
+    {
+        SaveCalls++;
+        Sessions[session.Id] = session;
+    }
+
+    public void Delete(string id) => Sessions.Remove(id);
+}
+
 internal sealed class MemoryPresetStore : IPresetStore
 {
     public List<Preset> Presets { get; } = [];
@@ -121,6 +140,7 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<IProviderFactory>(sp => new FakeProviderFactory(sp.GetRequiredService<FakeProvider>()));
         services.AddSingleton<IUserStateStore, MemoryUserStateStore>();
         services.AddSingleton<IGalleryStore, MemoryGalleryStore>();
+        services.AddSingleton<IChatSessionStore, MemoryChatSessionStore>();
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
         services.AddSingleton<ISecretStore, MemorySecretStore>();
         services.AddSingleton<IWindowStateStore, MemoryWindowStateStore>();
@@ -145,6 +165,7 @@ internal sealed class TestApp : IDisposable
     public MainViewModel Vm => Get<MainViewModel>();
     public FakeProvider Provider => Get<FakeProvider>();
     public FakeDialogs Dialogs => Get<FakeDialogs>();
+    public MemoryChatSessionStore ChatSessions => (MemoryChatSessionStore)Get<IChatSessionStore>();
     public MemoryPresetStore Presets => (MemoryPresetStore)Get<IPresetStore>();
     public MemoryUserStateStore State => (MemoryUserStateStore)Get<IUserStateStore>();
     public MemorySecretStore Secrets => (MemorySecretStore)Get<ISecretStore>();

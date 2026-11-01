@@ -38,6 +38,15 @@ public interface ISettingsStore
               string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true);
 }
 
+// Zapisane sesje czatu (sesja incognito nigdy tu nie trafia)
+public interface IChatSessionStore
+{
+    IReadOnlyList<ChatSessionInfo> List();
+    ChatSessionData? Load(string id);
+    void Save(ChatSessionData session);
+    void Delete(string id);
+}
+
 public interface IWindowStateStore
 {
     WindowRecord? GetWindow(string key);

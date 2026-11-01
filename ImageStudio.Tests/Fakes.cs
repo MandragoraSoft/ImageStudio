@@ -24,17 +24,21 @@ internal class FakeProvider : IAiProvider
     public string Id => "fake";
     public string DisplayName => "Fake";
 
-    public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
-                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
-                                     ChatOptions? options = null)
+    // Opóźnia odpowiedź do chwili, gdy test ją zwolni albo anuluje (Stop)
+    public Func<CancellationToken, Task>? Gate { get; set; }
+
+    public async Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                           IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
+                                           ChatOptions? options = null)
     {
+        if (Gate is { } gate) await gate(ct);
         LastOptions = options;
         ChatCalls++;
         LastModel = model;
         LastTools = tools;
         LastMessages.Clear();
         LastMessages.AddRange(messages);
-        return Task.FromResult(OnReply?.Invoke(messages) ?? new ChatReply(OnChat(model, messages), []));
+        return OnReply?.Invoke(messages) ?? new ChatReply(OnChat(model, messages), []);
     }
 
     // Katalog dla testów przeładowania; null = dana część "nie jest obsługiwana" (jak dotąd)

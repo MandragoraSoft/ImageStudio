@@ -118,7 +118,7 @@ public sealed partial class MainViewModel : ObservableObject
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
-                         IActivityTracker activity)
+                         IActivityTracker activity, IChatSessionStore chatSessions)
     {
         _provider = provider;
         _providers = providers;
@@ -158,7 +158,7 @@ public sealed partial class MainViewModel : ObservableObject
                                                       () => _settings.MaxSide),
                                  id => _chatModels.GetValueOrDefault(id),
                                  _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
-                                 activity, ChatModelOptions, () => _settings.UseStreaming);
+                                 activity, ChatModelOptions, () => _settings.UseStreaming, chatSessions);
         Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)

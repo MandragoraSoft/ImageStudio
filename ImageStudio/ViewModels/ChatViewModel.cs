@@ -5,6 +5,7 @@ using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ImageStudio.Configuration;
 using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
@@ -28,6 +29,8 @@ public sealed partial class ChatViewModel : ObservableObject
     private readonly Func<string, ChatModelInfo?>? _modelInfo;
     private readonly IActivityTracker? _activity;
     private readonly Func<bool>? _useStreaming;
+    private readonly IChatSessionStore? _sessionStore;
+    private CancellationTokenSource? _cts;
 
     // Treść ostatniej wiadomości zmieniła się w trakcie strumienia (widok przewija rozmowę na dół)
     public event Action? MessageUpdated;
@@ -40,9 +43,11 @@ public sealed partial class ChatViewModel : ObservableObject
                          ChatImageSupport? images = null, Func<string, ChatModelInfo?>? modelInfo = null,
                          bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
                          IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null,
-                         Func<bool>? useStreaming = null)
+                         Func<bool>? useStreaming = null, IChatSessionStore? sessionStore = null)
     {
         _useStreaming = useStreaming;
+        _sessionStore = sessionStore;
+        LoadSessionList();
         ModelOptions = modelOptions ?? [];
         ModelOptionsView = CollectionViewSource.GetDefaultView(ModelOptions);
         ModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedModelOption));
@@ -123,7 +128,9 @@ public sealed partial class ChatViewModel : ObservableObject
     private string _input = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(NewChatCommand), nameof(AttachImagesCommand), nameof(PasteImageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(NewChatCommand), nameof(NewIncognitoChatCommand), nameof(AttachImagesCommand),
+                                nameof(PasteImageCommand), nameof(StopCommand), nameof(DeleteSessionCommand))]
+    [NotifyPropertyChangedFor(nameof(CanChangeSession))]
     private bool _isSending;
 
     // Ostrzeżenie, gdy dołączono obraz, a katalog mówi, że wybrany model obrazów nie przyjmuje
@@ -149,6 +156,8 @@ public sealed partial class ChatViewModel : ObservableObject
         IsSending = true;
         _report("Model odpowiada...", false);
         ChatMessage? live = null;
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
         try
         {
             var definitions = Tools?.Tools ?? [];
@@ -167,12 +176,12 @@ public sealed partial class ChatViewModel : ObservableObject
                         if (delta.Content is { Length: > 0 }) message.Content += delta.Content;
                         if (delta.Reasoning is { Length: > 0 }) message.Reasoning = (message.Reasoning ?? "") + delta.Reasoning;
                         MessageUpdated?.Invoke();
-                    }, options: BuildOptions());
+                    }, ct, BuildOptions());
                 }
                 else
                 {
                     live = null;
-                    reply = await _provider().ChatAsync(SelectedModel!, history, tools, options: BuildOptions());
+                    reply = await _provider().ChatAsync(SelectedModel!, history, tools, ct, BuildOptions());
                 }
 
                 if (reply.ToolCalls.Count == 0)
@@ -191,7 +200,7 @@ public sealed partial class ChatViewModel : ObservableObject
 
                 Complete(live, new ChatMessage("assistant", reply.Content, reply.ToolCalls), reply);
                 foreach (var call in reply.ToolCalls)
-                    Messages.Add(new ChatMessage("tool", await RunToolAsync(call), ToolCallId: call.Id, ToolName: call.Name));
+                    Messages.Add(new ChatMessage("tool", await RunToolAsync(call, ct), ToolCallId: call.Id, ToolName: call.Name));
                 _report("Model odpowiada...", false);
             }
 
@@ -199,6 +208,8 @@ public sealed partial class ChatViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            var stopped = ex is OperationCanceledException;
+
             // Pusta wiadomość ze strumienia, który nic nie dostarczył, nie zostaje w rozmowie
             if (live is not null && live.Content.Length == 0 && !live.HasToolCalls) Messages.Remove(live);
 
@@ -210,13 +221,22 @@ public sealed partial class ChatViewModel : ObservableObject
                 foreach (var image in images) Attachments.Add(image);
             }
 
-            _report($"Błąd czatu: {ex.Message}", true);
+            // Stop zostawia tekst, który zdążył napłynąć; to nie jest błąd
+            if (stopped) _report("Zatrzymano odpowiedź", false);
+            else _report($"Błąd czatu: {ex.Message}", true);
         }
         finally
         {
+            _cts?.Dispose();
+            _cts = null;
             IsSending = false;
+            SaveSession();
         }
     }
+
+    // Przerywa trwającą odpowiedź (żądanie HTTP i narzędzia); tekst, który już napłynął, zostaje
+    [RelayCommand(CanExecute = nameof(IsSending))]
+    private void Stop() => _cts?.Cancel();
 
     // Zamyka odpowiedź: w trybie strumieniowym uzupełnia już widoczną wiadomość pełnymi danymi, inaczej dodaje nową
     private void Complete(ChatMessage? live, ChatMessage fresh, ChatReply reply)
@@ -239,7 +259,7 @@ public sealed partial class ChatViewModel : ObservableObject
     }
 
     // Wynik zawsze wraca do modelu jako tekst: odmowa i błąd narzędzia też, żeby mógł zareagować
-    private async Task<string> RunToolAsync(ToolCall call)
+    private async Task<string> RunToolAsync(ToolCall call, CancellationToken ct)
     {
         if (Tools is null) return "Narzędzia są wyłączone.";
         if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false)) return "Użytkownik odrzucił wywołanie narzędzia.";
@@ -249,7 +269,7 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             // Wywołanie narzędzia (serwer MCP) to też operacja sieciowa: spinner w stopce
             using var _ = _activity?.Begin($"Narzędzie {call.Name}");
-            return await Tools.CallAsync(call);
+            return await Tools.CallAsync(call, ct);
         }
         catch (Exception ex)
         {
@@ -326,8 +346,171 @@ public sealed partial class ChatViewModel : ObservableObject
         }
     }
 
+    // ---- Sesje ----
+    // Każda rozmowa to sesja zapisywana po każdej odpowiedzi. Sesja incognito (nowa przyciskiem "Incognito") nie jest
+    // zapisywana nigdzie i znika po zamknięciu albo przejściu do innej sesji.
+
+    private string _sessionId = Guid.NewGuid().ToString("N");
+    private DateTime _sessionCreated = DateTime.UtcNow;
+    private string? _sessionTitle;
+    private bool _switching;
+
+    public ObservableCollection<ChatSessionInfo> Sessions { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DeleteSessionCommand))]
+    private ChatSessionInfo? _selectedSession;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SessionLabel))]
+    private bool _isIncognito;
+
+    public bool CanChangeSession => !IsSending;
+
+    public string SessionLabel => IsIncognito
+        ? "Sesja incognito: rozmowa nie jest zapisywana"
+        : _sessionTitle is { Length: > 0 } title ? title : "Nowa sesja";
+
+    partial void OnSelectedSessionChanged(ChatSessionInfo? value)
+    {
+        if (!_switching && value is not null) OpenSession(value);
+    }
+
+    private void LoadSessionList()
+    {
+        Sessions.Clear();
+        if (_sessionStore is null) return;
+        foreach (var info in _sessionStore.List()) Sessions.Add(info);
+    }
+
+    private void StartSession(bool incognito)
+    {
+        _switching = true;
+        try
+        {
+            Messages.Clear();
+            Attachments.Clear();
+            _sessionId = Guid.NewGuid().ToString("N");
+            _sessionCreated = DateTime.UtcNow;
+            _sessionTitle = null;
+            IsIncognito = incognito;
+            SelectedSession = null;
+        }
+        finally
+        {
+            _switching = false;
+        }
+
+        OnPropertyChanged(nameof(SessionLabel));
+    }
+
+    private void OpenSession(ChatSessionInfo info)
+    {
+        var data = _sessionStore?.Load(info.Id);
+        if (data is null)
+        {
+            // Plik zniknął lub jest uszkodzony: wpis znika z listy
+            Sessions.Remove(info);
+            return;
+        }
+
+        _switching = true;
+        try
+        {
+            Messages.Clear();
+            Attachments.Clear();
+            foreach (var message in data.Messages) Messages.Add(FromData(message));
+            _sessionId = data.Id;
+            _sessionCreated = data.CreatedUtc;
+            _sessionTitle = data.Title;
+            IsIncognito = false;
+            if (data.Model is { } model && Models.Contains(model)) SelectedModel = model;
+        }
+        finally
+        {
+            _switching = false;
+        }
+
+        OnPropertyChanged(nameof(SessionLabel));
+        MessageUpdated?.Invoke();
+    }
+
+    // Zapis po każdej odpowiedzi; puste rozmowy i incognito nie są zapisywane
+    private void SaveSession()
+    {
+        if (IsIncognito || _sessionStore is null || Messages.Count == 0) return;
+
+        _sessionTitle ??= TitleFrom(Messages.FirstOrDefault(m => m.Role == "user")?.Content);
+        var data = new ChatSessionData
+        {
+            Id = _sessionId,
+            Title = _sessionTitle,
+            CreatedUtc = _sessionCreated,
+            UpdatedUtc = DateTime.UtcNow,
+            Model = SelectedModel,
+            Messages = Messages.Select(ToData).ToList(),
+        };
+        _sessionStore.Save(data);
+
+        var info = new ChatSessionInfo(data.Id, data.Title, data.UpdatedUtc);
+        _switching = true;
+        try
+        {
+            var existing = Sessions.FirstOrDefault(s => s.Id == info.Id);
+            if (existing is not null) Sessions.Remove(existing);
+            Sessions.Insert(0, info);
+            SelectedSession = info;
+        }
+        finally
+        {
+            _switching = false;
+        }
+
+        OnPropertyChanged(nameof(SessionLabel));
+    }
+
+    private static string TitleFrom(string? firstQuestion)
+    {
+        var text = string.IsNullOrWhiteSpace(firstQuestion) ? "Rozmowa z obrazem" : string.Join(' ', firstQuestion.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length <= 48 ? text : text[..45] + "...";
+    }
+
+    private static ChatMessageData ToData(ChatMessage m) => new()
+    {
+        Role = m.Role,
+        Content = m.Content,
+        Reasoning = m.Reasoning,
+        ToolCalls = m.ToolCalls?.ToList(),
+        ToolCallId = m.ToolCallId,
+        ToolName = m.ToolName,
+        Usage = m.Usage,
+        Images = m.Images?.Select(i => new ChatImageData(i.Mime, Convert.ToBase64String(i.Bytes))).ToList(),
+    };
+
+    private static ChatMessage FromData(ChatMessageData d) => new(d.Role, d.Content, d.ToolCalls, d.ToolCallId, d.ToolName,
+        d.Images?.Select(i => new ChatImage(Convert.FromBase64String(i.Base64), i.Mime)).ToList(), d.Reasoning, d.Usage);
+
+    // Nowa zapisywana sesja (poprzednia jest już zapisana po ostatniej odpowiedzi)
     [RelayCommand(CanExecute = nameof(CanNewChat))]
-    private void NewChat() => Messages.Clear();
+    private void NewChat() => StartSession(false);
+
+    // Nowa sesja incognito: nic z niej nie trafia na dysk
+    [RelayCommand(CanExecute = nameof(CanNewChat))]
+    private void NewIncognitoChat() => StartSession(true);
 
     private bool CanNewChat => !IsSending;
+
+    // Usuwa zaznaczoną sesję z dysku; jeśli to bieżąca rozmowa, zaczyna nową
+    [RelayCommand(CanExecute = nameof(CanDeleteSession))]
+    private void DeleteSession()
+    {
+        if (SelectedSession is not { } info) return;
+
+        _sessionStore?.Delete(info.Id);
+        Sessions.Remove(info);
+        if (info.Id == _sessionId) StartSession(false);
+        else SelectedSession = null;
+    }
+
+    private bool CanDeleteSession => !IsSending && SelectedSession is not null;
 }
