@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:svc="clr-namespace:ImageStudio.Services;assembly=ImageStudio.Providers.Core"
+             xmlns:local="clr-namespace:ImageStudio.Views"
              AllowDrop="True" PreviewDragOver="OnDragOver" PreviewDrop="OnDrop">
     <!-- Rozmowa i pole wpisywania z obrazami (DataContext = ChatViewModel); pliki można przeciągnąć na cały panel -->
     <UserControl.Resources>
@@ -33,9 +34,32 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <!-- TextBox tylko do odczytu, żeby dało się zaznaczać i kopiować fragmenty odpowiedzi -->
+                    <!-- Odpowiedź modelu jako Markdown (kod, listy, pogrubienia); tekst użytkownika i narzędzi zostaje surowy.
+                         Oba pola są tylko do odczytu, żeby dało się zaznaczać i kopiować fragmenty -->
+                    <local:MarkdownView Markdown="{Binding DisplayText, Mode=OneWay}">
+                        <local:MarkdownView.Style>
+                            <Style TargetType="local:MarkdownView">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAssistant}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </local:MarkdownView.Style>
+                    </local:MarkdownView>
                     <TextBox Text="{Binding DisplayText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
-                             BorderThickness="0" Padding="0" Background="Transparent"/>
+                             BorderThickness="0" Padding="0" Background="Transparent">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAssistant}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
                     <!-- Zużycie tokenów tego wywołania: wejście, wyjście i z cache -->
                     <TextBlock Text="{Binding UsageText}" FontSize="11" Margin="0,4,0,0" Style="{StaticResource MutedTextBlock}"
                                ToolTip="{loc:T chat.tokens.tip}"

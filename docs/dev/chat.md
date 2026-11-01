@@ -21,3 +21,7 @@ Każda rozmowa to sesja zapisywana po każdej odpowiedzi przez `IChatSessionStor
 ## Czat i narzędzia MCP
 
 `ChatViewModel` + `ToolsViewModel` jako klient narzędzi MCP (`McpToolHost`, konfiguracja w `McpConfig`). Osobno `McpAppServer` (lokalny serwer MCP) wystawia sterowanie aplikacją przez `IAppControl` / `AppControlTools`, implementowane przez `MainViewModel.AppControl`.
+
+## Markdown w odpowiedziach
+
+Odpowiedzi modelu (`ChatMessage.IsAssistant`) pokazuje `MarkdownView` (`RichTextBox` tylko do odczytu), a tekst użytkownika i narzędzi zostaje w zwykłym `TextBox`. `MarkdownRenderer` (Markdig) zamienia Markdown na `FlowDocument`: akapity, nagłówki, bloki kodu (Consolas, bez znaczników ```), listy, cytaty, tabele, listy zadań, pogrubienia, linki. Dokument budowany jest od nowa przy każdej zmianie tekstu (kawałki strumienia). Kolory idą przez `SetResourceReference` (motyw działa bez odświeżania), linki otwierają tylko `http(s)`, a obrazy z sieci nie są pobierane. Wyłączona lista (np. sesje w czasie odpowiedzi) nie może być biała: `ListBox` w `App.xaml` ma własny szablon, bo domyślny maluje stan wyłączony na biało.
