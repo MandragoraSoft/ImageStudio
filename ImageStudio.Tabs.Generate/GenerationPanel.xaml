@@ -5,19 +5,19 @@
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Button Content="{loc:T common.editPrompt}" Height="34" Command="{Binding EditGeneratePromptCommand}"
+            <!-- Układ każdej zakładki: Model, Prompt, Wejście, Parametry, Rozmiar, Akcja -->
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}"
+                               ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"/>
+
+            <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditGeneratePromptCommand}"
                     ToolTip="{loc:T common.editPrompt.tip}"/>
 
-            <UniformGrid Columns="2" Margin="0,4,0,0">
+            <UniformGrid Columns="2" Margin="0,4,0,8">
                 <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
                         Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
                 <Button Content="{loc:T common.presets}"
                         Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
             </UniformGrid>
-
-
-            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" Margin="0,4,0,0"
-                               ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"/>
 
             <Expander Header="{loc:T gen.imageParams}" Margin="0,0,0,6">
                 <StackPanel Margin="0,4,0,0">

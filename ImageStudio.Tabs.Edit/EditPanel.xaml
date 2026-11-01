@@ -5,8 +5,22 @@
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Expander Header="{loc:T edit.refs}" IsExpanded="True">
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}"
+                               ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
+
+            <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditEditPromptCommand}"
+                    ToolTip="{loc:T common.editPrompt.tip}"/>
+
+            <UniformGrid Columns="2" Margin="0,4,0,8">
+                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
+                        Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
+                <Button Content="{loc:T common.presets}"
+                        Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
+            </UniformGrid>
+
+            <Expander Margin="0,0,0,6" Header="{loc:T common.inputImages}" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
+                    <TextBlock Text="{loc:T edit.refs.note}" Style="{StaticResource MutedTextBlock}" Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Button Content="{loc:T common.add}" Width="90" Margin="0,0,6,0" Command="{Binding AddReferencesCommand}"/>
                         <Button Content="{loc:T common.clear}" Width="90" Margin="0,0,6,0" Command="{Binding ClearReferencesCommand}"/>
@@ -43,20 +57,6 @@
                     </Border>
                 </StackPanel>
             </Expander>
-
-            <Button Content="{loc:T common.editPrompt}" Height="34" Command="{Binding EditEditPromptCommand}"
-                    ToolTip="{loc:T common.editPrompt.tip}"/>
-
-            <UniformGrid Columns="2" Margin="0,4,0,0">
-                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
-                        Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
-                <Button Content="{loc:T common.presets}"
-                        Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
-            </UniformGrid>
-
-
-            <views:ModelPicker Header="{loc:T edit.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" Margin="0,4,0,0"
-                               ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
 
             <Expander Header="{loc:T common.sizeSection}" IsExpanded="True" Margin="0,0,0,6">
                 <StackPanel>

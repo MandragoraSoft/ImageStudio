@@ -15,13 +15,13 @@
         <StackPanel>
             <Expander Header="{loc:T voice.speech}" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
-                    <TextBox Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
-                             TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>
-
-                    <views:ModelPicker Header="{loc:T voice.speechModel}" HasFilters="True" ShowImageFilter="False"
+                    <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ShowImageFilter="False"
                                        FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                        ReloadCommand="{Binding ReloadModelsCommand}"
                                        ItemsSource="{Binding SpeechModelsView}" SelectedItem="{Binding SelectedSpeechModel}"/>
+
+                    <TextBox Margin="0,6,0,0" Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                             TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>
 
                     <TextBlock Text="{loc:T voice.voice}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}"/>
@@ -59,7 +59,12 @@
 
             <Expander Header="{loc:T voice.recognition}" IsExpanded="True" Margin="0,10,0,0">
                 <StackPanel Margin="0,4,0,0">
-                    <Button Content="{Binding RecordButtonText}" Height="34" Command="{Binding ToggleRecordingCommand}"/>
+                    <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ShowImageFilter="False"
+                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       ReloadCommand="{Binding ReloadModelsCommand}"
+                                       ItemsSource="{Binding TranscriptionModelsView}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
+
+                    <Button Content="{Binding RecordButtonText}" Height="34" Margin="0,6,0,0" Command="{Binding ToggleRecordingCommand}"/>
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding RecordLevel}" Height="6" Margin="0,6,0,0"
                                  Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"/>
                     <TextBlock Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"><Run Text="{loc:T voice.recordingFor}"/><Run Text="{Binding RecordSeconds, Mode=OneWay}"/><Run Text=" s"/></TextBlock>
@@ -74,11 +79,6 @@
                         <TextBlock Text="{Binding AudioFileName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                    ToolTip="{Binding AudioPath}"/>
                     </DockPanel>
-
-                    <views:ModelPicker Header="{loc:T voice.sttModel}" HasFilters="True" ShowImageFilter="False"
-                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
-                                       ReloadCommand="{Binding ReloadModelsCommand}"
-                                       ItemsSource="{Binding TranscriptionModelsView}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
 
                     <TextBlock Text="{loc:T voice.sttLanguage}" Style="{StaticResource SectionHeader}"/>
                     <TextBox Text="{Binding Language, UpdateSourceTrigger=PropertyChanged}"/>

@@ -8,7 +8,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <!-- Filtry (szukaj, dostawca, obraz na wejściu, preferowane) są wspólne z modelami obrazów i leżą w MainViewModel -->
-            <views:ModelPicker Header="{loc:T chat.model}" HasFilters="True"
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True"
                                FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                ItemsSource="{Binding ModelOptionsView}" SelectedItem="{Binding SelectedModelOption}"/>

@@ -21,6 +21,7 @@ Przejdź całą listę, nie tylko to, o co poproszono. Zakładka Głos pominęł
    - `ItemsSource` musi być `ICollectionView` z filtrem z `MainViewModel` (`FilterModel`, albo `FilterAudioModel` dla modeli bez wejścia obrazowego; wtedy też `ShowImageFilter="False"`).
    - Widok odświeżaj w `MainViewModel.RefreshFilters`, a modele uwzględnij w `RefreshOwners` (lista dostawców) i w `OpenModelBrowser` (+ rodzaj w `ModelBrowserViewModel.Kinds`).
    - Pilnuje tego test `Every_model_picker_in_the_main_window_tabs_has_filters`: nie omijaj go.
+2a. **Układ panelu jak w pozostałych zakładkach:** Model (`ModelPicker`, nagłówek `common.model`, pierwszy), Prompt, Wejście, Parametry, Rozmiar, Akcja (przycisk na końcu). Test: `TabLayoutTests`.
 3. **Teksty tylko przez tłumaczenia.** Tytuł zakładki (`Title => Loc.T("tab.<nazwa>")`), etykiety, dymki i komunikaty ViewModelu: klucze w obu słownikach (`Strings.pl.json`, `Strings.en.json`) i `{loc:T}` / `Loc.T`. Zasady w `docs/dev/localization.md`; test `LocalizationTests` złapie brakujący klucz, nieużywany klucz i różne parametry w PL i EN.
 4. **`ComboBox` z obiektami**: `ItemTemplate`, nigdy `DisplayMemberPath` (własny szablon ComboBox w `App.xaml` go ignoruje i pokazuje zapis rekordu).
 5. **Panel wyników w prawej kolumnie.** Zakładka z własnym panelem (jak Czat i Głos): dodaj flagę `IsXTab` w `MainViewModel.Generation` i wyklucz ją z `IsOutputTab` (obraz i metryczka modelu są tylko dla zakładek 0-2). Panel dodaj w `MainWindow.xaml` obok `VoiceResults`.
