@@ -18,7 +18,8 @@
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <CheckBox Content="Przyjmuje obraz" IsChecked="{Binding InputImageOnly}" Margin="0,0,16,0"/>
+                <CheckBox Content="Przyjmuje obraz" IsChecked="{Binding InputImageOnly}" Margin="0,0,16,0"
+                          Visibility="{Binding ShowImageFilter, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"/>
                 <CheckBox Content="Ukryj NSFW" IsChecked="{Binding HideNsfw}"/>
             </StackPanel>
 

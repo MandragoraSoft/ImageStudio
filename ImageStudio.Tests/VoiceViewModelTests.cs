@@ -36,8 +36,8 @@ public sealed class VoiceViewModelTests : IDisposable
 
     private static async Task<TestApp> LoadedAsync(TestApp app)
     {
+        // bez Task.Yield: widoki modeli (ICollectionView) wolno zmieniać tylko z wątku, na którym powstały
         await app.Vm.InitializeAsync();
-        await Task.Yield();
         return app;
     }
 

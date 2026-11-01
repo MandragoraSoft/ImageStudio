@@ -162,7 +162,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
-                                   () => SelectedEnhancerModel);
+                                   () => SelectedEnhancerModel, FilterAudioModel);
         Voice.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)
@@ -311,13 +311,19 @@ public sealed partial class MainViewModel : ObservableObject
         EditModelsView.Refresh();
         VideoModelsView.Refresh();
         ChatModelsView.Refresh();
+        Voice.RefreshFilters();
     }
 
-    private bool FilterModel(object item)
+    private bool FilterModel(object item) => Matches(item, imageFilter: true);
+
+    // Modele dźwięku: te same filtry, ale bez "Przyjmuje obraz" (nie mają wejścia obrazowego, więc ukryłoby je wszystkie)
+    private bool FilterAudioModel(object item) => Matches(item, imageFilter: false);
+
+    private bool Matches(object item, bool imageFilter)
     {
         if (item is not ModelOption m) return false;
         if (HideNsfw && m.Nsfw) return false;
-        if (InputImageOnly && !m.AcceptsImage) return false;
+        if (imageFilter && InputImageOnly && !m.AcceptsImage) return false;
         if (SelectedProvider != AllProviders && m.OwnedBy != SelectedProvider) return false;
         // Pusta lista preferowanych nie ukrywa wszystkiego: filtr działa dopiero po dodaniu pierwszego modelu
         if (PreferredOnly && _prefs.For(_provider.Id) is { Preferred.Count: > 0 } prefs && !prefs.Preferred.Contains(m.Id))

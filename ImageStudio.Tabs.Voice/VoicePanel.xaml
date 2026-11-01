@@ -22,8 +22,10 @@
                     <TextBox Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                              TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>
 
-                    <views:ModelPicker Header="Model mowy" ReloadCommand="{Binding ReloadModelsCommand}"
-                                       ItemsSource="{Binding SpeechModels}" SelectedItem="{Binding SelectedSpeechModel}"/>
+                    <views:ModelPicker Header="Model mowy" HasFilters="True" ShowImageFilter="False"
+                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       ReloadCommand="{Binding ReloadModelsCommand}"
+                                       ItemsSource="{Binding SpeechModelsView}" SelectedItem="{Binding SelectedSpeechModel}"/>
 
                     <TextBlock Text="Głos" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}"/>
@@ -74,8 +76,10 @@
                                    ToolTip="{Binding AudioPath}"/>
                     </DockPanel>
 
-                    <views:ModelPicker Header="Model rozpoznawania" ReloadCommand="{Binding ReloadModelsCommand}"
-                                       ItemsSource="{Binding TranscriptionModels}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
+                    <views:ModelPicker Header="Model rozpoznawania" HasFilters="True" ShowImageFilter="False"
+                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       ReloadCommand="{Binding ReloadModelsCommand}"
+                                       ItemsSource="{Binding TranscriptionModelsView}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
 
                     <TextBlock Text="Język (kod, np. pl; puste = automatycznie)" Style="{StaticResource SectionHeader}"/>
                     <TextBox Text="{Binding Language, UpdateSourceTrigger=PropertyChanged}"/>

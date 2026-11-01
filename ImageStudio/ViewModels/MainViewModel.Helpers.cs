@@ -27,7 +27,7 @@ public sealed partial class MainViewModel
     // Lista dostawców modeli do filtra: właściciele ze wszystkich list (obrazy, edycja, wideo, czat)
     private void RefreshOwners()
     {
-        var owners = Models.Concat(EditModels).Concat(VideoModels).Concat(ChatModelOptions)
+        var owners = Models.Concat(EditModels).Concat(VideoModels).Concat(ChatModelOptions).Concat(Voice.SpeechModels).Concat(Voice.TranscriptionModels)
             .Select(m => m.OwnedBy).OfType<string>().Distinct().OrderBy(o => o, StringComparer.OrdinalIgnoreCase).ToList();
         Providers.Clear();
         Providers.Add(AllProviders);

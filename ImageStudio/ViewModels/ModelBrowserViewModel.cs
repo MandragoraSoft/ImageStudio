@@ -62,7 +62,7 @@ public sealed partial class ModelBrowserViewModel : ObservableObject
 
     public const string All = "Wszystkie";
 
-    public IReadOnlyList<string> Kinds { get; } = [All, "generowanie", "edycja", "wideo"];
+    public IReadOnlyList<string> Kinds { get; } = [All, "generowanie", "edycja", "wideo", "czat", "mowa", "transkrypcja"];
     public ObservableCollection<string> Owners { get; } = [All];
 
     private bool Matches(object o) =>

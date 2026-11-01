@@ -1,7 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Globalization;
+using System.ComponentModel;
 using System.IO;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
@@ -67,8 +68,16 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     public VoiceViewModel(Func<IAiProvider> provider, IDialogService dialogs, IAudioPlayer player, IAudioRecorder recorder,
                           Action<string, bool> report, Action reload, string outputDir, UserState state,
-                          Func<string?>? textModel = null)
+                          Func<string?>? textModel = null, Func<object, bool>? modelFilter = null)
     {
+        SpeechModelsView = CollectionViewSource.GetDefaultView(SpeechModels);
+        TranscriptionModelsView = CollectionViewSource.GetDefaultView(TranscriptionModels);
+        if (modelFilter is not null)
+        {
+            SpeechModelsView.Filter = new Predicate<object>(modelFilter);
+            TranscriptionModelsView.Filter = new Predicate<object>(modelFilter);
+        }
+
         (_provider, _dialogs, _player, _recorder, _report, _reload, OutputDir) = (provider, dialogs, player, recorder, report, reload, outputDir);
         _textModel = textModel ?? (() => null);
         _savedSpeechModel = state.VoiceSpeechModel;
@@ -92,6 +101,16 @@ public sealed partial class VoiceViewModel : ObservableObject
     // --- Mowa z tekstu ---
 
     public ObservableCollection<ModelOption> SpeechModels { get; } = [];
+
+    // Listy z filtrami modeli (szukaj, dostawca, preferowane) wspólnymi z resztą aplikacji; ModelPicker pokazuje te widoki
+    public ICollectionView SpeechModelsView { get; }
+    public ICollectionView TranscriptionModelsView { get; }
+
+    public void RefreshFilters()
+    {
+        SpeechModelsView.Refresh();
+        TranscriptionModelsView.Refresh();
+    }
     public ObservableCollection<string> Voices { get; } = [];
     public IReadOnlyList<string> Formats { get; } = ["mp3", "wav"];
 

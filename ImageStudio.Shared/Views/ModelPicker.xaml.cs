@@ -16,6 +16,9 @@ public partial class ModelPicker : UserControl
         DependencyProperty.Register(nameof(Header), typeof(string), typeof(ModelPicker));
     public static readonly DependencyProperty HasFiltersProperty =
         DependencyProperty.Register(nameof(HasFilters), typeof(bool), typeof(ModelPicker));
+    public static readonly DependencyProperty ShowImageFilterProperty =
+        DependencyProperty.Register(nameof(ShowImageFilter), typeof(bool), typeof(ModelPicker),
+            new PropertyMetadata(true, (d, e) => ((ModelPicker)d).FilterBar.ShowImageFilter = (bool)e.NewValue));
     public static readonly DependencyProperty FiltersContextProperty =
         DependencyProperty.Register(nameof(FiltersContext), typeof(object), typeof(ModelPicker),
             new PropertyMetadata(null, (d, e) =>
@@ -34,6 +37,9 @@ public partial class ModelPicker : UserControl
     public string? Header { get => (string?)GetValue(HeaderProperty); set => SetValue(HeaderProperty, value); }
     // Pokazuje przycisk panelu filtrów (filtry działają na DataContext rodzica, czyli MainViewModel)
     public bool HasFilters { get => (bool)GetValue(HasFiltersProperty); set => SetValue(HasFiltersProperty, value); }
+
+    // Ukrywa w panelu filtrów pole "Przyjmuje obraz" (selektory modeli dźwięku)
+    public bool ShowImageFilter { get => (bool)GetValue(ShowImageFilterProperty); set => SetValue(ShowImageFilterProperty, value); }
 
     // Obiekt z właściwościami filtrów (SearchText, SelectedProvider, ...); domyślnie DataContext rodzica.
     // Panel czatu ma DataContext = ChatViewModel, więc filtry (wspólne z obrazami) podaje stąd MainViewModel
