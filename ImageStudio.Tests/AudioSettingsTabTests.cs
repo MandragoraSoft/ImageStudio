@@ -132,6 +132,22 @@ public sealed class AudioSettingsTabTests
             Collect(view!);
             Assert.Equal(2, combos.Count);
             Assert.Equal("Domyślne", ((AudioDevice)combos[0].SelectedItem).Name);
+            foreach (var combo in combos)
+            {
+                var shown = new List<string>();
+                void Texts(DependencyObject d)
+                {
+                    for (var i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+                    {
+                        var c = VisualTreeHelper.GetChild(d, i);
+                        if (c is System.Windows.Controls.TextBlock tb) shown.Add(tb.Text);
+                        Texts(c);
+                    }
+                }
+                Texts(combo);
+                Assert.Contains("Domyślne", shown);               // nazwa urządzenia w polu wyboru
+                Assert.DoesNotContain(shown, t => t.Contains("AudioDevice {"));  // nie zapis rekordu
+            }
             window.Close();
         });
     }

@@ -50,6 +50,13 @@ public sealed class VoiceWindowTests
             Assert.Same(vm.Voice, panel.DataContext);
             Assert.Equal(2, FindAll<ModelPicker>(panel).Count());
 
+            // listy mikrofonu i wyjścia pokazują nazwy urządzeń, nie zapis rekordu
+            foreach (var expander in FindAll<Expander>(panel)) expander.IsExpanded = true;
+            Flush(window.Dispatcher);
+            var texts = FindAll<TextBlock>(panel).Select(t => t.Text).ToList();
+            Assert.Contains("Mikrofon testowy", texts);
+            Assert.DoesNotContain(texts, t => t.Contains("AudioDevice {"));
+
             vm.ActiveTab = 0;
             Flush(window.Dispatcher);
             Assert.True(output.IsVisible);

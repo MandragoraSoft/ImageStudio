@@ -102,7 +102,7 @@ public sealed class NAudioPlayer : IAudioPlayer
 {
     public const int DefaultDevice = -1;
 
-    private WaveOutEvent? _output;
+    private WaveOut? _output;
     private MediaFoundationReader? _reader;
     private int _generation;
 
@@ -119,7 +119,7 @@ public sealed class NAudioPlayer : IAudioPlayer
         try
         {
             var reader = new MediaFoundationReader(path);
-            var output = new WaveOutEvent { DeviceNumber = OutputDevice };
+            var output = new WaveOut { DeviceNumber = OutputDevice };
             output.PlaybackStopped += (_, e) =>
             {
                 if (generation != _generation) return;  // zatrzymane przez nas (Stop albo nowe odtwarzanie)

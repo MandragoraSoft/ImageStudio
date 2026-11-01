@@ -3,10 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <!-- DataContext = VoiceViewModel. Wyniki (odtwarzanie, zapis) są w prawym panelu okna głównego -->
+    <UserControl.Resources>
+        <DataTemplate x:Key="AudioDeviceTemplate">
+            <TextBlock Text="{Binding Name}"/>
+        </DataTemplate>
+    </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <Expander Header="Wyjście dźwięku" IsExpanded="False" ToolTip="Urządzenie, na którym grają nagrania">
-                <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" DisplayMemberPath="Name" Margin="0,4,0,0"/>
+                <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}" Margin="0,4,0,0"/>
             </Expander>
 
             <Expander Header="Mowa z tekstu" IsExpanded="True" Margin="0,10,0,0">
@@ -49,7 +54,7 @@
                                Margin="0,4,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"/>
 
                     <TextBlock Text="Mikrofon" Style="{StaticResource SectionHeader}"/>
-                    <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" DisplayMemberPath="Name"/>
+                    <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
 
                     <TextBlock Text="Albo plik" Style="{StaticResource SectionHeader}"/>
                     <DockPanel>
