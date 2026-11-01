@@ -38,6 +38,8 @@ public sealed class UserState
     public bool? RequireToolApproval { get; set; }
     public List<string> McpEnabled { get; set; } = [];
     public bool AppControlEnabled { get; set; }
+    // Wbudowane narzędzia czatu (data i czas, pamięć, pliki); null = domyślnie włączone
+    public bool? BuiltinToolsEnabled { get; set; }
     public bool McpServerEnabled { get; set; }
     public int? McpServerPort { get; set; }
     public string? EnhancerInstruction { get; set; }

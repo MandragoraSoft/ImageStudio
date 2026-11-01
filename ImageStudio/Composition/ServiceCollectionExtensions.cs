@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGalleryStore, FileGalleryStore>();
         services.AddSingleton<IChatSessionStore, FileChatSessionStore>();
         services.AddSingleton<IVoiceGalleryStore, FileVoiceGalleryStore>();
+        services.AddSingleton<IMemoryStore, FileMemoryStore>();
         services.AddSingleton<IPresetStore, FilePresetStore>();
         services.AddSingleton<ISecretStore, FileSecretStore>();
         services.AddSingleton<ISettingsStore, FileSettingsStore>();

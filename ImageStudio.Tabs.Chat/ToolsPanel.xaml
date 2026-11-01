@@ -9,6 +9,17 @@
             <CheckBox Content="{loc:T tools.confirm}" IsChecked="{Binding RequireApproval}" Margin="0,4,0,0"
                       ToolTip="{loc:T tools.confirm.tip}"/>
 
+            <CheckBox IsChecked="{Binding BuiltinEnabled}" Margin="0,4,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}"
+                      ToolTip="{loc:T tools.builtin.tip}">
+                <TextBlock Text="{loc:T tools.builtin}" TextWrapping="Wrap"/>
+            </CheckBox>
+            <StackPanel Orientation="Horizontal" Margin="22,4,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}">
+                <Button Content="{loc:T tools.openMemory}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenMemoryCommand}"
+                        ToolTip="{loc:T tools.openMemory.tip}"/>
+                <Button Content="{loc:T tools.openFiles}" Padding="10,4" Command="{Binding OpenWorkspaceCommand}"
+                        ToolTip="{loc:T tools.openFiles.tip}"/>
+            </StackPanel>
+
             <CheckBox IsChecked="{Binding AppControlEnabled}" Margin="0,4,0,0"
                       ToolTip="{loc:T tools.control.tip}">
                 <TextBlock Text="{loc:T tools.control}" TextWrapping="Wrap"/>

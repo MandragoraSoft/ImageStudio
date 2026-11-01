@@ -136,7 +136,7 @@ public sealed partial class MainViewModel : ObservableObject
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
-                         IVoiceGalleryStore voiceGallery)
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory)
     {
         _provider = provider;
         _providers = providers;
@@ -167,8 +167,11 @@ public sealed partial class MainViewModel : ObservableObject
         var appTools = new AppControlTools(this, _dialogs.ConfirmToolCall);
         var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
                                             _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
+        var builtin = new BuiltinTools(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
+                                       _dialogs.ConfirmToolCall);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
-                                   _mcp.ConfigPath, appTools, _state.AppControlEnabled, server);
+                                   _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
+                                   _state.BuiltinToolsEnabled ?? true, memory);
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
                                  Tools, _dialogs.ConfirmToolCall,
                                  new ChatImageSupport(_dialogs,
@@ -485,6 +488,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.RequireToolApproval = Tools.RequireApproval;
         _state.McpEnabled = Tools.EnabledServers.ToList();
         _state.AppControlEnabled = Tools.AppControlEnabled;
+        _state.BuiltinToolsEnabled = Tools.BuiltinEnabled;
         _state.McpServerEnabled = Tools.Server?.Enabled ?? false;
         _state.McpServerPort = Tools.Server?.Port;
         _state.EnhancerInstruction = EnhancerInstruction;

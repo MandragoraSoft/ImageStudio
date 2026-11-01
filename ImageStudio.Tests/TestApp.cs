@@ -15,6 +15,20 @@ internal sealed class MemoryUserStateStore : IUserStateStore
     public void Save(UserState state) => State = state;
 }
 
+// Pamięć czatu w pamięci procesu
+internal sealed class MemoryMemoryStore : IMemoryStore
+{
+    public List<MemoryItem> Items { get; } = [];
+    public IReadOnlyList<MemoryItem> Load() => Items.ToList();
+
+    public void Save(IEnumerable<MemoryItem> items)
+    {
+        var snapshot = items.ToList();
+        Items.Clear();
+        Items.AddRange(snapshot);
+    }
+}
+
 internal sealed class MemoryVoiceGalleryStore : IVoiceGalleryStore
 {
     public List<GalleryEntry> Entries { get; } = [];
@@ -174,6 +188,8 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<MemoryVoiceGalleryStore>();
         services.AddSingleton<IVoiceGalleryStore>(sp => sp.GetRequiredService<MemoryVoiceGalleryStore>());
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
+        services.AddSingleton<MemoryMemoryStore>();
+        services.AddSingleton<IMemoryStore>(sp => sp.GetRequiredService<MemoryMemoryStore>());
         services.AddSingleton<ISecretStore, MemorySecretStore>();
         services.AddSingleton<IWindowStateStore, MemoryWindowStateStore>();
         services.AddSingleton<FakeAudioPlayer>();

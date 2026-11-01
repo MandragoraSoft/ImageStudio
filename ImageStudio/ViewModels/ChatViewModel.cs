@@ -254,7 +254,8 @@ public sealed partial class ChatViewModel : ObservableObject
     private List<ChatMessage> BuildHistory()
     {
         var history = new List<ChatMessage>();
-        if (!string.IsNullOrWhiteSpace(SystemPrompt)) history.Add(new ChatMessage("system", SystemPrompt.Trim()));
+        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), Tools?.SystemNote }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (system.Length > 0) history.Add(new ChatMessage("system", system));
         history.AddRange(Messages);
         return history;
     }

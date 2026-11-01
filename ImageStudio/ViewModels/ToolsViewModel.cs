@@ -1,6 +1,7 @@
 using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
@@ -60,11 +61,17 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private bool _initialized;
 
     private readonly AppControlTools? _appTools;
+    private readonly BuiltinTools? _builtin;
+    private readonly IMemoryStore? _memory;
 
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
                           string? configPath = null, AppControlTools? appTools = null, bool appControlEnabled = false,
-                          AppServerViewModel? server = null)
+                          AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
+                          IMemoryStore? memory = null)
     {
+        _builtin = builtin;
+        _builtinEnabled = builtinEnabled;
+        _memory = memory;
         _host = host;
         _configPath = configPath;
         _useTools = useTools;
@@ -83,6 +90,13 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
     private bool _appControlEnabled;
 
+    // Wbudowane narzędzia (builtin__*): data i czas, pamięć między sesjami, pliki w folderze roboczym
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
+    private bool _builtinEnabled;
+
+    public bool HasBuiltin => _builtin is not null;
+
     public ObservableCollection<McpServerItem> Servers { get; } = [];
 
     // Główny przełącznik: wyłączony = model nie dostaje żadnych narzędzi, choć serwery pozostają połączone
@@ -98,13 +112,21 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 
     public IReadOnlyList<ToolDefinition> Tools => !UseTools
         ? []
-        : [.. _host.Tools, .. AppToolDefinitions()];
+        : [.. _host.Tools, .. AppToolDefinitions(), .. BuiltinToolDefinitions()];
+
+    // Zapamiętane informacje trafiają do instrukcji systemowej, gdy narzędzia pamięci są dostępne dla modelu
+    public string? SystemNote => UseTools && BuiltinEnabled ? _builtin?.MemoryNote() : null;
 
     public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
 
     private IEnumerable<ToolDefinition> AppToolDefinitions() =>
         AppControlEnabled && _appTools is not null
             ? _appTools.Definitions.Select(d => d with { Name = AppControlTools.ChatPrefix + d.Name })
+            : [];
+
+    private IEnumerable<ToolDefinition> BuiltinToolDefinitions() =>
+        BuiltinEnabled && _builtin is not null
+            ? _builtin.Definitions.Select(d => d with { Name = BuiltinTools.ChatPrefix + d.Name })
             : [];
 
     // Nazwy zaznaczonych serwerów, także tych, których chwilowo nie ma w mcp.json (żeby ich nie zgubić przy zapisie stanu)
@@ -114,6 +136,11 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // Gdy czat wymaga zgody, użytkownik już zatwierdził to wywołanie, więc kosztowne nie pytają drugi raz.
     public Task<string> CallAsync(ToolCall call, CancellationToken ct = default)
     {
+        if (call.Name.StartsWith(BuiltinTools.ChatPrefix, StringComparison.Ordinal) && _builtin is not null)
+            return BuiltinEnabled
+                ? _builtin.CallAsync(call.Name[BuiltinTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval)
+                : Task.FromResult("Wbudowane narzędzia są wyłączone.");
+
         if (!call.Name.StartsWith(AppControlTools.ChatPrefix, StringComparison.Ordinal) || _appTools is null)
             return _host.CallAsync(call, ct);
 
@@ -185,6 +212,39 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         LoadServers();
         OnPropertyChanged(nameof(Summary));
         await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
+    }
+
+    // Podgląd tego, co model zapamiętał (memory.json) i folderu, w którym czyta i zapisuje pliki
+    [RelayCommand]
+    private void OpenMemory() => OpenPath(_memory?.FilePath, createFile: true);
+
+    [RelayCommand]
+    private void OpenWorkspace()
+    {
+        if (_builtin is null) return;
+
+        Directory.CreateDirectory(_builtin.WorkspaceRoot);
+        OpenPath(_builtin.WorkspaceRoot, createFile: false);
+    }
+
+    private void OpenPath(string? path, bool createFile)
+    {
+        if (path is null) return;
+
+        try
+        {
+            if (createFile && !File.Exists(path))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, "[]");
+            }
+
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Info = Loc.T("tools.openFailed", ex.Message);
+        }
     }
 
     [RelayCommand]
