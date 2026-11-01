@@ -211,7 +211,7 @@ public sealed class BuiltinToolsTests : IDisposable
         tools.BuiltinEnabled = false;
         Assert.DoesNotContain(tools.Tools, t => t.Name.StartsWith("builtin__"));
         Assert.Null(tools.SystemNote);
-        Assert.Equal("Wbudowane narzędzia są wyłączone.",
+        Assert.Equal("Narzędzie jest wyłączone przez użytkownika.",
                      tools.CallAsync(new ToolCall("2", "builtin__get_datetime", "{}")).GetAwaiter().GetResult());
     }
 
@@ -287,5 +287,142 @@ public sealed class BuiltinToolsTests : IDisposable
         var many = (await Call(tools, "files_search", new { query = "trafienie" })).Split('\n');
         Assert.Equal(50 + 1, many.Length);
         Assert.Contains("obcięte", many[^1]);
+    }
+
+    [Fact]
+    public void Tool_groups_list_builtin_groups_and_app_control_with_counters()
+    {
+        using var app = TestApp.Create();
+        var groups = app.Vm.Tools.ToolGroups;
+
+        Assert.Equal(["Data i czas", "Pamięć", "Pliki", "Sterowanie aplikacją"], groups.Select(g => g.Title));
+        Assert.Equal(["get_datetime"], groups[0].Tools.Select(t => t.Title));
+        Assert.Equal(["memory_save", "memory_list", "memory_delete"], groups[1].Tools.Select(t => t.Title));
+        Assert.Equal("3/3", groups[1].Counter);
+        Assert.True(groups[0].IsChecked);
+        Assert.Equal(false, groups[3].IsChecked);  // sterowanie aplikacją jest domyślnie wyłączone
+        Assert.Equal("0/" + groups[3].Tools.Count, groups[3].Counter);
+    }
+
+    [Fact]
+    public void Disabling_a_single_tool_removes_it_from_the_model_and_leaves_the_group_mixed()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        tools.UseTools = true;
+        var memory = tools.ToolGroups[1];
+
+        memory.Tools.Single(t => t.Title == "memory_delete").IsEnabled = false;
+
+        Assert.DoesNotContain(tools.Tools, t => t.Name == "builtin__memory_delete");
+        Assert.Contains(tools.Tools, t => t.Name == "builtin__memory_save");
+        Assert.Null(memory.IsChecked);
+        Assert.Equal("2/3", memory.Counter);
+        Assert.Contains("builtin__memory_delete", tools.DisabledTools);
+        Assert.Equal("Narzędzie jest wyłączone przez użytkownika.",
+                     tools.CallAsync(new ToolCall("1", "builtin__memory_delete", """{"id":"x"}""")).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void Group_checkbox_toggles_every_tool_of_the_group_at_once()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        tools.UseTools = true;
+        var files = tools.ToolGroups[2];
+        var changes = 0;
+        tools.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) changes++;
+        };
+
+        files.IsChecked = false;
+
+        Assert.All(files.Tools, t => Assert.False(t.IsEnabled));
+        Assert.DoesNotContain(tools.Tools, t => t.Name.StartsWith("builtin__files_"));
+        Assert.Equal(1, changes);  // jedna zmiana zbiorcza, nie osobno dla każdego narzędzia
+
+        files.IsChecked = true;
+        Assert.Contains(tools.Tools, t => t.Name == "builtin__files_write");
+        Assert.Equal(true, files.IsChecked);
+    }
+
+    [Fact]
+    public void Disabling_the_memory_group_stops_the_memory_note_but_other_groups_keep_working()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        tools.UseTools = true;
+        app.Get<MemoryMemoryStore>().Items.Add(new MemoryItem("11112222", "Lubi herbatę", DateTimeOffset.UtcNow));
+        Assert.Contains("Lubi herbatę", tools.SystemNote);
+
+        tools.ToolGroups[1].IsChecked = false;
+
+        Assert.Null(tools.SystemNote);
+        Assert.Contains(tools.Tools, t => t.Name == "builtin__get_datetime");
+    }
+
+    [Fact]
+    public void Legacy_group_switches_still_work_and_decide_the_first_run_state()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        Assert.False(tools.AppControlEnabled);
+        Assert.True(tools.BuiltinEnabled);
+
+        tools.AppControlEnabled = true;
+        tools.BuiltinEnabled = false;
+
+        Assert.Equal(true, tools.ToolGroups[3].IsChecked);
+        Assert.Equal(false, tools.ToolGroups[0].IsChecked);
+        Assert.DoesNotContain(tools.DisabledTools, n => n.StartsWith("imagestudio__"));
+        Assert.Contains("builtin__get_datetime", tools.DisabledTools);
+    }
+
+    [Fact]
+    public void Disabled_tools_are_saved_and_restored()
+    {
+        using var app = TestApp.Create();
+        app.Vm.InitializeAsync().GetAwaiter().GetResult();
+        app.Vm.Tools.ToolGroups[0].Tools[0].IsEnabled = false;
+        app.Vm.SaveState();
+
+        var saved = app.Get<IUserStateStore>().Load();
+
+        Assert.Contains("builtin__get_datetime", saved.DisabledTools!);
+        var restored = new ToolsViewModel(new McpToolHost(), true, true, [], null, null, false, null,
+                                          BuiltinToolRegistry.Create(new MemoryMemoryStore(), Path.Combine(_dir, "ws"), _ => true), true,
+                                          disabledTools: saved.DisabledTools);
+        Assert.False(restored.ToolGroups[0].Tools[0].IsEnabled);
+        Assert.True(restored.ToolGroups[1].Tools[0].IsEnabled);
+    }
+
+    [Fact]
+    public void Tools_panel_shows_a_group_accordion_with_a_checkbox_per_tool()
+    {
+        WpfHost.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var panel = new ImageStudio.Tabs.Chat.ToolsPanel { DataContext = app.Vm.Tools };
+            var window = new System.Windows.Window { Content = panel, ShowInTaskbar = false };
+            window.Show();
+            ((System.Windows.Controls.Expander)panel.Content).IsExpanded = true;
+            window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            var groups = new List<System.Windows.Controls.Expander>();
+            void Walk(System.Windows.DependencyObject d)
+            {
+                for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++)
+                {
+                    var child = System.Windows.Media.VisualTreeHelper.GetChild(d, i);
+                    if (child is System.Windows.Controls.Expander e && e != panel.Content) groups.Add(e);
+                    Walk(child);
+                }
+            }
+            Walk(window);
+
+            Assert.Equal(4, groups.Count);  // wbudowane (3) i sterowanie aplikacją
+            window.Close();
+        });
     }
 }

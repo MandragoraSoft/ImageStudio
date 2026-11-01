@@ -24,6 +24,9 @@ public sealed class BuiltinTools
                     throw new InvalidOperationException($"Narzędzie {tool.Name} jest zdefiniowane w dwóch grupach.");
     }
 
+    // Grupy narzędzi (do listy w panelu narzędzi czatu)
+    public IReadOnlyList<IChatToolGroup> Groups => _groups;
+
     // Folder roboczy narzędzi plikowych (do otwarcia z panelu Narzędzia)
     public string WorkspaceRoot { get; }
 
@@ -34,6 +37,14 @@ public sealed class BuiltinTools
     public string? SystemNote => _groups.Select(g => g.SystemNote).Where(n => !string.IsNullOrWhiteSpace(n)) is var notes && notes.Any()
         ? string.Join("\n\n", notes)
         : null;
+
+    // Notatka tylko z grup, które mają choć jedno włączone narzędzie (isEnabled dostaje nazwę z przedrostkiem, jak widzi ją model)
+    public string? SystemNoteFor(Func<string, bool> isEnabled)
+    {
+        var notes = _groups.Where(g => g.Tools.Any(t => isEnabled(ChatPrefix + t.Name))).Select(g => g.SystemNote)
+            .Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        return notes.Count > 0 ? string.Join("\n\n", notes) : null;
+    }
 
     // alreadyApproved: użytkownik zatwierdził to wywołanie w czacie, więc zapis nie pyta drugi raz
     public Task<string> CallAsync(string name, string argumentsJson, bool alreadyApproved)

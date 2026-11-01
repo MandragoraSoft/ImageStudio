@@ -171,7 +171,11 @@ public sealed partial class MainViewModel : ObservableObject
                                                  _dialogs.ConfirmToolCall);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
                                    _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
-                                   _state.BuiltinToolsEnabled ?? true, memory);
+                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools);
+        Tools.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) SaveState();
+        };
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
                                  Tools, _dialogs.ConfirmToolCall,
                                  new ChatImageSupport(_dialogs,
@@ -489,6 +493,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.McpEnabled = Tools.EnabledServers.ToList();
         _state.AppControlEnabled = Tools.AppControlEnabled;
         _state.BuiltinToolsEnabled = Tools.BuiltinEnabled;
+        _state.DisabledTools = Tools.DisabledTools.ToList();
         _state.McpServerEnabled = Tools.Server?.Enabled ?? false;
         _state.McpServerPort = Tools.Server?.Port;
         _state.EnhancerInstruction = EnhancerInstruction;

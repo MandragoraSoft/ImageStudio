@@ -19,6 +19,10 @@ public sealed partial class McpToolHost : IAsyncDisposable
 
     public IReadOnlyList<ToolDefinition> Tools => _connections.Values.SelectMany(c => c.Tools).ToList();
 
+    // Narzędzia połączonych serwerów pogrupowane wg serwera (lista grup w panelu narzędzi czatu)
+    public IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>> ServerTools =>
+        _connections.ToDictionary(c => c.Key, c => (IReadOnlyList<ToolDefinition>)c.Value.Tools);
+
     // Łączy z serwerem (zastępując poprzednie połączenie o tej nazwie); zwraca liczbę narzędzi
     public async Task<int> ConnectAsync(string name, McpServerConfig config, CancellationToken ct = default)
     {

@@ -48,8 +48,97 @@ public sealed partial class McpServerItem : ObservableObject
     }
 }
 
-// Narzędzia czatu z serwerów MCP: lista serwerów z mcp.json, łączenie zaznaczonych i wykonywanie wywołań modelu.
-// Zaznaczone serwery, główny przełącznik i tryb zgody są zapamiętywane w state.json (przez MainViewModel).
+// Pojedyncze narzędzie na liście grup: włączane i wyłączane osobno. Name to nazwa widoczna dla modelu (z przedrostkiem grupy)
+public sealed partial class ToolItem : ObservableObject
+{
+    private readonly Action<ToolItem> _toggled;
+    private bool _silent;
+
+    public ToolItem(string name, string title, string description, bool enabled, Action<ToolItem> toggled)
+    {
+        Name = name;
+        Title = title;
+        Description = description;
+        _isEnabled = enabled;
+        _toggled = toggled;
+    }
+
+    public string Name { get; }
+    public string Title { get; }
+    public string Description { get; }
+
+    [ObservableProperty]
+    private bool _isEnabled;
+
+    // Zmiana zbiorcza z grupy nie zgłasza każdego narzędzia osobno
+    public void SetSilently(bool value)
+    {
+        _silent = true;
+        IsEnabled = value;
+        _silent = false;
+    }
+
+    partial void OnIsEnabledChanged(bool value)
+    {
+        if (!_silent) _toggled(this);
+    }
+}
+
+// Grupa narzędzi (zestaw wbudowany, sterowanie aplikacją albo serwer MCP): rozwijana, z polem zaznaczającym wszystkie narzędzia naraz.
+// IsChecked: true = wszystkie włączone, false = żadne, null = część
+public sealed partial class ToolGroupItem : ObservableObject
+{
+    private readonly Action<ToolGroupItem> _changed;
+
+    public ToolGroupItem(string title, string description, IReadOnlyList<ToolItem> tools, bool expanded, Action<ToolGroupItem> changed)
+    {
+        Title = title;
+        Description = description;
+        Tools = tools;
+        _isExpanded = expanded;
+        _changed = changed;
+        foreach (var tool in tools) tool.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ToolItem.IsEnabled)) RaiseState();
+        };
+    }
+
+    public string Title { get; }
+    public string Description { get; }
+    public IReadOnlyList<ToolItem> Tools { get; }
+
+    [ObservableProperty]
+    private bool _isExpanded;
+
+    public bool? IsChecked
+    {
+        get
+        {
+            var enabled = Tools.Count(t => t.IsEnabled);
+            return enabled == Tools.Count ? true : enabled == 0 ? false : null;
+        }
+        set
+        {
+            // Kliknięcie pola z częściowym zaznaczeniem wyłącza wszystko, kolejne włącza wszystko
+            foreach (var tool in Tools) tool.SetSilently(value == true);
+            RaiseState();
+            _changed(this);
+        }
+    }
+
+    // Licznik włączonych narzędzi w nagłówku, np. "2/4"
+    public string Counter => $"{Tools.Count(t => t.IsEnabled)}/{Tools.Count}";
+
+    private void RaiseState()
+    {
+        OnPropertyChanged(nameof(IsChecked));
+        OnPropertyChanged(nameof(Counter));
+    }
+}
+
+// Narzędzia czatu: serwery MCP z mcp.json (łączenie zaznaczonych), wbudowane grupy (data i czas, pamięć, pliki) i sterowanie
+// aplikacją. Lista grup pozwala włączać i wyłączać każde narzędzie albo całą grupę; wyłączone nie trafiają do modelu.
+// Zaznaczone serwery, główny przełącznik, tryb zgody i wyłączone narzędzia są zapamiętywane w state.json (przez MainViewModel).
 public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 {
     private static readonly ILogger Log = AppLog.For<ToolsViewModel>();
@@ -64,13 +153,17 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private readonly BuiltinTools? _builtin;
     private readonly IMemoryStore? _memory;
 
+    // Nazwy (widoczne dla modelu) narzędzi wyłączonych przez użytkownika; nowe narzędzia są domyślnie włączone
+    private readonly HashSet<string> _disabled;
+
+    // disabledTools null = pierwsze uruchomienie po wprowadzeniu listy: stan wynika z dawnych przełączników grup
+    // (sterowanie aplikacją było domyślnie wyłączone, wbudowane domyślnie włączone)
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
                           string? configPath = null, AppControlTools? appTools = null, bool appControlEnabled = false,
                           AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
-                          IMemoryStore? memory = null)
+                          IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null)
     {
         _builtin = builtin;
-        _builtinEnabled = builtinEnabled;
         _memory = memory;
         _host = host;
         _configPath = configPath;
@@ -78,30 +171,49 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         _requireApproval = requireApproval;
         _enabledNames = new HashSet<string>(enabledServers);
         _appTools = appTools;
-        _appControlEnabled = appControlEnabled;
         Server = server;
+
+        _disabled = disabledTools is null ? [] : new HashSet<string>(disabledTools);
+        if (disabledTools is null)
+        {
+            if (!appControlEnabled) _disabled.UnionWith(AppToolNames());
+            if (!builtinEnabled) _disabled.UnionWith(BuiltinToolNames());
+        }
+
+        RebuildGroups();
     }
 
     // Lokalny serwer MCP z narzędziami sterującymi aplikacją (dla zewnętrznych klientów); null = niedostępny
     public AppServerViewModel? Server { get; }
 
-    // Model w czacie może sterować aplikacją (imagestudio__*): modele, prompty, rozmiar, generowanie, galeria
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
-    private bool _appControlEnabled;
+    // Model w czacie może sterować aplikacją (imagestudio__*): modele, prompty, rozmiar, generowanie, galeria.
+    // Włączone, gdy jest włączone choć jedno z tych narzędzi; ustawienie zmienia wszystkie naraz
+    public bool AppControlEnabled
+    {
+        get => AppToolNames().Any(n => !_disabled.Contains(n));
+        set => SetGroupEnabled(AppToolNames(), value);
+    }
 
     // Wbudowane narzędzia (builtin__*): data i czas, pamięć między sesjami, pliki w folderze roboczym
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
-    private bool _builtinEnabled;
+    public bool BuiltinEnabled
+    {
+        get => BuiltinToolNames().Any(n => !_disabled.Contains(n));
+        set => SetGroupEnabled(BuiltinToolNames(), value);
+    }
 
     public bool HasBuiltin => _builtin is not null;
 
     public ObservableCollection<McpServerItem> Servers { get; } = [];
 
+    // Grupy narzędzi z polami włącz/wyłącz (zestawy wbudowane, sterowanie aplikacją, połączone serwery MCP)
+    public ObservableCollection<ToolGroupItem> ToolGroups { get; } = [];
+
+    // Nazwy wyłączonych narzędzi (do zapisu stanu)
+    public IReadOnlyCollection<string> DisabledTools => _disabled;
+
     // Główny przełącznik: wyłączony = model nie dostaje żadnych narzędzi, choć serwery pozostają połączone
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
+    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary), nameof(SystemNote))]
     private bool _useTools;
 
     [ObservableProperty]
@@ -110,43 +222,126 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     [ObservableProperty]
     private string _info = "";
 
+    // Narzędzia wysyłane do modelu: z włączonych grup, bez wyłączonych pojedynczo
     public IReadOnlyList<ToolDefinition> Tools => !UseTools
         ? []
         : [.. _host.Tools, .. AppToolDefinitions(), .. BuiltinToolDefinitions()];
 
-    // Zapamiętane informacje trafiają do instrukcji systemowej, gdy narzędzia pamięci są dostępne dla modelu
-    public string? SystemNote => UseTools && BuiltinEnabled ? _builtin?.SystemNote : null;
+    // Zapamiętane informacje trafiają do instrukcji systemowej, gdy któreś narzędzie ich grupy jest włączone
+    public string? SystemNote => UseTools ? _builtin?.SystemNoteFor(name => !_disabled.Contains(name)) : null;
 
     public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
 
     private IEnumerable<ToolDefinition> AppToolDefinitions() =>
-        AppControlEnabled && _appTools is not null
-            ? _appTools.Definitions.Select(d => d with { Name = AppControlTools.ChatPrefix + d.Name })
-            : [];
+        _appTools is null
+            ? []
+            : _appTools.Definitions.Select(d => d with { Name = AppControlTools.ChatPrefix + d.Name }).Where(d => !_disabled.Contains(d.Name));
 
     private IEnumerable<ToolDefinition> BuiltinToolDefinitions() =>
-        BuiltinEnabled && _builtin is not null
-            ? _builtin.Definitions.Select(d => d with { Name = BuiltinTools.ChatPrefix + d.Name })
-            : [];
+        _builtin is null
+            ? []
+            : _builtin.Definitions.Select(d => d with { Name = BuiltinTools.ChatPrefix + d.Name }).Where(d => !_disabled.Contains(d.Name));
+
+    private IEnumerable<string> AppToolNames() =>
+        _appTools?.Definitions.Select(d => AppControlTools.ChatPrefix + d.Name) ?? [];
+
+    private IEnumerable<string> BuiltinToolNames() =>
+        _builtin?.Definitions.Select(d => BuiltinTools.ChatPrefix + d.Name) ?? [];
+
+    // Włącza albo wyłącza wszystkie podane narzędzia naraz (zmiana z kodu, np. testy i stare przełączniki grup)
+    private void SetGroupEnabled(IEnumerable<string> names, bool enabled)
+    {
+        foreach (var name in names.ToList())
+        {
+            if (enabled) _disabled.Remove(name);
+            else _disabled.Add(name);
+        }
+
+        RebuildGroups();
+        OnToolsChanged();
+    }
+
+    // Zmiana pojedynczego narzędzia z listy grup
+    private void OnToolToggled(ToolItem item)
+    {
+        if (item.IsEnabled) _disabled.Remove(item.Name);
+        else _disabled.Add(item.Name);
+        OnToolsChanged();
+    }
+
+    // Zmiana zbiorcza z pola grupy: zbiór wyłączonych zgadza się ze stanem wszystkich jej narzędzi
+    private void OnGroupToggled(ToolGroupItem group)
+    {
+        foreach (var tool in group.Tools)
+        {
+            if (tool.IsEnabled) _disabled.Remove(tool.Name);
+            else _disabled.Add(tool.Name);
+        }
+
+        OnToolsChanged();
+    }
+
+    private void OnToolsChanged()
+    {
+        OnPropertyChanged(nameof(Tools));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(SystemNote));
+        OnPropertyChanged(nameof(AppControlEnabled));
+        OnPropertyChanged(nameof(BuiltinEnabled));
+        OnPropertyChanged(nameof(DisabledTools));
+    }
+
+    // Lista grup od nowa (po połączeniu albo rozłączeniu serwera MCP); rozwinięcia grup zostają
+    private void RebuildGroups()
+    {
+        var expanded = ToolGroups.Where(g => g.IsExpanded).Select(g => g.Title).ToHashSet();
+        ToolGroups.Clear();
+
+        ToolItem Item(string name, string title, string description) =>
+            new(name, title, description, !_disabled.Contains(name), OnToolToggled);
+
+        ToolGroupItem Group(string title, string description, IEnumerable<ToolItem> tools) =>
+            new(title, description, tools.ToList(), expanded.Contains(title), OnGroupToggled);
+
+        if (_builtin is not null)
+            foreach (var group in _builtin.Groups)
+                ToolGroups.Add(Group(BuiltinGroupTitle(group.Id), "",
+                                     group.Tools.Select(t => Item(BuiltinTools.ChatPrefix + t.Name, t.Name, t.Description))));
+
+        if (_appTools is not null)
+            ToolGroups.Add(Group(Loc.T("tools.group.app"), Loc.T("tools.control.tip"),
+                                 _appTools.Definitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
+
+        foreach (var (server, definitions) in _host.ServerTools.OrderBy(s => s.Key, StringComparer.OrdinalIgnoreCase))
+            ToolGroups.Add(Group(server, Loc.T("tools.group.mcp"),
+                                 definitions.Select(d => Item(d.Name, d.Name.Contains("__") ? d.Name[(d.Name.IndexOf("__", StringComparison.Ordinal) + 2)..] : d.Name, d.Description))));
+    }
+
+    private static string BuiltinGroupTitle(string id) => id switch
+    {
+        "datetime" => Loc.T("tools.group.datetime"),
+        "memory" => Loc.T("tools.group.memory"),
+        "files" => Loc.T("tools.group.files"),
+        _ => id,
+    };
 
     // Nazwy zaznaczonych serwerów, także tych, których chwilowo nie ma w mcp.json (żeby ich nie zgubić przy zapisie stanu)
     public IReadOnlyCollection<string> EnabledServers => _enabledNames;
 
-    // Narzędzia aplikacji (przedrostek imagestudio__) obsługuje AppControlTools, reszta idzie do serwerów MCP.
+    // Narzędzie wyłączone na liście nie jest wysyłane do modelu, a gdyby mimo to o nie poprosił, dostaje odmowę.
+    // Narzędzia aplikacji (przedrostek imagestudio__) obsługuje AppControlTools, wbudowane BuiltinTools, reszta idzie do serwerów MCP.
     // Gdy czat wymaga zgody, użytkownik już zatwierdził to wywołanie, więc kosztowne nie pytają drugi raz.
     public Task<string> CallAsync(ToolCall call, CancellationToken ct = default)
     {
+        if (_disabled.Contains(call.Name)) return Task.FromResult("Narzędzie jest wyłączone przez użytkownika.");
+
         if (call.Name.StartsWith(BuiltinTools.ChatPrefix, StringComparison.Ordinal) && _builtin is not null)
-            return BuiltinEnabled
-                ? _builtin.CallAsync(call.Name[BuiltinTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval)
-                : Task.FromResult("Wbudowane narzędzia są wyłączone.");
+            return _builtin.CallAsync(call.Name[BuiltinTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval);
 
         if (!call.Name.StartsWith(AppControlTools.ChatPrefix, StringComparison.Ordinal) || _appTools is null)
             return _host.CallAsync(call, ct);
 
-        return AppControlEnabled
-            ? _appTools.CallAsync(call.Name[AppControlTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval)
-            : Task.FromResult("Sterowanie aplikacją jest wyłączone.");
+        return _appTools.CallAsync(call.Name[AppControlTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval);
     }
 
     // Wczytuje listę serwerów i łączy zaznaczone; wywoływane raz po starcie aplikacji
@@ -181,7 +376,8 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
             _enabledNames.Remove(item.Name);
             await _host.DisconnectAsync(item.Name);
             item.Status = "";
-            OnPropertyChanged(nameof(Summary));
+            RebuildGroups();
+            OnToolsChanged();
         }
     }
 
@@ -192,6 +388,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         {
             var count = await _host.ConnectAsync(item.Name, _config.McpServers[item.Name]);
             item.Status = Loc.T("tools.connected", count);
+            RebuildGroups();
         }
         catch (Exception ex)
         {
@@ -201,7 +398,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
             item.SetEnabledSilently(false);
         }
 
-        OnPropertyChanged(nameof(Summary));
+        OnToolsChanged();
     }
 
     // Ponowne wczytanie mcp.json (po edycji) z połączeniem zaznaczonych serwerów od nowa
@@ -210,6 +407,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     {
         await _host.DisposeAsync();
         LoadServers();
+        RebuildGroups();
         OnPropertyChanged(nameof(Summary));
         await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
     }

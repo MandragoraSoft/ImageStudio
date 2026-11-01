@@ -3,27 +3,51 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <!-- Narzędzia MCP w zakładce Czat (DataContext = ToolsViewModel) -->
-    <Expander Header="{loc:T tools.header}" Margin="0,12,0,0">
+    <Expander Margin="0,12,0,0">
+        <Expander.Header>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{loc:T tools.header}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Summary}" Margin="8,0,0,0" Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Expander.Header>
         <StackPanel Margin="0,6,0,0">
             <CheckBox Content="{loc:T tools.enable}" IsChecked="{Binding UseTools}"/>
             <CheckBox Content="{loc:T tools.confirm}" IsChecked="{Binding RequireApproval}" Margin="0,4,0,0"
                       ToolTip="{loc:T tools.confirm.tip}"/>
 
-            <CheckBox IsChecked="{Binding BuiltinEnabled}" Margin="0,4,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}"
-                      ToolTip="{loc:T tools.builtin.tip}">
-                <TextBlock Text="{loc:T tools.builtin}" TextWrapping="Wrap"/>
-            </CheckBox>
-            <StackPanel Orientation="Horizontal" Margin="22,4,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}">
+            <!-- Grupy narzędzi: pole przy grupie włącza i wyłącza wszystkie jej narzędzia, pola w środku każde osobno -->
+            <TextBlock Text="{loc:T tools.available}" Style="{StaticResource SectionHeader}"/>
+            <ItemsControl ItemsSource="{Binding ToolGroups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,2,0,0" ToolTip="{Binding Description}">
+                            <Expander.Header>
+                                <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Title}"/>
+                                        <TextBlock Text="{Binding Counter}" Margin="6,0,0,0" Style="{StaticResource MutedTextBlock}"/>
+                                    </StackPanel>
+                                </CheckBox>
+                            </Expander.Header>
+                            <ItemsControl ItemsSource="{Binding Tools}" Margin="26,2,0,4">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Title}" IsChecked="{Binding IsEnabled}" Margin="0,1,0,1"
+                                                  ToolTip="{Binding Description}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}">
                 <Button Content="{loc:T tools.openMemory}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenMemoryCommand}"
                         ToolTip="{loc:T tools.openMemory.tip}"/>
                 <Button Content="{loc:T tools.openFiles}" Padding="10,4" Command="{Binding OpenWorkspaceCommand}"
                         ToolTip="{loc:T tools.openFiles.tip}"/>
             </StackPanel>
-
-            <CheckBox IsChecked="{Binding AppControlEnabled}" Margin="0,4,0,0"
-                      ToolTip="{loc:T tools.control.tip}">
-                <TextBlock Text="{loc:T tools.control}" TextWrapping="Wrap"/>
-            </CheckBox>
 
             <TextBlock Text="{loc:T tools.servers}" Style="{StaticResource SectionHeader}"/>
             <ItemsControl ItemsSource="{Binding Servers}">
