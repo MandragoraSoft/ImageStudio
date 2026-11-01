@@ -30,7 +30,7 @@ public sealed partial class MainViewModel
         }
     }
 
-    // Kliknięcie miniatury pokazuje ten obraz w podglądzie wyniku
+    // Kliknięcie miniatury pokazuje ten obraz lub wideo w podglądzie wyniku; opis (prompt, rodzaj, koszt) jest w dymku miniatury
     partial void OnSelectedGalleryEntryChanged(GalleryEntry? value)
     {
         if (value is null || !File.Exists(value.FilePath)) return;
@@ -39,7 +39,6 @@ public sealed partial class MainViewModel
         {
             ShowVideo = true;
             VideoSource = new Uri(value.FilePath);
-            Status = $"{value.KindLabel} · {value.CostLabel} · {value.Prompt}";
             return;
         }
 
@@ -47,7 +46,6 @@ public sealed partial class MainViewModel
         _imageBytes = File.ReadAllBytes(value.FilePath);
         Image = LoadImage(_imageBytes);
         FitToWindow = true;
-        Status = $"{value.KindLabel} · {value.CostLabel} · {value.Prompt}";
     }
 
     private void AddToGallery(GalleryEntry entry)
@@ -67,5 +65,58 @@ public sealed partial class MainViewModel
         _galleryStore.Save(Gallery);
         OnPropertyChanged(nameof(GalleryTotalLabel));
         Status = "Wyczyszczono galerię (pliki obrazów zostały w folderze zapisów).";
+    }
+
+    // --- Menu kontekstowe miniatury (prawy przycisk) ---
+
+    // Usuwa wpis z galerii; plik zostaje w folderze zapisów (jak przy "Wyczyść galerię")
+    [RelayCommand]
+    private void RemoveGalleryEntry(GalleryEntry? entry)
+    {
+        if (entry is null) return;
+
+        RemoveFromGallery(entry);
+        Status = "Usunięto z galerii (plik został w folderze zapisów).";
+    }
+
+    // Usuwa wpis razem z plikiem na dysku, po potwierdzeniu
+    [RelayCommand]
+    private void DeleteGalleryEntryFile(GalleryEntry? entry)
+    {
+        if (entry is null) return;
+        if (!_dialogs.Confirm($"Usunąć z galerii i z dysku?{Environment.NewLine}{Environment.NewLine}{entry.FilePath}", "Usuwanie z dysku")) return;
+
+        // Wyświetlane wideo trzyma plik otwarty: najpierw zwalniamy podgląd
+        if (ShowVideo && VideoSource?.LocalPath == entry.FilePath) ClearResult();
+
+        try
+        {
+            if (File.Exists(entry.FilePath)) File.Delete(entry.FilePath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status = $"Nie udało się usunąć pliku: {ex.Message}";
+            return;
+        }
+
+        RemoveFromGallery(entry);
+        Status = "Usunięto z galerii i z dysku.";
+    }
+
+    [RelayCommand]
+    private void CopyGalleryPrompt(GalleryEntry? entry)
+    {
+        if (entry is null) return;
+
+        _dialogs.CopyText(entry.Prompt);
+        Status = "Skopiowano prompt.";
+    }
+
+    private void RemoveFromGallery(GalleryEntry entry)
+    {
+        if (SelectedGalleryEntry == entry) SelectedGalleryEntry = null;
+        Gallery.Remove(entry);
+        _galleryStore.Save(Gallery);
+        OnPropertyChanged(nameof(GalleryTotalLabel));
     }
 }
