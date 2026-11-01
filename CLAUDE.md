@@ -60,6 +60,6 @@ Pliki w `docs/dev/` czytaj na żądanie, gdy zadanie dotyka danego obszaru (to z
 
 - **`new-main-tab`**: nowa zakładka okna głównego (`IMainTab`) albo okna Ustawień (`ISettingsTab`), z listą kontrolną (filtry modeli, `DataTemplate`, indeksy, testy).
 - **`new-provider`**: nowy dostawca AI albo nowa metoda w kontrakcie `IAiProvider`.
-- **`release`**: wydanie nowej wersji (notatki, numeracja, pipeline, naprawa).
+- **`release`**: wydanie nowej wersji (notatki, numeracja, pipeline, naprawa).  Polecenie `/wydanie [wersja]` prowadzi przez cały proces krok po kroku.
 
 Gdy zadanie pasuje do skilla, użyj go zamiast przepisywać procedurę z pamięci. Nowy obszar z własnymi regułami: dopisz plik do `docs/dev/` i wiersz do tabeli wyżej, a procedury, które się powtarzają, zamieniaj w skill; nie rozbudowuj tego pliku.
