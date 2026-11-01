@@ -63,7 +63,7 @@ public sealed class ProviderDefaultsTests
         var current = new SettingsResult("u", "m", 1536, "", "system",
                                          DefaultTextModels: new Dictionary<string, string?> { ["openai"] = "gpt-4.1" },
                                          ActiveTextModels: ["venice/uncensored", "venice/other"]);
-        var vm = new SettingsViewModel(current);
+        var vm = new ProviderSettingsTab(current);
         Assert.Equal("gpt-4.1", vm.OpenAi.DefaultTextModel);
         Assert.Contains("gpt-4o-mini", vm.OpenAi.TextModels);
         Assert.Equal("gpt-4.1", vm.OpenAi.PreferredTextModelOrNull);

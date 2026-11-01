@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Win32;
 
@@ -45,6 +47,24 @@ public static class ThemeService
         ["WarningBrush"] = "#F59E42",
     };
 
+    // Pasek tytułu okna rysuje system, więc nie zmienia go podmiana pędzli: osobno przełączamy tryb ciemny (DWM)
+    private const int DwmUseImmersiveDarkMode = 20;
+    private static bool _titleBarsHooked;
+    private static bool _dark;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    // Pasek tytułu zgodny z bieżącym motywem; bez uchwytu (okno jeszcze nie pokazane) nic nie robi
+    public static void ApplyTitleBar(Window window)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero) return;
+
+        var value = _dark ? 1 : 0;
+        DwmSetWindowAttribute(handle, DwmUseImmersiveDarkMode, ref value, sizeof(int));
+    }
+
     public static void Apply(string theme)
     {
         var dark = theme switch
@@ -53,6 +73,16 @@ public static class ThemeService
             Light => false,
             _ => !IsWindowsLightTheme(),
         };
+
+        _dark = dark;
+        if (!_titleBarsHooked)
+        {
+            // Okna otwierane później dostają pasek tytułu w aktualnym motywie po załadowaniu
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                                              new RoutedEventHandler((sender, _) => ApplyTitleBar((Window)sender)));
+            _titleBarsHooked = true;
+        }
+        foreach (Window window in Application.Current.Windows) ApplyTitleBar(window);
 
         // Pędzle z XAML są zamrożone, więc podmieniamy wpis; odwołania DynamicResource odświeżają się same
         foreach (var (key, hex) in dark ? DarkPalette : LightPalette)

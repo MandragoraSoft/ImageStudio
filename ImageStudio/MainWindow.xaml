@@ -18,7 +18,7 @@
 
         <Grid Grid.Row="0" Margin="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="390"/>
+                <ColumnDefinition Width="390" MinWidth="280" views:WindowMemory.ColumnKey="MainWindow.LeftPanel"/>
                 <ColumnDefinition Width="6"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>

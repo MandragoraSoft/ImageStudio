@@ -4,71 +4,33 @@
         xmlns:vm="clr-namespace:ImageStudio.ViewModels"
         xmlns:views="clr-namespace:ImageStudio.Views"
         Style="{StaticResource WindowBase}"
-        Title="Ustawienia" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        Title="Ustawienia" Width="500" Height="640" MinHeight="420"
         MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
-    <!-- Komponent konfiguracji wybierany po typie ViewModelu providera -->
+    <!-- Widok zakładki wybierany po typie jej ViewModelu (ISettingsTab); nowa zakładka = ViewModel + widok + wpis tutaj.
+         Brak wpisu wykrywa SettingsWindow.EnsureTabViews przed otwarciem okna -->
     <Window.Resources>
-        <DataTemplate DataType="{x:Type vm:UberLlmSettingsViewModel}">
-            <views:UberLlmSettingsView/>
+        <DataTemplate DataType="{x:Type vm:AppSettingsTab}">
+            <views:AppSettingsTabView/>
         </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:OpenRouterSettingsViewModel}">
-            <views:OpenRouterSettingsView/>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:OpenAiSettingsViewModel}">
-            <views:OpenAiSettingsView/>
+        <DataTemplate DataType="{x:Type vm:ProviderSettingsTab}">
+            <views:ProviderSettingsTabView/>
         </DataTemplate>
     </Window.Resources>
 
-    <!-- Rozwinięty selektor modelu wydłuża okno: przy niskim ekranie treść przewija się zamiast wychodzić poza ekran -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="16">
-        <TextBlock Text="Dostawca AI" Style="{StaticResource SectionHeader}"/>
-        <ComboBox ItemsSource="{Binding Providers}" SelectedValuePath="Id" SelectedValue="{Binding SelectedProvider}">
-            <ComboBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding DisplayName}"/>
-                </DataTemplate>
-            </ComboBox.ItemTemplate>
-        </ComboBox>
-
-        <!-- Konfiguracja aktywnego providera -->
-        <ContentControl Content="{Binding ActiveProvider}" Margin="0,4,0,0"/>
-        <TextBlock Text="{Binding ActiveProvider.EnvNotice}" TextWrapping="Wrap" Foreground="OrangeRed"/>
-
-        <TextBlock Text="Lista modeli tego dostawcy" Style="{StaticResource SectionHeader}"/>
-        <CheckBox Content="Pokazuj tylko preferowane (odznaczone = wszystkie)"
-                  IsChecked="{Binding ActiveProvider.PreferredOnly}"
-                  ToolTip="Preferowane wybierasz w oknie „Przeglądaj modele” obok filtrów. Pusta lista preferowanych pokazuje wszystkie modele."/>
-
-        <views:ModelPicker Header="Domyślny model tekstowy dostawcy"
-                           ItemsSource="{Binding ActiveProvider.TextModels}"
-                           SelectedItem="{Binding ActiveProvider.DefaultTextModel}"
-                           ReloadCommand="{Binding ReloadTextModelsCommand}"/>
-        <TextBlock Text="{Binding TextModelsStatus}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
-        <TextBlock Text="Ulepszanie promptów, czat i nazwy zestawów. Przycisk Odśwież pobiera listę modeli dostawcy z adresem i kluczem wpisanymi powyżej (bez zapisywania)."
-                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
-
-        <TextBlock Text="Maksymalny długi bok obrazu źródłowego (px)" Style="{StaticResource SectionHeader}"/>
-        <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>
-
-        <TextBlock Text="Motyw" Style="{StaticResource SectionHeader}"/>
-        <ComboBox ItemsSource="{Binding Themes}" SelectedValuePath="Code" SelectedValue="{Binding SelectedTheme}">
-            <ComboBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding Label}"/>
-                </DataTemplate>
-            </ComboBox.ItemTemplate>
-        </ComboBox>
-
-        <TextBlock Text="Klucze są szyfrowane (DPAPI) dla bieżącego konta Windows. Nie trafiają do plików projektu ani do repozytorium."
-                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,12,0,0"/>
-
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
                     Style="{StaticResource SecondaryButton}"/>
             <Button Content="Zapisz" IsDefault="True" Width="90" Click="Save_Click"/>
         </StackPanel>
-    </StackPanel>
-    </ScrollViewer>
+
+        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}">
+            <TabControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Title}"/>
+                </DataTemplate>
+            </TabControl.ItemTemplate>
+        </TabControl>
+    </DockPanel>
 </Window>

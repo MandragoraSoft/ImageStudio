@@ -95,8 +95,9 @@ internal sealed class FakeDialogs : IDialogService
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
-    public SettingsResult? ShowSettings(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null) =>
-        SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
+    public IReadOnlyList<ISettingsTab>? LastSettingsTabs { get; private set; }
+    public SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs) =>
+        (LastSettingsTabs = tabs) is not null && SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) => throw new NotSupportedException();
     public PromptEdit? PromptEditResult { get; set; }
     public Func<Task<string>>? LastDescribe { get; private set; }

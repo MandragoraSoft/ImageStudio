@@ -38,15 +38,16 @@ public sealed class WpfDialogService : IDialogService
     public BitmapSource? GetClipboardImage() => Clipboard.ContainsImage() ? Clipboard.GetImage() : null;
 
     // Modalne okno ustawień, właścicielem jest główne okno
-    public SettingsResult? ShowSettings(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null)
+    public SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs)
     {
-        var viewModel = new SettingsViewModel(current, loadTextModels);
+        var viewModel = new SettingsViewModel(current, tabs);
         var window = new SettingsWindow
         {
             DataContext = viewModel,
             Owner = Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Application.Current.MainWindow
         };
 
+        window.EnsureTabViews();
         return window.ShowDialog() == true ? viewModel.ToResult() : null;
     }
 

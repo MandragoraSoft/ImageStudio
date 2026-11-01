@@ -1,7 +1,8 @@
 <Application x:Class="ImageStudio.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:ImageStudio.ViewModels">
+             xmlns:vm="clr-namespace:ImageStudio.ViewModels"
+             xmlns:views="clr-namespace:ImageStudio.Views">
     <Application.Resources>
 
         <!-- Paleta: wartości ustawia ThemeService (jasny/ciemny), klucze są stałe.
@@ -28,7 +29,9 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Icon" Value="pack://application:,,,/Assets/AppIcon.ico"/>
+            <!-- Globalnie: rozmiar okna (a dla głównego też położenie) jest zapamiętywany, patrz WindowMemory -->
+            <Setter Property="views:WindowMemory.Remember" Value="True"/>
+            <Setter Property="Icon" Value="pack://application:,,,/ImageStudio;component/Assets/AppIcon.ico"/>
         </Style>
 
         <Style x:Key="MutedTextBlock" TargetType="TextBlock">
@@ -187,7 +190,9 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
 
+        <!-- Foreground TabControl dziedziczy zawartość zakładek (bez niego etykiety są czarne na ciemnym tle) -->
         <Style TargetType="TabControl">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
         </Style>

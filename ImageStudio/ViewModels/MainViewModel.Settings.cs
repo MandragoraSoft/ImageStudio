@@ -40,7 +40,7 @@ public sealed partial class MainViewModel
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
                                          EnhancerModels.ToList());
-        var result = _dialogs.ShowSettings(current, LoadTextModelsAsync);
+        var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current), new ProviderSettingsTab(current, LoadTextModelsAsync)]);
         if (result is null) return;
 
         foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())

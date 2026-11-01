@@ -81,7 +81,7 @@ public sealed class ReloadTests
     public async Task Settings_reload_fetches_text_models_with_the_typed_values_and_keeps_the_selection()
     {
         SettingsResult? seen = null;
-        var vm = new SettingsViewModel(Draft(), draft =>
+        var vm = new ProviderSettingsTab(Draft(), draft =>
         {
             seen = draft;
             return Task.FromResult<IReadOnlyList<string>>(["openai/gpt-4o-mini", "anthropic/claude", "x/y"]);
@@ -101,7 +101,7 @@ public sealed class ReloadTests
     [Fact]
     public async Task Settings_reload_reports_errors_and_keeps_the_list()
     {
-        var vm = new SettingsViewModel(Draft(), _ => throw new InvalidOperationException("401"));
+        var vm = new ProviderSettingsTab(Draft(), _ => throw new InvalidOperationException("401"));
         var before = vm.OpenRouter.TextModels.ToList();
 
         await vm.ReloadTextModelsCommand.ExecuteAsync(null);
@@ -113,6 +113,6 @@ public sealed class ReloadTests
     [Fact]
     public void Settings_reload_is_disabled_without_a_loader()
     {
-        Assert.False(new SettingsViewModel(Draft()).ReloadTextModelsCommand.CanExecute(null));
+        Assert.False(new ProviderSettingsTab(Draft()).ReloadTextModelsCommand.CanExecute(null));
     }
 }
