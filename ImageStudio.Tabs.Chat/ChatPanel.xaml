@@ -6,8 +6,11 @@
     <!-- Opcje czatu (DataContext = ChatViewModel); sama rozmowa jest po prawej w ChatConversation -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <views:ModelPicker Header="Model czatu"
-                               ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"/>
+            <!-- Filtry (szukaj, dostawca, obraz na wejściu, preferowane) są wspólne z modelami obrazów i leżą w MainViewModel -->
+            <views:ModelPicker Header="Model czatu" HasFilters="True"
+                               FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                               ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                               ItemsSource="{Binding ModelOptionsView}" SelectedItem="{Binding SelectedModelOption}"/>
 
             <!-- Rozumowanie: tylko dla modeli, które je deklarują (supported_parameters) -->
             <StackPanel Visibility="{Binding SupportsReasoning, Converter={StaticResource BoolToVis}}">

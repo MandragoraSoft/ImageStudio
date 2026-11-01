@@ -158,7 +158,9 @@ public sealed partial class MainViewModel : ObservableObject
                                                       () => _settings.MaxSide),
                                  id => _chatModels.GetValueOrDefault(id),
                                  _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
-                                 activity);
+                                 activity, ChatModelOptions);
+        Chat.ModelOptionsView.Filter = FilterModel;
+        ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)
         Chat.PropertyChanged += (_, e) =>
         {
@@ -185,6 +187,21 @@ public sealed partial class MainViewModel : ObservableObject
     public ICollectionView ModelsView { get; }
     public ICollectionView EditModelsView { get; }
     public ObservableCollection<string> Providers { get; } = [];
+
+    // Modele czatu z opisem (wspólne dla czatu i ulepszania promptów); filtrowane jak modele obrazów
+    public ObservableCollection<ModelOption> ChatModelOptions { get; } = [];
+    public ICollectionView ChatModelsView => Chat.ModelOptionsView;
+
+    // Wybór w selektorze ulepszania promptów; null z selektora (filtr ukrył pozycję) nie zmienia wyboru
+    public ModelOption? SelectedEnhancerModelOption
+    {
+        get => ChatModelOptions.FirstOrDefault(o => o.Id == SelectedEnhancerModel);
+        set
+        {
+            if (value is not null) SelectedEnhancerModel = value.Id;
+            else OnPropertyChanged();
+        }
+    }
 
     // Aktywny dostawca AI; odświeżane w SwitchProviderAsync
     public string ProviderId => _provider.Id;
@@ -218,6 +235,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSelectedEnhancerModelChanged(string? value)
     {
+        OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         RebuildEnhancerParameters();
         OnPresetInputChanged();
     }
@@ -278,6 +296,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ModelsView.Refresh();
         EditModelsView.Refresh();
+        ChatModelsView.Refresh();
     }
 
     private bool FilterModel(object item)
@@ -331,7 +350,6 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Replace(Models, models.Generation, pricing);
             Replace(EditModels, models.Edit, pricing);
-            FillProviders(models.Generation.Concat(models.Edit));
             SelectedModel = Models.FirstOrDefault(m => m.Id == _state.GenerationModel)
                             ?? Models.FirstOrDefault(m => m.Id == DefaultGeneration)
                             ?? Models.FirstOrDefault();
@@ -351,6 +369,7 @@ public sealed partial class MainViewModel : ObservableObject
         // Brak modeli tekstowych nie blokuje generowania, tylko wyłącza ulepszanie promptu
         if (catalog.Chat is { } chat) ApplyChatModels(chat);
 
+        RefreshOwners();
         Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
         if (catalog.Warnings.Count > 0)
         {
@@ -373,6 +392,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var model in chat) _chatModels[model.Id] = model;
         Chat.RefreshReasoningSupport();
         ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
+        ReplaceChatOptions(chat);
 
         SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
                                 : chat.Any(m => m.Id == EffectiveDefaultTextModel) ? EffectiveDefaultTextModel

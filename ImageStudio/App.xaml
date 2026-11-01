@@ -321,6 +321,14 @@
             <Setter Property="Padding" Value="6,3"/>
         </Style>
 
+        <!-- Dymki w kolorach motywu (domyślnie systemowe, jasne) -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+            <Setter Property="Padding" Value="10,8"/>
+        </Style>
+
         <!-- Akordeony: nagłówek w kolorze tekstu motywu -->
         <Style TargetType="Expander">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -351,6 +359,9 @@
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" Margin="4,0,0,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje wideo"
                            Visibility="{Binding AcceptsVideo, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE82F;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="Rozumowanie (można je włączyć i ustawić poziom)"
+                           Visibility="{Binding Reasoning, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D2;" Margin="4,0,0,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource TextMutedBrush}" ToolTip="Zwraca też tekst"
                            Visibility="{Binding ReturnsText, Converter={StaticResource BoolToVis}}"/>
@@ -361,7 +372,26 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ModelItemTemplate" DataType="{x:Type shared:ModelOption}">
-            <Grid>
+            <Grid ToolTipService.InitialShowDelay="250" ToolTipService.ShowDuration="20000">
+                <!-- Dymek po najechaniu (podświetleniu) pozycji: nazwa, opis i koszty -->
+                <Grid.ToolTip>
+                    <StackPanel MaxWidth="360">
+                        <TextBlock Text="{Binding Id}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,4,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Description}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Border Height="1" Margin="0,6" Background="{DynamicResource BorderSoftBrush}"/>
+                        <TextBlock Text="{Binding CostText}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid.ToolTip>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>

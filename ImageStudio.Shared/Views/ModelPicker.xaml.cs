@@ -16,6 +16,14 @@ public partial class ModelPicker : UserControl
         DependencyProperty.Register(nameof(Header), typeof(string), typeof(ModelPicker));
     public static readonly DependencyProperty HasFiltersProperty =
         DependencyProperty.Register(nameof(HasFilters), typeof(bool), typeof(ModelPicker));
+    public static readonly DependencyProperty FiltersContextProperty =
+        DependencyProperty.Register(nameof(FiltersContext), typeof(object), typeof(ModelPicker),
+            new PropertyMetadata(null, (d, e) =>
+            {
+                var bar = ((ModelPicker)d).FilterBar;
+                if (e.NewValue is null) bar.ClearValue(DataContextProperty);
+                else bar.DataContext = e.NewValue;
+            }));
     public static readonly DependencyProperty ReloadCommandProperty =
         DependencyProperty.Register(nameof(ReloadCommand), typeof(ICommand), typeof(ModelPicker),
             new PropertyMetadata(null, (d, e) => ((ModelPicker)d).ReloadButton.Visibility =
@@ -26,6 +34,10 @@ public partial class ModelPicker : UserControl
     public string? Header { get => (string?)GetValue(HeaderProperty); set => SetValue(HeaderProperty, value); }
     // Pokazuje przycisk panelu filtrów (filtry działają na DataContext rodzica, czyli MainViewModel)
     public bool HasFilters { get => (bool)GetValue(HasFiltersProperty); set => SetValue(HasFiltersProperty, value); }
+
+    // Obiekt z właściwościami filtrów (SearchText, SelectedProvider, ...); domyślnie DataContext rodzica.
+    // Panel czatu ma DataContext = ChatViewModel, więc filtry (wspólne z obrazami) podaje stąd MainViewModel
+    public object? FiltersContext { get => GetValue(FiltersContextProperty); set => SetValue(FiltersContextProperty, value); }
 
     // Odświeża listy modeli z dostawcy (IAiProvider.ReloadAsync); bez komendy przycisk jest ukryty
     public ICommand? ReloadCommand { get => (ICommand?)GetValue(ReloadCommandProperty); set => SetValue(ReloadCommandProperty, value); }

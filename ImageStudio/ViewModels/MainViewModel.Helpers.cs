@@ -24,13 +24,29 @@ public sealed partial class MainViewModel
                                        info.OutputModalities));
     }
 
-    private void FillProviders(IEnumerable<ImageModelInfo> infos)
+    // Lista dostawców modeli do filtra: właściciele ze wszystkich list (obrazy, edycja, wideo, czat)
+    private void RefreshOwners()
     {
+        var owners = Models.Concat(EditModels).Concat(VideoModels).Concat(ChatModelOptions)
+            .Select(m => m.OwnedBy).OfType<string>().Distinct().OrderBy(o => o, StringComparer.OrdinalIgnoreCase).ToList();
         Providers.Clear();
         Providers.Add(AllProviders);
-        foreach (var owner in infos.Select(i => i.OwnedBy).OfType<string>().Distinct().OrderBy(o => o, StringComparer.OrdinalIgnoreCase))
-            Providers.Add(owner);
+        foreach (var owner in owners) Providers.Add(owner);
     }
+
+    // Modele czatu jako pozycje z opisem: możliwości z katalogu (obraz na wejściu, rozumowanie), właściciel z katalogu lub z id
+    private void ReplaceChatOptions(IEnumerable<ChatModelInfo> chat)
+    {
+        ChatModelOptions.Clear();
+        foreach (var info in chat.OrderBy(i => i.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            var input = info.InputModalities ?? (info.AcceptsImage == true ? ["text", "image"] : ["text"]);
+            ChatModelOptions.Add(new ModelOption(info.Id, info.OwnedBy ?? OwnerFromId(info.Id), false, input, null, info.Description,
+                                                 ["text"], Reasoning: ReasoningSupport.ParameterFor(info.SupportedParameters) is not null));
+        }
+    }
+
+    private static string? OwnerFromId(string id) => id.Contains('/') ? id.Split('/')[0] : null;
 
     private static void ReplaceStrings(ObservableCollection<string> target, IEnumerable<string> items)
     {

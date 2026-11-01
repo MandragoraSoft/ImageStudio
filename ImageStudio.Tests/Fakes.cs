@@ -127,7 +127,9 @@ internal sealed class FakeDialogs : IDialogService
     public bool ConfirmToolCall(ToolCall call) => true;
     public bool ConfirmAnswer { get; set; } = true;
     public bool Confirm(string text, string title) => ConfirmAnswer;
-    public void ShowModelBrowser(ModelBrowserViewModel viewModel) => throw new NotSupportedException();
+    public Action<ModelBrowserViewModel>? OnShowModelBrowser { get; set; }
+    public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
+        (OnShowModelBrowser ?? throw new NotSupportedException()).Invoke(viewModel);
 }
 
 // Obrazy testowe generowane w pamięci

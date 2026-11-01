@@ -7,13 +7,66 @@
     <!-- Wspólny selektor modelu: akordeon z nagłówkiem = wybrany model, lista modeli z dowolnego źródła
          (ModelOption lub tekst) i opcjonalny panel filtrów (HasFilters; filtry biorą DataContext z rodzica) -->
     <UserControl.Resources>
+        <!-- Nagłówek akordeonu rozciągnięty na całą szerokość (domyślny szablon Expandera zwęża go do treści),
+             dzięki czemu cena modelu stoi przy prawej krawędzi, jak w liście -->
+        <Style x:Key="PickerExpander" TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <DockPanel>
+                            <ToggleButton DockPanel.Dock="Top" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Bd" Background="{DynamicResource SurfaceBrush}" BorderThickness="1" CornerRadius="4"
+                                                BorderBrush="{DynamicResource BorderSoftBrush}" Padding="8,5">
+                                            <DockPanel LastChildFill="True">
+                                                <Path x:Name="Arrow" DockPanel.Dock="Left" Data="M 0 0 L 4 4 L 8 0 Z" VerticalAlignment="Center"
+                                                      Fill="{DynamicResource TextMutedBrush}" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                                <ContentPresenter ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                  HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow" Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <RotateTransform Angle="180"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed" Margin="{TemplateBinding Padding}"/>
+                        </DockPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate DataType="{x:Type vm:ModelOption}">
             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ModelItemTemplate}"/>
         </DataTemplate>
     </UserControl.Resources>
     <StackPanel>
         <TextBlock Text="{Binding Header, ElementName=Picker}" Style="{StaticResource SectionHeader}"/>
-        <Expander x:Name="Accordion" HorizontalContentAlignment="Stretch" FontWeight="Normal" Margin="0,0,0,6"
+        <Expander x:Name="Accordion" Style="{StaticResource PickerExpander}" HorizontalContentAlignment="Stretch" FontWeight="Normal" Margin="0,0,0,6"
                   Expanded="Accordion_Expanded">
             <Expander.Header>
                 <ContentControl Content="{Binding SelectedItem, ElementName=Picker}" HorizontalContentAlignment="Stretch"/>
@@ -26,7 +79,7 @@
                     <ToggleButton x:Name="FiltersToggle" Content="Filtry modeli" Padding="10,2" HorizontalAlignment="Left"
                                   Visibility="{Binding HasFilters, ElementName=Picker, Converter={StaticResource BoolToVis}}"/>
                 </DockPanel>
-                <views:ModelFilterBar Margin="0,0,0,4"
+                <views:ModelFilterBar x:Name="FilterBar" Margin="0,0,0,4"
                                       Visibility="{Binding IsChecked, ElementName=FiltersToggle, Converter={StaticResource BoolToVis}}"/>
                 <ListBox x:Name="List" MaxHeight="260" HorizontalContentAlignment="Stretch"
                          ItemsSource="{Binding ItemsSource, ElementName=Picker}"

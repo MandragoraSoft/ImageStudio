@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.ComponentModel;
+using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -33,8 +35,11 @@ public sealed partial class ChatViewModel : ObservableObject
                          IToolHost? tools = null, Func<ToolCall, bool>? confirm = null,
                          ChatImageSupport? images = null, Func<string, ChatModelInfo?>? modelInfo = null,
                          bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
-                         IActivityTracker? activity = null)
+                         IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null)
     {
+        ModelOptions = modelOptions ?? [];
+        ModelOptionsView = CollectionViewSource.GetDefaultView(ModelOptions);
+        ModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedModelOption));
         _activity = activity;
         _modelInfo = modelInfo;
         _reasoningEnabled = reasoningEnabled;
@@ -56,6 +61,21 @@ public sealed partial class ChatViewModel : ObservableObject
     // Wspólna z ulepszaniem promptu lista modeli czatu aktywnego dostawcy
     public ObservableCollection<string> Models { get; }
 
+    // Te same modele z opisem (ikony możliwości); widok ma filtry ustawiane przez MainViewModel
+    public ObservableCollection<ModelOption> ModelOptions { get; }
+    public ICollectionView ModelOptionsView { get; }
+
+    // Wybór w selektorze z opisem; null z selektora (filtr ukrył wybraną pozycję) nie zmienia wyboru
+    public ModelOption? SelectedModelOption
+    {
+        get => ModelOptions.FirstOrDefault(o => o.Id == SelectedModel);
+        set
+        {
+            if (value is not null) SelectedModel = value.Id;
+            else OnPropertyChanged();
+        }
+    }
+
     // Źródło narzędzi (panel MCP wiąże się z jego właściwościami); null = czat bez narzędzi
     public IToolHost? Tools { get; }
 
@@ -66,7 +86,7 @@ public sealed partial class ChatViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(SupportsReasoning))]
+    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
     private string? _selectedModel;
 
     // Rozumowanie: sterowanie pojawia się tylko dla modeli, które je deklarują (supported_parameters z katalogu)

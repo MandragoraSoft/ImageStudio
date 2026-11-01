@@ -9,7 +9,9 @@ public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IRead
 
 // Model czatu z listą parametrów, które deklaruje (supported_parameters)
 // AcceptsImage: czy katalog deklaruje wejście obrazowe (null = katalog nic o tym nie mówi)
-public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters, bool? AcceptsImage = null);
+// OwnedBy / InputModalities / Description zasilają listę modeli czatu (ikony możliwości, filtry); null = katalog nic nie mówi
+public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters, bool? AcceptsImage = null,
+                                   string? OwnedBy = null, IReadOnlyList<string>? InputModalities = null, string? Description = null);
 
 // Narzędzie dla modelu: nazwa, opis i schemat parametrów (JSON Schema jako tekst)
 public sealed record ToolDefinition(string Name, string Description, string ParametersJson);

@@ -5,8 +5,8 @@
              xmlns:vm="clr-namespace:ImageStudio.ViewModels">
     <Border Style="{StaticResource Panel}">
         <StackPanel>
-            <views:ModelPicker Header="Model AI do przetwarzania tekstu" ReloadCommand="{Binding ReloadModelsCommand}" ItemsSource="{Binding EnhancerModels}"
-                               SelectedItem="{Binding SelectedEnhancerModel}"/>
+            <views:ModelPicker Header="Model AI do przetwarzania tekstu" ReloadCommand="{Binding ReloadModelsCommand}" HasFilters="True" ItemsSource="{Binding ChatModelsView}"
+                               SelectedItem="{Binding SelectedEnhancerModelOption}"/>
 
             <TextBlock Text="Parametry modelu (włączone są wysyłane)" Style="{StaticResource SectionHeader}"/>
             <ItemsControl ItemsSource="{Binding EnhancerParameters}">

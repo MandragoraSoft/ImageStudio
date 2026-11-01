@@ -56,7 +56,7 @@ public sealed class OpenAiProvider : IAiProvider
     {
         var ids = await GetModelIdsAsync(ct);
         return ids.Where(IsChatModel)
-                  .Select(id => new ChatModelInfo(id, ChatParameters))
+                  .Select(id => new ChatModelInfo(id, ChatParameters, OwnedBy: "openai"))
                   .ToList();
     }
 

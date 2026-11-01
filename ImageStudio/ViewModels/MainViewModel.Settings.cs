@@ -21,7 +21,8 @@ public sealed partial class MainViewModel
     {
         var models = Models.Select(m => (m, "generowanie"))
             .Concat(EditModels.Select(m => (m, "edycja")))
-            .Concat(VideoModels.Select(m => (m, "wideo")));
+            .Concat(VideoModels.Select(m => (m, "wideo")))
+            .Concat(ChatModelOptions.Select(m => (m, "czat")));
         var viewModel = new ModelBrowserViewModel(_provider.DisplayName, models, _prefs.For(_provider.Id), _prefs);
         _dialogs.ShowModelBrowser(viewModel);
         RefreshFilters();
