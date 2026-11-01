@@ -17,8 +17,9 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);
 
-// Wynik edytora promptu; System = null, gdy dany rodzaj nie ma promptu systemowego
-public sealed record PromptEdit(string? System, string Prompt, string? Instruction = null);
+// Wynik edytora promptu; System = null, gdy dany rodzaj nie ma promptu systemowego; History = kroki przebudowy AI (kontekst kolejnych)
+public sealed record PromptEdit(string? System, string Prompt, string? Instruction = null,
+                                IReadOnlyList<PromptRevision>? History = null);
 
 // Interakcje z systemem i oknami, których ViewModel nie wykonuje sam
 public interface IDialogService

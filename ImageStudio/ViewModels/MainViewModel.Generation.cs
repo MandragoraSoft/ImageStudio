@@ -49,22 +49,28 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _selectedQuality = "auto";
 
+    // Kroki przebudowy AI osobno dla zakładek; trafiają do modelu jako kontekst i znikają po wczytaniu zestawu
+    private IReadOnlyList<PromptRevision>? _generateHistory;
+    private IReadOnlyList<PromptRevision>? _editHistory;
+
     private static List<Preset> PresetsOfKind(string kind) => PresetStore.LoadAll().Where(p => p.Kind == kind).ToList();
 
     [RelayCommand]
     private void EditGeneratePrompt() =>
-        EditPromptWithPresets("Prompt generowania", "generate", new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction), edit =>
+        EditPromptWithPresets("Prompt generowania", "generate", new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction, _generateHistory), edit =>
         {
             GenerateSystemPrompt = edit.System ?? "";
             GeneratePrompt = edit.Prompt;
+            _generateHistory = edit.History;
         }, () => DescribeImagesAsync([]));
 
     [RelayCommand]
     private void EditEditPrompt() =>
-        EditPromptWithPresets("Prompt edycji", "edit", new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction), edit =>
+        EditPromptWithPresets("Prompt edycji", "edit", new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction, _editHistory), edit =>
         {
             EditSystemPrompt = edit.System ?? "";
             EditPrompt = edit.Prompt;
+            _editHistory = edit.History;
         }, () => DescribeImagesAsync(References));
 
     // Edytor z zestawami. Gdy w oknie nadpisano zestaw, a zatwierdzone pola są z nim zgodne, stan
@@ -128,8 +134,11 @@ public sealed partial class MainViewModel
     {
         var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model ulepszania w „Ustawieniach ulepszania AI”.");
         var instruction = string.IsNullOrWhiteSpace(current.Instruction) ? DefaultInstruction : current.Instruction;
-        var parts = await _provider.EnhancePromptAsync(model, instruction, current.System ?? "", current.Prompt, EnhancerParameterValues());
-        return current with { System = parts.System, Prompt = parts.Concept };
+        var parts = await _provider.EnhancePromptAsync(model, instruction, current.System ?? "", current.Prompt, EnhancerParameterValues(),
+                                                       current.History);
+        var step = new PromptRevision(current.System ?? "", current.Prompt, parts.System, parts.Concept, instruction, parts.Changes);
+        var history = (current.History ?? []).Append(step).TakeLast(OpenAiCompat.MaxHistory).ToList();
+        return current with { System = parts.System, Prompt = parts.Concept, History = history };
     }
 
     // --- Edycja / generowanie z referencjami ---

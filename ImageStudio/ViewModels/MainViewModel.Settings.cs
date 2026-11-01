@@ -156,6 +156,7 @@ public sealed partial class MainViewModel
     // Wczytanie przełącza na zakładkę zestawu i ustawia wszystkie jego wartości
     private void ApplyPreset(Preset preset)
     {
+        _generateHistory = _editHistory = null;
         var isEdit = preset.Kind == "edit";
         if (isEdit)
         {

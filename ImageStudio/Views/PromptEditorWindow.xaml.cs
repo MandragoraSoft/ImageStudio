@@ -12,6 +12,7 @@ public partial class PromptEditorWindow : Window
 {
     private readonly Func<PromptEdit, Task<PromptEdit>>? _rebuild;
     private PromptEdit? _beforeRebuild;
+    private IReadOnlyList<PromptRevision>? _history;
     private bool _busy;
     private readonly Action<Preset>? _savePreset;
     private readonly Func<Task<string>>? _describeImages;
@@ -33,13 +34,15 @@ public partial class PromptEditorWindow : Window
         DescribeButton.Visibility = describeImages is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBar.Visibility = presets is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBox.ItemsSource = presets;
-        PromptHeader.Text = "Koncept";
+        PromptHeader.Text = "OCZEKIWANY WYNIK: co ma pokazać generator (temat i scena)";
         SystemSection.Visibility = initial.System is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
         SystemBox.Text = initial.System ?? "";
         PromptBox.Text = initial.Prompt;
+        _history = initial.History;
         InstructionBox.Text = initial.Instruction ?? "";
         UpdateCounters();
+        UpdateHistoryLabel();
         Loaded += (_, _) => { PromptBox.Focus(); PromptBox.CaretIndex = PromptBox.Text.Length; };
         PreviewKeyDown += (_, e) =>
         {
@@ -52,12 +55,15 @@ public partial class PromptEditorWindow : Window
     private PromptEdit Read() => new(
         SystemSection.Visibility == Visibility.Visible ? SystemBox.Text : null,
         PromptBox.Text,
-        RebuildSection.Visibility == Visibility.Visible ? InstructionBox.Text : null);
+        RebuildSection.Visibility == Visibility.Visible ? InstructionBox.Text : null,
+        _history);
 
     private void Show(PromptEdit edit)
     {
         if (SystemSection.Visibility == Visibility.Visible) SystemBox.Text = edit.System ?? "";
         PromptBox.Text = edit.Prompt;
+        _history = edit.History;
+        UpdateHistoryLabel();
     }
 
     private async void Rebuild_Click(object sender, RoutedEventArgs e)
@@ -68,7 +74,9 @@ public partial class PromptEditorWindow : Window
         SetBusy(true, "Model przebudowuje koncept...");
         try
         {
-            Show(await _rebuild(before));
+            var rebuilt = await _rebuild(before);
+            Show(rebuilt);
+            ChangesStatus.Text = rebuilt.History?.LastOrDefault()?.Changes is { Length: > 0 } changes ? $"Zmiany: {changes}" : "";
             _beforeRebuild = before;
             UndoButton.IsEnabled = true;
             RebuildStatus.Text = "";
@@ -114,6 +122,20 @@ public partial class PromptEditorWindow : Window
             SetBusy(false, "");
             DescribeButton.IsEnabled = true;
         }
+    }
+
+    private void UpdateHistoryLabel()
+    {
+        var count = _history?.Count ?? 0;
+        HistoryLabel.Text = count == 0 ? "Kontekst: brak poprzednich zmian" : $"Kontekst dla modelu: poprzednie zmiany ({count})";
+        ClearHistoryButton.IsEnabled = count > 0;
+    }
+
+    private void ClearHistory_Click(object sender, RoutedEventArgs e)
+    {
+        _history = null;
+        ChangesStatus.Text = "";
+        UpdateHistoryLabel();
     }
 
     private void UndoRebuild_Click(object sender, RoutedEventArgs e)
@@ -179,6 +201,8 @@ public partial class PromptEditorWindow : Window
     {
         SystemBox.Clear();
         PromptBox.Clear();
+        _history = null;
+        UpdateHistoryLabel();
         PromptBox.Focus();
     }
 

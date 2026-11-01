@@ -51,7 +51,12 @@ public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
 public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality);
 
 // Prompt rozdzielony: System = konfiguracja (styl, technika), Concept = treść wskazana przez użytkownika
-public sealed record PromptParts(string System, string Concept);
+// Changes: jednozdaniowe podsumowanie, co model zmienił (opcjonalne)
+public sealed record PromptParts(string System, string Concept, string? Changes = null);
+
+// Jeden krok przebudowy promptu przez model: wejście, wynik i polecenie; lista takich kroków to kontekst kolejnych przebudów
+public sealed record PromptRevision(string InSystem, string InConcept, string OutSystem, string OutConcept,
+                                    string Instruction, string? Changes = null);
 
 // Cena z rynku: PriceNow za jednostkę (Unit), reszta to dane pomocnicze do wyświetlenia
 public sealed record ModelPricing(

@@ -116,33 +116,11 @@ public sealed class ImageGenerationService : IDisposable
 
     // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).
     // Model zwraca JSON; przy błędzie parsowania koncept to surowa odpowiedź, a system zostaje bez zmian.
-    public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
-                                                      IReadOnlyDictionary<string, object> parameters, CancellationToken ct = default)
-    {
-        var body = new Dictionary<string, object>
-        {
-            ["model"] = model,
-            ["messages"] = new[]
-            {
-                new { role = "system", content = $"{instruction}\n\n{OpenAiCompat.SplitFormat}" },
-                new { role = "user", content = $"SYSTEM (config):\n{system}\n\nCONCEPT:\n{concept}" },
-            },
-        };
-        foreach (var (key, value) in parameters) body[key] = value;
-
-        using var response = await _http.PostAsJsonAsync("/v1/chat/completions", body, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
-
-        using var doc = JsonDocument.Parse(text);
-        var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
-            .GetProperty("content").GetString() ?? "";
-        var parts = OpenAiCompat.ParseSplit(content, system, concept);
-        if (string.IsNullOrWhiteSpace(parts.Concept))
-            throw new InvalidOperationException("Model nie zwrócił promptu.");
-        return parts;
-    }
+    public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
+                                                IReadOnlyDictionary<string, object> parameters,
+                                                IReadOnlyList<PromptRevision>? history = null,
+                                                CancellationToken ct = default) =>
+        OpenAiCompat.EnhanceAsync(_http, "/v1/chat/completions", model, instruction, system, concept, parameters, history, jsonMode: false, ct);
 
 
 

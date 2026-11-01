@@ -52,8 +52,14 @@ internal sealed class FakeProvider : IAiProvider
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
-                                                CancellationToken ct = default) =>
-        Enhance?.Invoke(instruction, system, concept) is { } parts ? Task.FromResult(parts) : throw new NotSupportedException();
+                                                IReadOnlyList<PromptRevision>? history = null,
+                                                CancellationToken ct = default)
+    {
+        LastHistory = history;
+        return Enhance?.Invoke(instruction, system, concept) is { } parts ? Task.FromResult(parts) : throw new NotSupportedException();
+    }
+
+    public IReadOnlyList<PromptRevision>? LastHistory { get; private set; }
 
     public Func<string, string, string, PromptParts?>? Enhance { get; set; }
 

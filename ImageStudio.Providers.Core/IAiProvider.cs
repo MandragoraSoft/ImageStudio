@@ -32,5 +32,6 @@ public interface IAiProvider : IDisposable
                               IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default);
 
     Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
-                                         IReadOnlyDictionary<string, object> parameters, CancellationToken ct = default);
+                                         IReadOnlyDictionary<string, object> parameters,
+                                         IReadOnlyList<PromptRevision>? history = null, CancellationToken ct = default);
 }

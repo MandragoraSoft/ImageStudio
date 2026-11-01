@@ -47,8 +47,9 @@ public sealed class UberLlmProvider : IAiProvider
 
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,
+                                                      IReadOnlyList<PromptRevision>? history = null,
                                                       CancellationToken ct = default) =>
-        await _api.EnhancePromptAsync(model, instruction, system, concept, parameters, ct);
+        await _api.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct);
 
     public void Dispose()
     {

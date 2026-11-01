@@ -91,11 +91,82 @@ public static class OpenAiCompat
         return wire;
     }
 
+    // Stały kontrakt odpowiedzi modelu. Dwie części są rozdzielone: konfiguracja generowania (JAK wykonać) i koncept (CO ma powstać)
     public const string SplitFormat =
-        "Split the input into two parts and reply with JSON only, no code fences: " +
-        "{\"system\": \"...\", \"concept\": \"...\"}. " +
-        "\"system\" = technical configuration (style, lighting, camera, quality, format, constraints), keep existing system text. " +
-        "\"concept\" = what the user wants depicted, improved and vivid. Keep the input language.";
+        "The input has two strictly separate parts. " +
+        "\"system\" = GENERATION CONFIGURATION: how the generator must render the result (style, technique, lighting, camera, " +
+        "quality, format, constraints). Never describe the scene there. " +
+        "\"concept\" = EXPECTED RESULT: what the generator must depict (subject, scene, action). Never put technical settings there. " +
+        "Earlier iterations of this prompt may be given as previous turns: keep what they already established unless the instruction says otherwise. " +
+        "Reply with exactly one JSON object and nothing else (no code fences, no comments) with exactly these keys: " +
+        "{\"system\": string, \"concept\": string, \"changes\": string}. " +
+        "\"changes\" = one short sentence saying what you changed. Use \"\" for an empty part, never null. " +
+        "Apply the instruction to both parts when it concerns the whole prompt (e.g. translation). " +
+        "Keep the input language unless the instruction asks for another one.";
+
+    // Ile ostatnich kroków historii trafia do modelu jako kontekst
+    public const int MaxHistory = 6;
+
+    private static string Turn(string system, string concept) =>
+        $"GENERATION CONFIGURATION (system):\n{system}\n\nEXPECTED RESULT (concept):\n{concept}";
+
+    // Wiadomości dla modelu: polecenie + kontrakt, poprzednie kroki jako rozmowa, bieżący stan na końcu
+    public static List<object> BuildEnhanceMessages(string instruction, string system, string concept,
+                                                    IReadOnlyList<PromptRevision>? history)
+    {
+        var messages = new List<object> { new { role = "system", content = $"{instruction}\n\n{SplitFormat}" } };
+        foreach (var step in (history ?? []).TakeLast(MaxHistory))
+        {
+            messages.Add(new { role = "user", content = $"INSTRUCTION: {step.Instruction}\n\n{Turn(step.InSystem, step.InConcept)}" });
+            messages.Add(new
+            {
+                role = "assistant",
+                content = JsonSerializer.Serialize(new { system = step.OutSystem, concept = step.OutConcept, changes = step.Changes ?? "" }),
+            });
+        }
+        messages.Add(new { role = "user", content = $"INSTRUCTION: {instruction}\n\n{Turn(system, concept)}" });
+        return messages;
+    }
+
+    // Wspólne dla providerów: przebudowa promptu z historią; jsonMode dodaje response_format (z ponowieniem bez niego,
+    // gdy endpoint go odrzuci). Wynik jest walidowany: koncept nie może być pusty
+    public static async Task<PromptParts> EnhanceAsync(HttpClient http, string path, string model, string instruction,
+                                                       string system, string concept,
+                                                       IReadOnlyDictionary<string, object> parameters,
+                                                       IReadOnlyList<PromptRevision>? history, bool jsonMode,
+                                                       CancellationToken ct)
+    {
+        var body = new Dictionary<string, object>
+        {
+            ["model"] = model,
+            ["messages"] = BuildEnhanceMessages(instruction, system, concept, history),
+        };
+        foreach (var (key, value) in parameters) body[key] = value;
+        if (jsonMode) body["response_format"] = new { type = "json_object" };
+
+        var (ok, text) = await PostAsync(http, path, body, ct);
+        if (!ok && jsonMode && text.Contains("response_format", StringComparison.OrdinalIgnoreCase))
+        {
+            body.Remove("response_format");
+            (ok, text) = await PostAsync(http, path, body, ct);
+        }
+        if (!ok) throw new InvalidOperationException(text);
+
+        using var doc = JsonDocument.Parse(text);
+        var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
+            .GetProperty("content").GetString() ?? "";
+        var parts = ParseSplit(content, system, concept);
+        if (string.IsNullOrWhiteSpace(parts.Concept))
+            throw new InvalidOperationException("Model nie zwrócił promptu.");
+        return parts;
+    }
+
+    private static async Task<(bool Ok, string Text)> PostAsync(HttpClient http, string path, object body, CancellationToken ct)
+    {
+        using var response = await http.PostAsJsonAsync(path, body, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        return response.IsSuccessStatusCode ? (true, text) : (false, $"HTTP {(int)response.StatusCode}: {text}");
+    }
 
     public static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)
     {
@@ -115,7 +186,10 @@ public static class OpenAiCompat
             var concept = root.TryGetProperty("concept", out var c) && c.ValueKind == JsonValueKind.String
                 ? c.GetString()!.Trim()
                 : "";
-            return new PromptParts(system, concept);
+            var changes = root.TryGetProperty("changes", out var ch) && ch.ValueKind == JsonValueKind.String
+                ? ch.GetString()!.Trim()
+                : null;
+            return new PromptParts(system, concept, string.IsNullOrWhiteSpace(changes) ? null : changes);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {

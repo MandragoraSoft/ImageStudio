@@ -38,11 +38,12 @@
         <StackPanel x:Name="SystemSection" Grid.Row="1" Margin="0,0,0,10">
             <DockPanel>
                 <TextBlock x:Name="SystemCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
-                <TextBlock Text="Konfiguracja (prompt systemowy: styl, technika, format)" Style="{StaticResource SectionHeader}"/>
+                <TextBlock Text="KONFIGURACJA GENEROWANIA: jak wykonać (styl, technika, światło, format)" Style="{StaticResource SectionHeader}"/>
             </DockPanel>
             <TextBox x:Name="SystemBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="130"
                      VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"
                      TextChanged="Box_TextChanged"/>
+            <TextBlock Text="Parametry techniczne dla generatora. Nie opisuj tu sceny." Style="{StaticResource MutedTextBlock}" Margin="0,2,0,0"/>
         </StackPanel>
 
         <DockPanel Grid.Row="2">
@@ -51,7 +52,8 @@
                     Click="Describe_Click" Visibility="Collapsed"
                     ToolTip="Wybrany model tekstowy opisze obrazy zakładki (a gdy ich brak, wskazane pliki) i dopisze opis do konceptu"/>
             <TextBlock x:Name="DescribeStatus" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
-            <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"/>
+            <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"
+                       ToolTip="Opis tego, co ma pokazać obraz lub wideo; bez parametrów technicznych"/>
         </DockPanel>
         <TextBox x:Name="PromptBox" Grid.Row="3" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14"
@@ -73,6 +75,13 @@
                 <Button Content="Instrukcja domyślna" Padding="12,4" Click="DefaultInstruction_Click"
                         Style="{StaticResource SecondaryButton}"/>
             </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <TextBlock x:Name="HistoryLabel" VerticalAlignment="Center" Style="{StaticResource MutedTextBlock}"
+                           ToolTip="Poprzednie przebudowy trafiają do modelu jako kontekst (ostatnie 6), żeby nie gubił wcześniejszych ustaleń"/>
+                <Button x:Name="ClearHistoryButton" Content="Wyczyść kontekst" Padding="10,2" Margin="10,0,0,0" Click="ClearHistory_Click"
+                        Style="{StaticResource SecondaryButton}"/>
+            </StackPanel>
+            <TextBlock x:Name="ChangesStatus" TextWrapping="Wrap" Margin="0,4,0,0" Style="{StaticResource MutedTextBlock}"/>
             <Expander x:Name="EnhancerHost" Header="Model i parametry przetwarzania tekstu" IsExpanded="True" Margin="0,8,0,0">
                 <views:EnhancerPanel Margin="0,4,0,0"/>
             </Expander>
