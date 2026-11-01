@@ -32,6 +32,9 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public void OpenFile(string path) =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+
     public string? PickAudioFile()
     {
         var dialog = new OpenFileDialog

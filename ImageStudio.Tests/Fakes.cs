@@ -161,6 +161,9 @@ internal sealed class FakeDialogs : IDialogService
     public string? AudioPick { get; set; }
     public string? SaveAsAnswer { get; set; }
     public string? PickAudioFile() => AudioPick;
+    public List<string> Opened { get; } = [];
+    public Exception? OpenError { get; set; }
+    public void OpenFile(string path) => (OpenError is null ? Opened : throw OpenError).Add(path);
     public string? ChooseSaveFileAs(string suggestedFileName, string title, string filter) => SaveAsAnswer;
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
@@ -283,13 +286,18 @@ internal sealed class FakeAudioPlayer : IAudioPlayer
     public int Stops { get; private set; }
     private Action? _ended;
 
-    public void Play(string path, Action? ended = null)
+    public void Play(string path, Action? ended = null, Action<string>? failed = null)
     {
         Played.Add(path);
-        _ended = ended;
+        (_ended, _failed) = (ended, failed);
     }
 
+    private Action<string>? _failed;
+    public void Fail(string reason) => _failed?.Invoke(reason);
+
     public void Stop() => Stops++;
+    public int OutputDevice { get; set; } = -1;
+    public IReadOnlyList<AudioDevice> OutputDevices() => [new(-1, "Domyślne"), new(0, "Głośniki"), new(1, "Słuchawki")];
     public void FinishPlayback() => _ended?.Invoke();
 }
 

@@ -1,5 +1,4 @@
 using System.IO;
-using System.Windows.Media;
 using NAudio.Wave;
 
 namespace ImageStudio.Services;
@@ -25,8 +24,14 @@ public interface IAudioRecorder
 // Odtwarzanie pliku dźwiękowego; jedno naraz (nowe odtwarzanie zatrzymuje poprzednie)
 public interface IAudioPlayer
 {
-    void Play(string path, Action? ended = null);
+    // ended: koniec pliku albo błąd; failed (opcjonalne): powód, gdy pliku nie da się odtworzyć (brak kodeka, urządzenie)
+    void Play(string path, Action? ended = null, Action<string>? failed = null);
     void Stop();
+
+    // Wyjścia dźwięku: pozycja o indeksie -1 to domyślne urządzenie systemu. Komputery z wirtualnymi urządzeniami
+    // (Sonar, Steam Streaming) bywają ustawione tak, że domyślne wyjście nic nie słychać, więc wybór jest dla użytkownika
+    IReadOnlyList<AudioDevice> OutputDevices();
+    int OutputDevice { get; set; }
 }
 
 // WaveIn (winmm): najstarsze API Windows, działa z każdym sterownikiem. Zdarzenia wracają na wątek UI,
@@ -40,7 +45,8 @@ public sealed class NAudioRecorder : IAudioRecorder
     public event Action<double>? LevelChanged;
 
     public IReadOnlyList<AudioDevice> Devices() =>
-        Enumerable.Range(0, WaveIn.DeviceCount).Select(i => new AudioDevice(i, WaveIn.GetCapabilities(i).ProductName)).ToList();
+        [new(NAudioPlayer.DefaultDevice, "Domyślne urządzenie systemu"),
+         .. Enumerable.Range(0, WaveIn.DeviceCount).Select(i => new AudioDevice(i, WaveIn.GetCapabilities(i).ProductName))];
 
     public void Start(int deviceIndex, string path)
     {
@@ -90,39 +96,59 @@ public sealed class NAudioRecorder : IAudioRecorder
     }
 }
 
-public sealed class WpfAudioPlayer : IAudioPlayer
+// Odtwarzanie przez NAudio: dekoder Media Foundation (mp3, wav, m4a, aac...) i wyjście winmm z wybranym urządzeniem.
+// PlaybackStopped wraca na wątek UI, na którym utworzono odtwarzacz
+public sealed class NAudioPlayer : IAudioPlayer
 {
-    private MediaPlayer? _player;
-    private Action? _ended;
+    public const int DefaultDevice = -1;
 
-    public void Play(string path, Action? ended = null)
+    private WaveOutEvent? _output;
+    private MediaFoundationReader? _reader;
+    private int _generation;
+
+    public int OutputDevice { get; set; } = DefaultDevice;
+
+    public IReadOnlyList<AudioDevice> OutputDevices() =>
+        [new(DefaultDevice, "Domyślne urządzenie systemu"),
+         .. Enumerable.Range(0, WaveOut.DeviceCount).Select(i => new AudioDevice(i, WaveOut.GetCapabilities(i).ProductName))];
+
+    public void Play(string path, Action? ended = null, Action<string>? failed = null)
     {
         Stop();
-        _player ??= CreatePlayer();
-        _ended = ended;
-        _player.Open(new Uri(path));
-        _player.Play();
+        var generation = _generation;
+        try
+        {
+            var reader = new MediaFoundationReader(path);
+            var output = new WaveOutEvent { DeviceNumber = OutputDevice };
+            output.PlaybackStopped += (_, e) =>
+            {
+                if (generation != _generation) return;  // zatrzymane przez nas (Stop albo nowe odtwarzanie)
+                Release();
+                if (e.Exception is not null) failed?.Invoke(e.Exception.Message);
+                ended?.Invoke();
+            };
+            output.Init(reader);
+            (_reader, _output) = (reader, output);
+            output.Play();
+        }
+        catch (Exception ex)  // dekoder i sterownik zgłaszają różne wyjątki (COM, MmException, IO): każdy to "nie da się odtworzyć"
+        {
+            Release();
+            failed?.Invoke(ex.Message);
+            ended?.Invoke();
+        }
     }
 
     public void Stop()
     {
-        _player?.Stop();
-        _player?.Close();
-        _ended = null;
+        _generation++;
+        Release();
     }
 
-    private MediaPlayer CreatePlayer()
+    private void Release()
     {
-        var player = new MediaPlayer();
-        player.MediaEnded += (_, _) => Finish();
-        player.MediaFailed += (_, _) => Finish();
-        return player;
-    }
-
-    private void Finish()
-    {
-        var ended = _ended;
-        Stop();
-        ended?.Invoke();
+        _output?.Dispose();
+        _reader?.Dispose();
+        (_output, _reader) = (null, null);
     }
 }

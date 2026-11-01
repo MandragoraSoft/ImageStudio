@@ -166,7 +166,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)
                 or nameof(VoiceViewModel.Speed) or nameof(VoiceViewModel.Format) or nameof(VoiceViewModel.SelectedTranscriptionModel)
-                or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone)) SaveState();
+                or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone) or nameof(VoiceViewModel.SelectedSpeaker)) SaveState();
         };
         Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));

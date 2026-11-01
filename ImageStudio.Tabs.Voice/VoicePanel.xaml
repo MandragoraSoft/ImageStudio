@@ -5,7 +5,11 @@
     <!-- DataContext = VoiceViewModel. Wyniki (odtwarzanie, zapis) są w prawym panelu okna głównego -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Expander Header="Mowa z tekstu" IsExpanded="True">
+            <Expander Header="Wyjście dźwięku" IsExpanded="False" ToolTip="Urządzenie, na którym grają nagrania">
+                <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" DisplayMemberPath="Name" Margin="0,4,0,0"/>
+            </Expander>
+
+            <Expander Header="Mowa z tekstu" IsExpanded="True" Margin="0,10,0,0">
                 <StackPanel Margin="0,4,0,0">
                     <TextBox Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                              TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>

@@ -136,6 +136,33 @@ public sealed class VoiceViewModelTests : IDisposable
         Assert.Equal("Mikrofon testowy", state.VoiceMicrophone);
     }
 
+    [Fact]
+    public async Task Chosen_output_device_goes_to_the_player_and_is_remembered()
+    {
+        var app = App();
+        await LoadedAsync(app);
+        using var _ = app;
+        var voice = app.Vm.Voice;
+        var player = app.Get<FakeAudioPlayer>();
+        Assert.Equal(["Domyślne", "Głośniki", "Słuchawki"], voice.Speakers.Select(d => d.Name));
+        Assert.Equal(-1, player.OutputDevice);
+
+        voice.SelectedSpeaker = voice.Speakers[2];
+        app.Vm.SaveState();
+
+        Assert.Equal(1, player.OutputDevice);
+        Assert.Equal("Słuchawki", app.Get<IUserStateStore>().Load().VoiceSpeaker);
+    }
+
+    [Fact]
+    public async Task Remembered_output_device_is_selected_on_start()
+    {
+        using var app = await LoadedAsync(App(s => s.VoiceSpeaker = "Głośniki"));
+
+        Assert.Equal("Głośniki", app.Vm.Voice.SelectedSpeaker!.Name);
+        Assert.Equal(0, app.Get<FakeAudioPlayer>().OutputDevice);
+    }
+
     // ---- synteza ----
 
     [Fact]
@@ -371,6 +398,27 @@ public sealed class VoiceViewModelTests : IDisposable
 
         app.Vm.Voice.StopPlaybackCommand.Execute(null);
         Assert.False(item.IsPlaying);
+    }
+
+    [Fact]
+    public async Task A_playback_failure_is_reported_with_its_reason_and_the_external_player_opens_the_file()
+    {
+        var (app, item) = await WithSpeechResultAsync();
+        using var _ = app;
+        var player = app.Get<FakeAudioPlayer>();
+        var dialogs = app.Get<FakeDialogs>();
+
+        player.Fail("Nie znaleziono kodeka");
+        await Until(() => app.Vm.Status.Contains("kodeka"));
+        Assert.Contains("Otwórz w odtwarzaczu", app.Vm.Status);
+
+        app.Vm.Voice.OpenExternallyCommand.Execute(item);
+        Assert.Equal([item.Path], dialogs.Opened);
+        Assert.True(player.Stops > 0);  // wbudowany odtwarzacz nie gra równolegle
+
+        dialogs.OpenError = new InvalidOperationException("brak programu");
+        app.Vm.Voice.OpenExternallyCommand.Execute(item);
+        Assert.Contains("brak programu", app.Vm.Status);
     }
 
     [Fact]

@@ -60,7 +60,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<IThemeService, WpfThemeService>();
-        services.AddSingleton<IAudioPlayer, WpfAudioPlayer>();
+        services.AddSingleton<IAudioPlayer, NAudioPlayer>();
         services.AddSingleton<IAudioRecorder, NAudioRecorder>();
         return services;
     }

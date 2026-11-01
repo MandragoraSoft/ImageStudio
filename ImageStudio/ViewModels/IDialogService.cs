@@ -13,7 +13,8 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    IReadOnlyDictionary<string, bool>? PreferredOnly = null,
                                    IReadOnlyDictionary<string, string?>? DefaultTextModels = null,
                                    IReadOnlyList<string>? ActiveTextModels = null,
-                                   bool UseStreaming = true);
+                                   bool UseStreaming = true,
+                                   string? Microphone = null, string? Speaker = null);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);
@@ -30,6 +31,9 @@ public interface IDialogService
 
     // Plik dźwiękowy do rozpoznania (null = anulowano) i zapis dowolnego pliku (filter w formacie okna systemowego: "Dźwięk|*.mp3")
     string? PickAudioFile();
+
+    // Otwiera plik w programie domyślnym systemu (np. odtwarzacz dla mp3); błąd wyjątkiem
+    void OpenFile(string path);
     string? ChooseSaveFileAs(string suggestedFileName, string title, string filter);
     void CopyImage(BitmapSource image);
     BitmapSource? GetClipboardImage();

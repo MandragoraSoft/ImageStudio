@@ -56,7 +56,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     private readonly Stopwatch _recordingClock = new();
     private CancellationTokenSource? _cts;
     private string? _recordingPath;
-    private string? _savedSpeechModel, _savedVoice, _savedTranscriptionModel, _savedMicrophone;
+    private string? _savedSpeechModel, _savedVoice, _savedTranscriptionModel, _savedMicrophone, _savedSpeaker;
 
     public VoiceViewModel(Func<IAiProvider> provider, IDialogService dialogs, IAudioPlayer player, IAudioRecorder recorder,
                           Action<string, bool> report, Action reload, string outputDir, UserState state)
@@ -66,6 +66,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         _savedVoice = state.VoiceName;
         _savedTranscriptionModel = state.VoiceTranscriptionModel;
         _savedMicrophone = state.VoiceMicrophone;
+        _savedSpeaker = state.VoiceSpeaker;
         _speed = state.VoiceSpeed ?? 1.0;
         _format = state.VoiceFormat is "wav" ? "wav" : "mp3";
         _language = state.VoiceLanguage ?? "";
@@ -75,6 +76,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             RecordSeconds = (int)_recordingClock.Elapsed.TotalSeconds;
         });
         RefreshMicrophones();
+        RefreshSpeakers();
     }
 
     // --- Mowa z tekstu ---
@@ -154,6 +156,48 @@ public sealed partial class VoiceViewModel : ObservableObject
     public string TranscriptionPriceLabel => SelectedTranscriptionModel?.Pricing is { } p
         ? $"${p.PriceNow:0.####} za minutę nagrania"
         : "Brak ceny dla tego modelu";
+
+    // Wyjście dźwięku odtwarzacza (domyślne urządzenie albo konkretne); wybór jest zapamiętywany
+    public ObservableCollection<AudioDevice> Speakers { get; } = [];
+
+    [ObservableProperty]
+    private AudioDevice? _selectedSpeaker;
+
+    partial void OnSelectedSpeakerChanged(AudioDevice? value)
+    {
+        if (value is not null) _player.OutputDevice = value.Index;
+    }
+
+    // Lista urządzeń przy każdym otwarciu ustawień: sprzęt bywa podłączany i odłączany w trakcie pracy
+    public void RefreshDevices()
+    {
+        _savedMicrophone = SelectedMicrophone?.Name ?? _savedMicrophone;
+        _savedSpeaker = SelectedSpeaker?.Name ?? _savedSpeaker;
+        RefreshMicrophones();
+        RefreshSpeakers();
+    }
+
+    // Wybór z okna ustawień (po nazwie; nieznana nazwa nic nie zmienia)
+    public void ApplyDevices(string? microphone, string? speaker)
+    {
+        if (Microphones.FirstOrDefault(d => d.Name == microphone) is { } mic) SelectedMicrophone = mic;
+        if (Speakers.FirstOrDefault(d => d.Name == speaker) is { } output) SelectedSpeaker = output;
+    }
+
+    private void RefreshSpeakers()
+    {
+        Speakers.Clear();
+        try
+        {
+            foreach (var device in _player.OutputDevices()) Speakers.Add(device);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report($"Nie udało się odczytać listy wyjść dźwięku: {ex.Message}", true);
+        }
+
+        SelectedSpeaker = Speakers.FirstOrDefault(d => d.Name == _savedSpeaker) ?? Speakers.FirstOrDefault();
+    }
 
     // --- Wyniki ---
 
@@ -408,7 +452,25 @@ public sealed partial class VoiceViewModel : ObservableObject
 
         StopPlayback();
         item.IsPlaying = true;
-        _player.Play(item.Path, () => Post(() => item.IsPlaying = false));
+        _player.Play(item.Path, () => Post(() => item.IsPlaying = false),
+                     reason => Post(() => Report($"Nie udało się odtworzyć nagrania: {reason}. Użyj „Otwórz w odtwarzaczu”.", true)));
+    }
+
+    // Zapasowa droga: domyślny odtwarzacz systemu (gdy wbudowany nie radzi sobie z plikiem albo urządzeniem dźwiękowym)
+    [RelayCommand]
+    private void OpenExternally(VoiceItem? item)
+    {
+        if (item?.Path is null || !item.HasAudio) return;
+
+        StopPlayback();
+        try
+        {
+            _dialogs.OpenFile(item.Path);
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            Report($"Nie udało się otworzyć pliku: {ex.Message}", true);
+        }
     }
 
     [RelayCommand]
@@ -489,5 +551,6 @@ public sealed partial class VoiceViewModel : ObservableObject
         state.VoiceTranscriptionModel = SelectedTranscriptionModel?.Id ?? state.VoiceTranscriptionModel;
         state.VoiceLanguage = Language;
         state.VoiceMicrophone = SelectedMicrophone?.Name ?? state.VoiceMicrophone;
+        state.VoiceSpeaker = SelectedSpeaker?.Name ?? state.VoiceSpeaker;
     }
 }

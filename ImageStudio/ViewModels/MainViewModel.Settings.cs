@@ -40,9 +40,15 @@ public sealed partial class MainViewModel
                                          _settings.OpenAiBaseUrl, _secrets.Load("openai") ?? "",
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
-                                         EnhancerModels.ToList(), _settings.UseStreaming);
-        var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current), new ProviderSettingsTab(current, LoadTextModelsAsync)]);
+                                         EnhancerModels.ToList(), _settings.UseStreaming,
+                                         Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name);
+        Voice.RefreshDevices();
+        var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
+                                                     new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
+                                                     new ProviderSettingsTab(current, LoadTextModelsAsync)]);
         if (result is null) return;
+
+        Voice.ApplyDevices(result.Microphone, result.Speaker);
 
         foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())
             _prefs.For(id).PreferredOnly = preferredOnly;

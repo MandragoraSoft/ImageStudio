@@ -49,6 +49,11 @@
                                         Visibility="{Binding HasAudio, Converter={StaticResource BoolToVis}}"
                                         Command="{Binding DataContext.PlayCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
+                                <Button Content="Otwórz w odtwarzaczu" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        ToolTip="Otwiera plik w domyślnym odtwarzaczu systemu"
+                                        Visibility="{Binding HasAudio, Converter={StaticResource BoolToVis}}"
+                                        Command="{Binding DataContext.OpenExternallyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
                                 <Button Content="■ Stop" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
                                         Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}"
                                         Command="{Binding DataContext.StopPlaybackCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
