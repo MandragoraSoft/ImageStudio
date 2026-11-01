@@ -70,7 +70,7 @@ public sealed partial class MainViewModel
         if (_settings with { Theme = "", UseStreaming = true, Language = "" } == previous with { Theme = "", UseStreaming = true, Language = "" })
         {
             PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
-            Status = "Zapisano ustawienia.";
+            Status = Loc.T("settings.msg.saved");
             return;
         }
 
@@ -132,7 +132,7 @@ public sealed partial class MainViewModel
 
         _presetStore.Create(CapturePreset(draft));
         PresetDirty = false;
-        Status = $"Zapisano zestaw: {draft.Name}";
+        Status = Loc.T("presets.msg.saved", draft.Name);
     }
 
     [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
@@ -210,7 +210,7 @@ public sealed partial class MainViewModel
         RebuildEnhancerParameters();
 
         ActiveTab = isEdit ? 1 : 0;
-        Status = $"Wczytano zestaw: {preset.Name}";
+        Status = Loc.T("presets.msg.loaded", preset.Name);
         SaveState();
         PresetDirty = false; // wczytany zestaw jest zgodny z zapisem
     }

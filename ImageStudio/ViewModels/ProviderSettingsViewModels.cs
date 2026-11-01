@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImageStudio.Services;
@@ -14,7 +15,7 @@ public abstract partial class ProviderSettingsViewModel : ObservableObject
 
     // Ostrzeżenie w oknie ustawień; null, gdy zmienna nie jest ustawiona
     public string? EnvNotice => Environment.GetEnvironmentVariable(EnvVar) is { Length: > 0 }
-        ? $"Zmienna środowiskowa {EnvVar} jest ustawiona i ma pierwszeństwo nad kluczem wpisanym tutaj."
+        ? Loc.T("provider.envOverride", EnvVar)
         : null;
 
     // Lista modeli tego dostawcy: false = wszystkie, true = tylko preferowane

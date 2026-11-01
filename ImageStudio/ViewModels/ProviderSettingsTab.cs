@@ -43,16 +43,16 @@ public sealed partial class ProviderSettingsTab : ObservableObject, ISettingsTab
     private async Task ReloadTextModelsAsync()
     {
         var provider = ActiveProvider;
-        TextModelsStatus = "Pobieranie modeli...";
+        TextModelsStatus = Loc.T("models.msg.loadingShort");
         try
         {
             var models = await _loadTextModels!(Apply(_current));
             provider.SetTextModels(models, provider.PreferredTextModelOrNull);
-            TextModelsStatus = $"Pobrano modeli: {models.Count}";
+            TextModelsStatus = Loc.T("models.msg.count", models.Count);
         }
         catch (Exception ex)
         {
-            TextModelsStatus = $"Nie udało się pobrać modeli: {ex.Message}";
+            TextModelsStatus = Loc.T("models.msg.failed", ex.Message);
         }
     }
 

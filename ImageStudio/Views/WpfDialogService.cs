@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -14,8 +15,8 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Wybierz obrazy referencyjne",
-            Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.webp",
+            Title = Loc.T("dialog.pickImages"),
+            Filter = Loc.T("dialog.imagesFilter"),
             Multiselect = true
         };
         return dialog.ShowDialog() == true ? dialog.FileNames : null;
@@ -25,7 +26,7 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
     {
         var dialog = new SaveFileDialog
         {
-            Title = "Zapisz obraz",
+            Title = Loc.T("dialog.saveImage"),
             FileName = suggestedFileName,
             Filter = "PNG|*.png|JPEG|*.jpg;*.jpeg|WEBP|*.webp"
         };
@@ -39,8 +40,8 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Wybierz nagranie",
-            Filter = "Nagrania|*.mp3;*.wav;*.ogg;*.flac;*.m4a;*.mp4;*.webm;*.aac|Wszystkie pliki|*.*",
+            Title = Loc.T("dialog.pickRecording"),
+            Filter = Loc.T("dialog.recordingsFilter"),
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
@@ -95,8 +96,8 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
         == MessageBoxResult.Yes;
 
     public bool ConfirmToolCall(ToolCall call) =>
-        Confirm($"Wywołanie narzędzia (czat albo klient MCP):\n\n{call.Name}\n\nArgumenty:\n{call.ArgumentsJson}\n\nPozwolić?",
-                "Wywołanie narzędzia");
+        Confirm(Loc.T("dialog.toolCall", call.Name, call.ArgumentsJson),
+                Loc.T("dialog.toolCall.title"));
 
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         new ModelBrowserWindow { DataContext = viewModel, Owner = OwnerWindow() }.ShowDialog();

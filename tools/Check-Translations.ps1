@@ -36,7 +36,7 @@ $dictDir = Join-Path $Root 'ImageStudio.Shared/Localization'
 $languages = @('pl', 'en')
 $keyPattern = '^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)+$'
 $dynamicPrefixes = @('lang.')                       # klucze składane w kodzie, np. $"lang.{Code}"
-$sameInBothLanguages = @('settings.language.pl', 'settings.language.en', 'voice.format', 'voice.stop')   # nazwy własne i skróty
+$sameInBothLanguages = @('settings.language.pl', 'settings.language.en', 'voice.format', 'voice.stop', 'common.model', 'common.prompt', 'gen.seed', 'presets.auto', 'tools.port', 'chat.incognito', 'chat.stop', 'param.seed', 'param.topk', 'param.topp')   # nazwy własne i skróty
 
 $errors = [System.Collections.Generic.List[string]]::new()
 $warnings = [System.Collections.Generic.List[string]]::new()
@@ -115,8 +115,9 @@ if ($null -ne $dict['pl'] -and $null -ne $dict['en']) {   # tylko gdy oba pliki 
         $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
         $rel = $f.FullName.Substring($Root.TrimEnd('\', '/').Length + 1)
         if ($f.Extension -eq '.xaml') {
-            foreach ($m in [regex]::Matches($text, '\{loc:T ([A-Za-z0-9.]+)\}')) {
-                $k = $m.Groups[1].Value
+            # {loc:T klucz} oraz NullToLoc z kluczem w ConverterParameter
+            foreach ($m in [regex]::Matches($text, '\{loc:T ([A-Za-z0-9.]+)\}|NullToLoc\.Instance\}, ConverterParameter=([A-Za-z0-9.]+)')) {
+                $k = if ($m.Groups[1].Success) { $m.Groups[1].Value } else { $m.Groups[2].Value }
                 if (-not $knownKeys.Contains($k)) { $errors.Add("Nieznany klucz w XAML: $k ($rel)") } else { $used[$k] = $true }
             }
         }
@@ -145,7 +146,7 @@ if ($Pending) {
         $lines = [System.IO.File]::ReadAllLines($f.FullName, [System.Text.Encoding]::UTF8)
         if ($f.Extension -eq '.xaml') {
             $n = ([regex]::Matches(($lines -join "`n"), '\b(?:Content|Header|Text|ToolTip|Title)="([^"{][^"]*)"') |
-                Where-Object { $_.Groups[1].Value -match '[A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]{3}' -and $_.Groups[1].Value -notmatch '^(&#|ImageStudio$)' }).Count
+                Where-Object { $_.Groups[1].Value -match '[A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]{3}' -and $_.Groups[1].Value -notmatch '^(&#|ImageStudio$|Ctrl\+|NSFW$|: $)' }).Count
         } else {
             $n = ($lines | Where-Object { $_ -notmatch '^\s*//' -and $_ -match "`"[^`"]*$polish[^`"]*`"" -and $_ -notmatch 'Loc\.T' }).Count
         }

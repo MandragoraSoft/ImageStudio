@@ -93,7 +93,7 @@ public sealed class NAudioRecorder : IAudioRecorder
 
     public void Start(int deviceIndex, string path)
     {
-        if (_input is not null) throw new InvalidOperationException("Nagrywanie już trwa.");
+        if (_input is not null) throw new InvalidOperationException(Loc.T("voice.err.alreadyRecording"));
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var format = new WaveFormat(16000, 16, 1);

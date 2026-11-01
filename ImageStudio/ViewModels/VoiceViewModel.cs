@@ -227,6 +227,16 @@ public sealed partial class VoiceViewModel : ObservableObject
     private int _recordSeconds;
 
     public string AudioFileName => AudioPath is null ? Loc.T("voice.file.none") : Path.GetFileName(AudioPath);
+    // Etykiety liczone w kodzie nie mają powiązania ze słownikiem: po zmianie języka odświeżamy je ręcznie
+    public void RefreshLanguageTexts()
+    {
+        OnPropertyChanged(nameof(SpeechEstimateLabel));
+        OnPropertyChanged(nameof(RecordButtonText));
+        OnPropertyChanged(nameof(TranscriptionPriceLabel));
+        OnPropertyChanged(nameof(AudioFileName));
+        OnPropertyChanged(nameof(GalleryLabel));
+    }
+
     public string RecordButtonText => IsRecording ? Loc.T("voice.record.stop") : Loc.T("voice.record.start");
     public string TranscriptionPriceLabel => SelectedTranscriptionModel?.Pricing is { } p
         ? Loc.T("voice.price.perMinute", p.PriceNow)

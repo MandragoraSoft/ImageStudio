@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -82,7 +83,7 @@ public sealed partial class PresetsViewModel : ObservableObject
         var name = EditName.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
-            Status = "Nazwa zestawu nie może być pusta.";
+            Status = Loc.T("presets.msg.emptyName");
             return;
         }
 
@@ -90,7 +91,7 @@ public sealed partial class PresetsViewModel : ObservableObject
         SelectedPreset.Description = EditDescription.Trim();
         _presets.Save(SelectedPreset);
         Reload(SelectedPreset.FilePath);
-        Status = "Zapisano nazwę i opis.";
+        Status = Loc.T("presets.msg.metaSaved");
     }
 
     // Jednorazowy import starej historii promptów; powtórne uruchomienie pomija już zaimportowane
@@ -100,12 +101,12 @@ public sealed partial class PresetsViewModel : ObservableObject
         var result = _importer.Import();
         if (!result.FileFound)
         {
-            Status = "Nie znaleziono starej historii (prompts.json).";
+            Status = Loc.T("presets.msg.noLegacy");
             return;
         }
 
         Reload(SelectedPreset?.FilePath);
-        Status = $"Zaimportowano: {result.Imported}, pominięto (już istnieją): {result.Skipped}.";
+        Status = Loc.T("presets.msg.imported", result.Imported, result.Skipped);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
@@ -113,10 +114,10 @@ public sealed partial class PresetsViewModel : ObservableObject
     {
         if (SelectedPreset is null) return;
 
-        if (!_dialogs.Confirm($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu")) return;
+        if (!_dialogs.Confirm(Loc.T("presets.confirmDelete", SelectedPreset.Name), Loc.T("presets.confirmDelete.title"))) return;
 
         _presets.Delete(SelectedPreset);
         Reload(null);
-        Status = "Usunięto zestaw.";
+        Status = Loc.T("presets.msg.deleted");
     }
 }

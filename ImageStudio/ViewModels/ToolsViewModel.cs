@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -99,7 +100,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         ? []
         : [.. _host.Tools, .. AppToolDefinitions()];
 
-    public string Summary => UseTools ? $"Dostępne narzędzia: {Tools.Count}" : "Narzędzia wyłączone";
+    public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
 
     private IEnumerable<ToolDefinition> AppToolDefinitions() =>
         AppControlEnabled && _appTools is not null
@@ -159,15 +160,15 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 
     private async Task ConnectAsync(McpServerItem item)
     {
-        item.Status = "Łączenie...";
+        item.Status = Loc.T("tools.connecting");
         try
         {
             var count = await _host.ConnectAsync(item.Name, _config.McpServers[item.Name]);
-            item.Status = $"Połączono, narzędzi: {count}";
+            item.Status = Loc.T("tools.connected", count);
         }
         catch (Exception ex)
         {
-            item.Status = $"Błąd: {ex.Message}";
+            item.Status = Loc.T("msg.error", ex.Message);
             Log.LogError("Serwer MCP {Server}: {Message}", item.Name, ex.Message);
             _enabledNames.Remove(item.Name);
             item.SetEnabledSilently(false);
@@ -197,7 +198,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         }
         catch (Exception ex)
         {
-            Info = $"Nie udało się otworzyć mcp.json: {ex.Message}";
+            Info = Loc.T("tools.openFailed", ex.Message);
         }
     }
 

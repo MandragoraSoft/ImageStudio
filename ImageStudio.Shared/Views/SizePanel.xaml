@@ -58,6 +58,6 @@
         </Grid>
 
         <CheckBox Content="{loc:T size.lock}" IsChecked="{Binding KeepAspect}" Margin="0,0,0,4"/>
-        <TextBlock Text="{Binding Size, StringFormat='Rozmiar wysyłany: {0}'}" Style="{StaticResource MutedTextBlock}"/>
+        <TextBlock Style="{StaticResource MutedTextBlock}"><Run Text="{loc:T size.sent}"/><Run Text="{Binding Size, Mode=OneWay}"/></TextBlock>
     </StackPanel>
 </UserControl>

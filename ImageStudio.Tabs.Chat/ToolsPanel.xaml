@@ -1,19 +1,20 @@
 <UserControl x:Class="ImageStudio.Tabs.Chat.ToolsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <!-- Narzędzia MCP w zakładce Czat (DataContext = ToolsViewModel) -->
-    <Expander Header="Narzędzia (MCP)" Margin="0,12,0,0">
+    <Expander Header="{loc:T tools.header}" Margin="0,12,0,0">
         <StackPanel Margin="0,6,0,0">
-            <CheckBox Content="Pozwól modelowi używać narzędzi" IsChecked="{Binding UseTools}"/>
-            <CheckBox Content="Pytaj o zgodę przed każdym wywołaniem" IsChecked="{Binding RequireApproval}" Margin="0,4,0,0"
-                      ToolTip="Zalecane: narzędzia mogą czytać pliki, wysyłać dane i zmieniać rzeczy poza aplikacją"/>
+            <CheckBox Content="{loc:T tools.enable}" IsChecked="{Binding UseTools}"/>
+            <CheckBox Content="{loc:T tools.confirm}" IsChecked="{Binding RequireApproval}" Margin="0,4,0,0"
+                      ToolTip="{loc:T tools.confirm.tip}"/>
 
             <CheckBox IsChecked="{Binding AppControlEnabled}" Margin="0,4,0,0"
-                      ToolTip="Narzędzia imagestudio__*: wybór modeli, prompty, rozmiar, galeria i generowanie (kosztuje, ale pyta o zgodę)">
-                <TextBlock Text="Model może sterować aplikacją (modele, prompty, generowanie)" TextWrapping="Wrap"/>
+                      ToolTip="{loc:T tools.control.tip}">
+                <TextBlock Text="{loc:T tools.control}" TextWrapping="Wrap"/>
             </CheckBox>
 
-            <TextBlock Text="Serwery z mcp.json" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T tools.servers}" Style="{StaticResource SectionHeader}"/>
             <ItemsControl ItemsSource="{Binding Servers}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -30,27 +31,27 @@
             <TextBlock Text="{Binding Info}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Button Content="Otwórz mcp.json" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenConfigCommand}"/>
-                <Button Content="Wczytaj ponownie" Padding="10,4" Command="{Binding ReloadCommand}"/>
+                <Button Content="{loc:T tools.openJson}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenConfigCommand}"/>
+                <Button Content="{loc:T tools.reload}" Padding="10,4" Command="{Binding ReloadCommand}"/>
             </StackPanel>
 
-            <TextBlock Text="Serwer MCP aplikacji (sterowanie z zewnątrz)" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T tools.server}" Style="{StaticResource SectionHeader}"/>
             <CheckBox IsChecked="{Binding Server.Enabled}">
-                <TextBlock Text="Udostępnij sterowanie aplikacją klientom MCP (tylko ten komputer)" TextWrapping="Wrap"/>
+                <TextBlock Text="{loc:T tools.server.enable}" TextWrapping="Wrap"/>
             </CheckBox>
             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                <TextBlock Text="Port:" VerticalAlignment="Center" Margin="0,0,6,0" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Text="{loc:T tools.port}" VerticalAlignment="Center" Margin="0,0,6,0" Style="{StaticResource MutedTextBlock}"/>
                 <TextBox Text="{Binding Server.Port, UpdateSourceTrigger=LostFocus}" Width="70"/>
             </StackPanel>
             <TextBlock Text="{Binding Server.Status}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0"/>
-            <Button Content="Kopiuj konfigurację klienta" Padding="10,4" Margin="0,6,0,0" HorizontalAlignment="Left"
+            <Button Content="{loc:T tools.copyConfig}" Padding="10,4" Margin="0,6,0,0" HorizontalAlignment="Left"
                     Command="{Binding Server.CopyConfigCommand}"
-                    ToolTip="Wkleja się do konfiguracji klienta MCP; zawiera token dostępu"/>
+                    ToolTip="{loc:T tools.copyConfig.tip}"/>
             <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"
-                       Text="Dostęp tylko z tego komputera i z tokenem. Każde generowanie z zewnątrz wymaga potwierdzenia w aplikacji."/>
+                       Text="{loc:T tools.server.note}"/>
 
             <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"
-                       Text="Format jak w Claude Desktop: {&quot;mcpServers&quot;: {&quot;nazwa&quot;: {&quot;command&quot;: &quot;npx&quot;, &quot;args&quot;: [...]}}} albo {&quot;url&quot;: &quot;https://...&quot;, &quot;headers&quot;: {...}}. Tokeny w pliku są zwykłym tekstem."/>
+                       Text="{loc:T tools.json.note}"/>
         </StackPanel>
     </Expander>
 </UserControl>

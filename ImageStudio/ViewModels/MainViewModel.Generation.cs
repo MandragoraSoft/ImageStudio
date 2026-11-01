@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -88,7 +89,7 @@ public sealed partial class MainViewModel
         EnhancerInstruction = edit.Instruction ?? EnhancerInstruction;
         if (saved is null) return;
 
-        Status = $"Zapisano prompt w zestawie: {saved.Name}";
+        Status = Loc.T("gen.msg.promptSaved", saved.Name);
         if (edit.Prompt == saved.Prompt && (edit.System ?? "") == saved.SystemPrompt)
             PresetDirty = wasDirty;
     }
@@ -106,7 +107,7 @@ public sealed partial class MainViewModel
     {
         var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model w „Ustawieniach ulepszania AI”.");
         if (_chatModels.TryGetValue(model, out var info) && info.AcceptsImage == false)
-            throw new InvalidOperationException($"Model {model} nie przyjmuje obrazów. Wybierz model z ikoną obrazu.");
+            throw new InvalidOperationException(Loc.T("gen.err.noImages", model));
 
         var paths = tabImages.Count > 0 ? tabImages.Select(i => i.Path).ToList() : _dialogs.PickImageFiles()?.ToList();
         if (paths is not { Count: > 0 }) return "";
@@ -240,11 +241,11 @@ public sealed partial class MainViewModel
         try
         {
             _dialogs.CopyImage(Image!);
-            Status = "Skopiowano do schowka";
+            Status = Loc.T("gen.msg.copied");
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się skopiować: {ex.Message}";
+            Status = Loc.T("gen.msg.copyFailed", ex.Message);
             Log.LogError("{Message}", Status);
         }
     }
@@ -260,7 +261,7 @@ public sealed partial class MainViewModel
             if (target is null) return;
 
             File.Copy(VideoSource.LocalPath, target, overwrite: true);
-            Status = $"Zapisano: {target}";
+            Status = Loc.T("gen.msg.saved", target);
             return;
         }
 
@@ -269,7 +270,7 @@ public sealed partial class MainViewModel
         if (path is null) return;
 
         File.WriteAllBytes(path, _imageBytes!);
-        Status = $"Zapisano: {path}";
+        Status = Loc.T("gen.msg.saved", path);
     }
 
     // Czyści ekran wyniku (obraz lub wideo); plik w galerii i zapis w folderze zostają
@@ -283,7 +284,7 @@ public sealed partial class MainViewModel
         ShowVideo = false;
         VideoSource = null;
         SelectedGalleryEntry = null;
-        Status = "Wyczyszczono wynik.";
+        Status = Loc.T("gen.msg.cleared");
     }
 
     // 100%: rzeczywisty rozmiar obrazu z przewijaniem
@@ -302,7 +303,7 @@ public sealed partial class MainViewModel
                                 string size, decimal? estimate)
     {
         IsBusy = true;
-        Status = "Przetwarzanie...";
+        Status = Loc.T("gen.msg.processing");
         try
         {
             var result = await produce();
@@ -323,11 +324,11 @@ public sealed partial class MainViewModel
                 CostEstimated = result.CostUsd is null && estimate is not null,
                 Thumbnail = GalleryStore.Thumbnail(path),
             });
-            Status = $"Zapisano: {path}";
+            Status = Loc.T("gen.msg.saved", path);
         }
         catch (Exception ex)
         {
-            Status = $"Błąd: {ex.Message}";
+            Status = Loc.T("msg.error", ex.Message);
             Log.LogError("{Message}", Status);
         }
         finally

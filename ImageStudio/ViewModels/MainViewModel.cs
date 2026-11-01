@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -185,6 +186,7 @@ public sealed partial class MainViewModel : ObservableObject
         EditModelsView.Filter = FilterModel;
         VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
         VideoModelsView.Filter = FilterModel;
+        Loc.LanguageChanged += RefreshLanguageTexts;
         References.CollectionChanged += (_, _) => EditCommand.NotifyCanExecuteChanged();
         VideoAttachments.CollectionChanged += (_, _) =>
         {
@@ -339,7 +341,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         // Zajętość na czas ładowania: pasek postępu i zablokowane akcje (także po zmianie dostawcy w Ustawieniach)
         IsBusy = true;
-        Status = "Pobieranie listy modeli i cen...";
+        Status = Loc.T("models.msg.loading");
         PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
         var keepVideo = SelectedVideoModel?.Id;
         try
@@ -348,7 +350,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się pobrać modeli: {ex.Message}";
+            Status = Loc.T("models.msg.failed", ex.Message);
             Log.LogError("{Message}", Status);
         }
 
@@ -392,7 +394,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice.ApplyCatalog(catalog);
 
         RefreshOwners();
-        Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
+        Status = Loc.T("models.msg.loaded", Models.Count, EditModels.Count, VideoModels.Count);
         if (catalog.Warnings.Count > 0)
         {
             var warnings = string.Join("; ", catalog.Warnings);

@@ -1,9 +1,10 @@
 <UserControl x:Class="ImageStudio.Views.ModelMetricsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <Border Style="{StaticResource Panel}">
         <StackPanel>
-            <TextBlock Text="{Binding ActiveModel.Id, TargetNullValue='Brak modelu'}"
+            <TextBlock Text="{Binding ActiveModel.Id, Converter={x:Static loc:NullToLoc.Instance}, ConverterParameter=metrics.noModel}"
                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
             <Grid Margin="0,6,0,0">
                 <Grid.ColumnDefinitions>
@@ -18,24 +19,24 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Cena teraz:" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Text="{loc:T metrics.priceNow}" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Column="1" Margin="0,2" FontWeight="SemiBold"
                            Text="{Binding ActiveModel.Pricing.PriceNow, StringFormat='${0:0.0000}', TargetNullValue='—'}"/>
-                <TextBlock Grid.Column="2" Text="Katalog:" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Grid.Column="2" Text="{loc:T metrics.list}" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Column="3" Margin="0,2"
                            Text="{Binding ActiveModel.Pricing.ListUsd, StringFormat='${0:0.0000}', TargetNullValue='—'}"/>
 
-                <TextBlock Grid.Row="1" Text="Rabat:" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Grid.Row="1" Text="{loc:T metrics.discount}" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,2"
                            Text="{Binding ActiveModel.Pricing.DiscountPct, StringFormat='{}{0:0.#}%', TargetNullValue='—'}"/>
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="Jednostka:" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="{loc:T metrics.unit}" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Row="1" Grid.Column="3" Margin="0,2"
                            Text="{Binding ActiveModel.Pricing.Unit, TargetNullValue='—'}"/>
 
-                <TextBlock Grid.Row="2" Text="Oferty:" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Grid.Row="2" Text="{loc:T metrics.offers}" Margin="0,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,2"
                            Text="{Binding ActiveModel.Pricing.MarketOffers, TargetNullValue='—'}"/>
-                <TextBlock Grid.Row="2" Grid.Column="2" Text="Żądań 24h:" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="{loc:T metrics.requests}" Margin="10,2,6,2" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Grid.Row="2" Grid.Column="3" Margin="0,2"
                            Text="{Binding ActiveModel.Pricing.Requests24h, StringFormat='{}{0:0}', TargetNullValue='—'}"/>
             </Grid>

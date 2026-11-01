@@ -1,23 +1,24 @@
 <UserControl x:Class="ImageStudio.Tabs.Edit.EditPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Expander Header="Obrazy referencyjne (pierwszy = podstawowy)" IsExpanded="True">
+            <Expander Header="{loc:T edit.refs}" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <Button Content="Dodaj..." Width="90" Margin="0,0,6,0" Command="{Binding AddReferencesCommand}"/>
-                        <Button Content="Wyczyść" Width="90" Margin="0,0,6,0" Command="{Binding ClearReferencesCommand}"/>
-                        <Button Content="Wklej ze schowka" Padding="10,6" Command="{Binding PasteReferenceCommand}"
-                                ToolTip="Wkleja obraz ze schowka (np. zrzut ekranu)"/>
+                        <Button Content="{loc:T common.add}" Width="90" Margin="0,0,6,0" Command="{Binding AddReferencesCommand}"/>
+                        <Button Content="{loc:T common.clear}" Width="90" Margin="0,0,6,0" Command="{Binding ClearReferencesCommand}"/>
+                        <Button Content="{loc:T common.pasteClipboard}" Padding="10,6" Command="{Binding PasteReferenceCommand}"
+                                ToolTip="{loc:T edit.paste.tip}"/>
                     </StackPanel>
 
                     <DockPanel Margin="0,0,0,6">
-                        <Button DockPanel.Dock="Right" Content="Dodaj z linku" Width="110" Margin="6,0,0,0"
+                        <Button DockPanel.Dock="Right" Content="{loc:T edit.addUrl}" Width="110" Margin="6,0,0,0"
                                 Command="{Binding AddReferenceFromUrlCommand}"/>
                         <TextBox Text="{Binding ReferenceUrl, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Adres http(s) obrazu JPG, PNG lub WEBP"/>
+                                 ToolTip="{loc:T edit.url.tip}"/>
                     </DockPanel>
 
                     <ListBox ItemsSource="{Binding References}" Height="110" Margin="0,0,0,10">
@@ -43,29 +44,29 @@
                 </StackPanel>
             </Expander>
 
-            <Button Content="Edytuj prompt..." Height="34" Command="{Binding EditEditPromptCommand}"
-                    ToolTip="Edytor promptu w osobnym oknie: konfiguracja, koncept, przebudowa AI"/>
+            <Button Content="{loc:T common.editPrompt}" Height="34" Command="{Binding EditEditPromptCommand}"
+                    ToolTip="{loc:T common.editPrompt.tip}"/>
 
             <UniformGrid Columns="2" Margin="0,4,0,0">
-                <Button Content="Zapisz zestaw" Margin="0,0,4,0"
-                        Command="{Binding SavePresetCommand}" ToolTip="Zapisz prompt, model i parametry jako zestaw"/>
-                <Button Content="Zestawy..."
-                        Command="{Binding OpenPresetsCommand}" ToolTip="Wczytaj lub zarządzaj zapisanymi zestawami"/>
+                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
+                        Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
+                <Button Content="{loc:T common.presets}"
+                        Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
             </UniformGrid>
 
 
-            <views:ModelPicker Header="Model edycji" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" Margin="0,4,0,0"
+            <views:ModelPicker Header="{loc:T edit.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" Margin="0,4,0,0"
                                ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
 
-            <Expander Header="Proporcje i rozmiar wyjścia" IsExpanded="True" Margin="0,0,0,6">
+            <Expander Header="{loc:T common.sizeSection}" IsExpanded="True" Margin="0,0,0,6">
                 <StackPanel>
                     <views:SizePanel Margin="0,4,0,0"/>
-                    <TextBlock Text="Endpoint edycji nie przyjmuje rozmiaru: wynik dopasowujemy do proporcji lokalnie."
+                    <TextBlock Text="{loc:T edit.sizeNote}"
                                TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Expander>
 
-            <Button Content="Edytuj" Height="34" Margin="0,6,0,0" Command="{Binding EditCommand}" ToolTip="Ctrl+Enter"/>
+            <Button Content="{loc:T edit.run}" Height="34" Margin="0,6,0,0" Command="{Binding EditCommand}" ToolTip="Ctrl+Enter"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

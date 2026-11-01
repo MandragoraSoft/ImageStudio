@@ -66,8 +66,16 @@ public sealed class LocalizationTests
                 used.Add(m.Groups[1].Value);
             }
 
+        // NullToLoc: klucz w ConverterParameter zamiast TargetNullValue
+        foreach (var file in SourceFiles("*.xaml"))
+            foreach (Match m in Regex.Matches(File.ReadAllText(file), @"NullToLoc\.Instance\}, ConverterParameter=([A-Za-z0-9.]+)"))
+            {
+                Assert.True(keys.Contains(m.Groups[1].Value), $"brak klucza {m.Groups[1].Value} ({Path.GetFileName(file)})");
+                used.Add(m.Groups[1].Value);
+            }
+
         foreach (var file in SourceFiles("*.cs"))
-            foreach (Match m in Regex.Matches(File.ReadAllText(file), "\"([a-z]+(?:\\.[A-Za-z0-9]+)+)\""))
+            foreach (Match m in Regex.Matches(File.ReadAllText(file), "\"([a-z][A-Za-z0-9]*(?:\\.[A-Za-z0-9]+)+)\""))
                 if (keys.Contains(m.Groups[1].Value)) used.Add(m.Groups[1].Value);
             // klucze składane w kodzie ("lang.{Code}") i wywołania Loc.T("...") sprawdza kolejna pętla
 
@@ -294,6 +302,48 @@ public sealed class LocalizationTests
                 Loc.Set(Loc.Polish);
             }
 
+            window.Close();
+        });
+    }
+
+    // Widoczne teksty (treść, nagłówki, dymki) bez polskich znaków; łapie ekran, któremu zostały teksty na sztywno
+    private static IEnumerable<string> VisibleTexts(DependencyObject root)
+    {
+        foreach (var element in FindAll<FrameworkElement>(root).Append((FrameworkElement)root))
+        {
+            if (element is TextBlock t) yield return t.Text;
+            if (element is ContentControl { Content: string c }) yield return c;
+            if (element is HeaderedContentControl { Header: string h }) yield return h;
+            if (element is MenuItem { Header: string m }) yield return m;
+            if (element.ToolTip is string tip) yield return tip;
+        }
+    }
+
+    [Fact]
+    public void Every_tab_and_the_result_panel_of_the_main_window_have_no_polish_text_in_english()
+    {
+        WpfHost.Run(() =>
+        {
+            Loc.Set(Loc.English);  // okno otwarte od razu po angielsku: listy budowane raz (np. urządzenia) też muszą być przetłumaczone
+            using var app = TestApp.Create();
+            var window = app.Get<ImageStudio.MainWindow>();
+            window.ShowInTaskbar = false;
+            window.Show();
+            try
+            {
+                var polish = new Regex("[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]");
+                for (var tab = 0; tab < 5; tab++)
+                {
+                    app.Vm.ActiveTab = tab;
+                    Flush(window.Dispatcher);
+                    var left = VisibleTexts(window).Where(s => polish.IsMatch(s) && s != "Domyślne").Distinct().ToList();  // "Domyślne": nazwa urządzenia z atrapy odtwarzacza
+                    Assert.True(left.Count == 0, $"zakładka {tab}: polskie teksty w trybie angielskim: " + string.Join(" | ", left));
+                }
+            }
+            finally
+            {
+                Loc.Set(Loc.Polish);
+            }
             window.Close();
         });
     }

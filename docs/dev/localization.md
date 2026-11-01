@@ -37,23 +37,19 @@ Skrypt i testy `LocalizationTests` sprawdzają to samo z dwóch stron: skrypt da
 
 ## Co jest przetłumaczone
 
-Menu, stopka, nazwy zakładek, okno Ustawień (Aplikacja, Dźwięk, Dostawca AI, widoki dostawców), selektor modeli i panel filtrów, panel proporcji (`SizePanel`), dymki ikon modeli i koszty modelu (`ModelOption.CostText`), cała zakładka Głos (panel, wyniki, komunikaty `VoiceViewModel`, nazwy języków), domyślne urządzenie audio.
+Całe okno główne (menu, stopka, wszystkie zakładki lewego panelu, panel wyniku i galeria, czat, narzędzia MCP), okna Ustawień, Edytora promptu, Zestawów, Zapisu zestawu i Przeglądarki modeli, selektor modeli i filtry, komunikaty ViewModeli (statusy, potwierdzenia, nazwy czynności w stopce), okna dialogowe plików, domyślne urządzenie audio, parametry modeli czatu (`ParamSpec` trzyma klucze, `ModelParameter.Label/Hint` czytają słownik).
 
-## Do przetłumaczenia (kolejne etapy)
+## Pułapki
 
-Szacunkowa lista plików z tekstami po polsku (liczba to orientacyjna liczba tekstów; w kodzie liczone tylko łańcuchy z polskimi znakami, więc rzeczywista jest wyższa):
+- `TargetNullValue` nie przyjmuje powiązania, więc `{loc:T}` tam nie zadziała. Tekst zastępczy daje konwerter: `Converter={x:Static loc:NullToLoc.Instance}, ConverterParameter=klucz` (tak samo traktują go skrypt i test kluczy).
+- Etykiety liczone w ViewModelu (`GalleryTotalLabel`, `VideoEstimateLabel`, `VoiceViewModel.GalleryLabel`...) nie mają powiązania ze słownikiem: `MainViewModel` nasłuchuje `Loc.LanguageChanged` i odświeża je w `RefreshLanguageTexts` (dopisz tam nową etykietę).
+- Listy budowane raz (nazwy języków mowy, urządzenia audio) przyjmują nowy język przy następnym zbudowaniu, a nie od razu.
+- Test `Every_tab_and_the_result_panel_of_the_main_window_have_no_polish_text_in_english` otwiera okno po angielsku i szuka polskich znaków we wszystkich zakładkach. Nie widzi tekstów bez polskich liter ani okien dodatkowych, więc nowe okno sprawdź ręcznie (`-Pending` też pomaga).
+- Statyczne katalogi (jak `ModelParameter.Catalog`) trzymają **klucze**, a tekst pobierają przy odczycie.
 
-| Obszar | Pliki |
-|---|---|
-| Zakładki lewego panelu | `ImageStudio.Tabs.Generate/GenerationPanel.xaml` (17), `ImageStudio.Tabs.Edit/EditPanel.xaml` (18), `ImageStudio.Tabs.Video/VideoPanel.xaml` (12), `ImageStudio.Tabs.Chat/ChatPanel.xaml` (16), `ToolsPanel.xaml` (16) |
-| Panel wyniku | `Views/OutputPanel.xaml` (17) + `.cs`, `Views/ModelMetricsPanel.xaml` (6), `Views/EnhancerPanel.xaml` |
-| Czat | `Views/ChatConversation.xaml` (11), `ViewModels/ChatViewModel.cs` (12), `ToolsViewModel.cs`, `McpToolHost.cs`, `AppServerViewModel.cs` |
-| Okna | `PromptEditorWindow.xaml` (23) + `.cs`, `PresetsWindow.xaml` (22), `PresetSaveWindow.xaml`, `ModelBrowserWindow.xaml` (13), ich ViewModele |
-| Komunikaty głównego okna | `MainViewModel.*.cs` (wideo, galeria, referencje, generowanie, AppControl), `ModelParameter.cs`, `ImageDownloadService.cs`, `WpfDialogService.cs` |
-| Narzędzia MCP | `Services/AppControlTools.cs` (21; opisy narzędzi widzi model, nie użytkownik: zostaw po angielsku albo polsku, ale spójnie) |
-| Dostawcy (komunikaty błędów) | `ImageStudio.Providers.*` (kilka tekstów; biblioteki dostawców nie referują `ImageStudio.Shared`, więc teksty dla użytkownika zwracaj kodem błędu albo tłumacz w ViewModelu) |
+## Zostaje po polsku (celowo)
 
-Kolejność: zakładki lewego panelu i panel wyniku (najczęściej oglądane), potem okna, na końcu komunikaty ViewModeli. Po każdym etapie zostaw w tabeli tylko to, co zostało.
+Teksty, których nie widzi użytkownik: opisy i wyniki narzędzi MCP dla modelu (`Services/AppControlTools.cs`, `McpToolHost.cs`, część `MainViewModel.AppControl.cs`), komunikaty wyjątków dostawców (`ImageStudio.Providers.*` nie referują `ImageStudio.Shared`), błędy programisty (brak `DataTemplate`, `Loc.cs`), dzienniki (`Log.*`) i prompty dla modeli. `-Pending` nadal je wypisze; to oczekiwane.
 
 ## Dodanie kolejnego języka
 

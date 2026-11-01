@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.ComponentModel;
@@ -136,7 +137,7 @@ public sealed partial class ChatViewModel : ObservableObject
     // Ostrzeżenie, gdy dołączono obraz, a katalog mówi, że wybrany model obrazów nie przyjmuje
     public string ImageWarning =>
         Attachments.Count > 0 && SelectedModel is { } model && _images?.AcceptsImage(model) == false
-            ? "Ten model nie przyjmuje obrazów: wiadomość może zostać odrzucona. Wybierz model z obsługą obrazu."
+            ? Loc.T("chat.msg.noImages")
             : "";
 
     private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null;
@@ -154,7 +155,7 @@ public sealed partial class ChatViewModel : ObservableObject
         Input = "";
         Attachments.Clear();
         IsSending = true;
-        _report("Model odpowiada...", false);
+        _report(Loc.T("chat.msg.answering"), false);
         ChatMessage? live = null;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
@@ -194,17 +195,17 @@ public sealed partial class ChatViewModel : ObservableObject
                 if (round >= MaxToolRounds)
                 {
                     if (live is not null) Messages.Remove(live);
-                    Messages.Add(new ChatMessage("assistant", "Przerwano: model zbyt wiele razy z rzędu prosił o narzędzia."));
+                    Messages.Add(new ChatMessage("assistant", Loc.T("chat.msg.toolLoop")));
                     break;
                 }
 
                 Complete(live, new ChatMessage("assistant", reply.Content, reply.ToolCalls), reply);
                 foreach (var call in reply.ToolCalls)
                     Messages.Add(new ChatMessage("tool", await RunToolAsync(call, ct), ToolCallId: call.Id, ToolName: call.Name));
-                _report("Model odpowiada...", false);
+                _report(Loc.T("chat.msg.answering"), false);
             }
 
-            _report("Gotowy", false);
+            _report(Loc.T("msg.ready"), false);
         }
         catch (Exception ex)
         {
@@ -222,8 +223,8 @@ public sealed partial class ChatViewModel : ObservableObject
             }
 
             // Stop zostawia tekst, który zdążył napłynąć; to nie jest błąd
-            if (stopped) _report("Zatrzymano odpowiedź", false);
-            else _report($"Błąd czatu: {ex.Message}", true);
+            if (stopped) _report(Loc.T("chat.msg.stopped"), false);
+            else _report(Loc.T("chat.msg.error", ex.Message), true);
         }
         finally
         {
@@ -261,19 +262,19 @@ public sealed partial class ChatViewModel : ObservableObject
     // Wynik zawsze wraca do modelu jako tekst: odmowa i błąd narzędzia też, żeby mógł zareagować
     private async Task<string> RunToolAsync(ToolCall call, CancellationToken ct)
     {
-        if (Tools is null) return "Narzędzia są wyłączone.";
-        if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false)) return "Użytkownik odrzucił wywołanie narzędzia.";
+        if (Tools is null) return Loc.T("chat.msg.toolsOff");
+        if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false)) return Loc.T("chat.msg.toolRejected");
 
-        _report($"Narzędzie {call.Name}...", false);
+        _report(Loc.T("chat.msg.tool", call.Name), false);
         try
         {
             // Wywołanie narzędzia (serwer MCP) to też operacja sieciowa: spinner w stopce
-            using var _ = _activity?.Begin($"Narzędzie {call.Name}");
+            using var _ = _activity?.Begin(Loc.T("chat.msg.toolActivity", call.Name));
             return await Tools.CallAsync(call, ct);
         }
         catch (Exception ex)
         {
-            return $"Błąd narzędzia: {ex.Message}";
+            return Loc.T("chat.msg.toolError", ex.Message);
         }
     }
 
@@ -294,7 +295,7 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             if (_images!.Dialogs.GetClipboardImage() is not { } image)
             {
-                _report("Schowek nie zawiera obrazu.", false);
+                _report(Loc.T("msg.noClipboardImage"), false);
                 return;
             }
 
@@ -306,7 +307,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            _report($"Nie udało się wkleić obrazu: {ex.Message}", true);
+            _report(Loc.T("msg.pasteFailed", ex.Message), true);
         }
     }
 
@@ -327,7 +328,7 @@ public sealed partial class ChatViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                _report($"Nie udało się wczytać {Path.GetFileName(path)}: {ex.Message}", true);
+                _report(Loc.T("msg.loadFileFailed", Path.GetFileName(path), ex.Message), true);
             }
         }
     }
@@ -342,7 +343,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is NotSupportedException or FileFormatException or InvalidOperationException)
         {
-            _report($"Nie udało się wczytać obrazu {name}: {ex.Message}", true);
+            _report(Loc.T("msg.loadNamedImageFailed", name, ex.Message), true);
         }
     }
 

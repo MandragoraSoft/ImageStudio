@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -27,11 +28,11 @@ public sealed partial class MainViewModel
             foreach (var path in paths)
                 References.Add(new ReferenceItem(ImageOrientation.EnsureUpright(path), Path.GetFileName(path), path));
             if (SourceImage is null) LoadPrimary();
-            Status = $"Referencje: {References.Count}";
+            Status = Loc.T("ref.msg.count", References.Count);
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się wczytać obrazu: {ex.Message}";
+            Status = Loc.T("ref.msg.loadFailed", ex.Message);
             Log.LogError("{Message}", Status);
         }
     }
@@ -43,20 +44,20 @@ public sealed partial class MainViewModel
     {
         var url = ReferenceUrl.Trim();
         IsBusy = true;
-        Status = "Pobieranie obrazu z linku...";
+        Status = Loc.T("ref.msg.downloading");
         try
         {
             string path;
-            using (Activity.Begin("Pobieranie obrazu"))
+            using (Activity.Begin(Loc.T("activity.downloadImage")))
                 path = await _downloads.DownloadAsync(url);
             References.Add(new ReferenceItem(path, ReferenceItem.Shorten(url), url));
             if (SourceImage is null) LoadPrimary();
             ReferenceUrl = "";
-            Status = "Dodano obraz z linku";
+            Status = Loc.T("ref.msg.addedUrl");
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się pobrać obrazu: {ex.Message}";
+            Status = Loc.T("ref.msg.downloadFailed", ex.Message);
             Log.LogError("{Message}", Status);
         }
         finally
@@ -74,7 +75,7 @@ public sealed partial class MainViewModel
 
         References.Add(new ReferenceItem(path, $"Schowek {DateTime.Now:HH:mm:ss}", "schowek"));
         if (SourceImage is null) LoadPrimary();
-        Status = $"Dodano obraz ze schowka. Referencje: {References.Count}";
+        Status = Loc.T("ref.msg.addedClipboard", References.Count);
     }
 
     // Zapisuje obraz ze schowka jako PNG w katalogu referencji; null, gdy schowka nie ma obrazu
@@ -85,7 +86,7 @@ public sealed partial class MainViewModel
             var image = _dialogs.GetClipboardImage();
             if (image is null)
             {
-                Status = "Schowek nie zawiera obrazu.";
+                Status = Loc.T("msg.noClipboardImage");
                 return null;
             }
 
@@ -100,7 +101,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się wkleić obrazu: {ex.Message}";
+            Status = Loc.T("msg.pasteFailed", ex.Message);
             Log.LogError("{Message}", Status);
             return null;
         }
@@ -121,7 +122,7 @@ public sealed partial class MainViewModel
             // Usunięto podstawowy: nowym podstawowym staje się następny na liście
             LoadPrimary();
         }
-        Status = $"Referencje: {References.Count}";
+        Status = Loc.T("ref.msg.count", References.Count);
     }
 
     [RelayCommand]
@@ -130,7 +131,7 @@ public sealed partial class MainViewModel
         References.Clear();
         _primaryPath = null;
         SourceImage = null;
-        Status = "Wyczyszczono referencje";
+        Status = Loc.T("ref.msg.cleared");
     }
 
     // Podgląd i proporcje z pierwszego obrazu (podstawowego)

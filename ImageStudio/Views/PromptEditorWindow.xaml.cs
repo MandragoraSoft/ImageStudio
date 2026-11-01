@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,7 +35,7 @@ public partial class PromptEditorWindow : Window
         DescribeButton.Visibility = describeImages is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBar.Visibility = presets is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBox.ItemsSource = presets;
-        PromptHeader.Text = "OCZEKIWANY WYNIK: co ma pokazać generator (temat i scena)";
+        PromptHeader.Text = Loc.T("prompt.header");
         SystemSection.Visibility = initial.System is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
         SystemBox.Text = initial.System ?? "";
@@ -83,7 +84,7 @@ public partial class PromptEditorWindow : Window
         }
         catch (Exception ex)
         {
-            RebuildStatus.Text = $"Błąd przebudowy: {ex.Message}";
+            RebuildStatus.Text = Loc.T("prompt.msg.rewriteError", ex.Message);
         }
         finally
         {
@@ -111,11 +112,11 @@ public partial class PromptEditorWindow : Window
             PromptBox.IsReadOnly = false;
             PromptBox.AppendText((PromptBox.Text.Length > 0 ? "\n\n" : "") + text);
             PromptBox.CaretIndex = PromptBox.Text.Length;
-            DescribeStatus.Text = "Dodano opis obrazów.";
+            DescribeStatus.Text = Loc.T("prompt.msg.described");
         }
         catch (Exception ex)
         {
-            DescribeStatus.Text = $"Błąd opisu: {ex.Message}";
+            DescribeStatus.Text = Loc.T("prompt.msg.describeError", ex.Message);
         }
         finally
         {
@@ -164,7 +165,7 @@ public partial class PromptEditorWindow : Window
 
         var hasText = !string.IsNullOrWhiteSpace(PromptBox.Text) || !string.IsNullOrWhiteSpace(SystemBox.Text);
         var same = PromptBox.Text == preset.Prompt && SystemBox.Text == preset.SystemPrompt;
-        if (hasText && !same && !Confirm($"Zastąpić bieżący prompt w oknie promptem z zestawu „{preset.Name}”?")) return;
+        if (hasText && !same && !Confirm(Loc.T("prompt.confirmReplace", preset.Name))) return;
 
         if (SystemSection.Visibility == Visibility.Visible) SystemBox.Text = preset.SystemPrompt;
         PromptBox.Text = preset.Prompt;
@@ -175,7 +176,7 @@ public partial class PromptEditorWindow : Window
     private void Overwrite_Click(object sender, RoutedEventArgs e)
     {
         if (PresetBox.SelectedItem is not Preset preset) return;
-        if (!Confirm($"Nadpisać prompt w zestawie „{preset.Name}”?\n\nObecna treść zestawu zostanie utracona (model, rozmiar i parametry zostają).")) return;
+        if (!Confirm(Loc.T("prompt.confirmOverwrite", preset.Name))) return;
 
         preset.Prompt = PromptBox.Text;
         if (SystemSection.Visibility == Visibility.Visible) preset.SystemPrompt = SystemBox.Text;
@@ -188,7 +189,7 @@ public partial class PromptEditorWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, $"Nie udało się zapisać zestawu: {ex.Message}", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, Loc.T("prompt.msg.saveFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -220,5 +221,5 @@ public partial class PromptEditorWindow : Window
     }
 
     private static string Describe(string text) =>
-        $"{text.Length} znaków, {text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length} słów";
+        Loc.T("prompt.counter", text.Length, text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
 }

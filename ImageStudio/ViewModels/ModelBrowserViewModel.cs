@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
@@ -24,7 +25,7 @@ public sealed partial class ModelBrowserItem : ObservableObject
     // Opis z API; gdy go brak, zbudowany z atrybutów modelu
     public string Description => Option.Description is { Length: > 0 } d
         ? d
-        : $"Dostawca: {Option.OwnedBy ?? "—"}. Wejście: {string.Join(", ", Option.InputModalities)}."
+        : Loc.T("browser.summary", Option.OwnedBy ?? "—", string.Join(", ", Option.InputModalities))
           + (Option.Nsfw ? " Model NSFW." : "");
 
     [ObservableProperty]

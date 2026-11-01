@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -48,8 +49,8 @@ public sealed partial class MainViewModel
         {
             if (VideoAttachments.Count == 0) return "";
             return SelectedVideoModel is { AcceptsImage: false }
-                ? "Wybrany model nie przyjmuje obrazów. Wybierz model image → video lub reference → video."
-                : $"Załączniki: {VideoAttachments.Count}";
+                ? Loc.T("video.msg.noImages")
+                : Loc.T("video.msg.attachmentsHint", VideoAttachments.Count);
         }
     }
 
@@ -63,11 +64,11 @@ public sealed partial class MainViewModel
         {
             foreach (var path in paths)
                 VideoAttachments.Add(new ReferenceItem(ImageOrientation.EnsureUpright(path), Path.GetFileName(path), path));
-            Status = $"Załączniki wideo: {VideoAttachments.Count}";
+            Status = Loc.T("video.msg.attachments", VideoAttachments.Count);
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się wczytać załącznika: {ex.Message}";
+            Status = Loc.T("video.msg.attachmentFailed", ex.Message);
             Log.LogError("{Message}", Status);
         }
     }
@@ -88,7 +89,7 @@ public sealed partial class MainViewModel
         if (path is null) return;
 
         VideoAttachments.Add(new ReferenceItem(path, $"Schowek {DateTime.Now:HH:mm:ss}", "schowek"));
-        Status = $"Załączniki wideo: {VideoAttachments.Count}";
+        Status = Loc.T("video.msg.attachments", VideoAttachments.Count);
     }
 
     private static string MimeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
@@ -110,7 +111,7 @@ public sealed partial class MainViewModel
     public bool ShowImage => !ShowVideo;
 
     public string VideoEstimateLabel => SelectedVideoModel?.Pricing is { } p
-        ? $"Szacunek: ~${p.PriceNow * VideoDuration:0.00} ({VideoDuration} s × ${p.PriceNow:0.####}/s)"
+        ? Loc.T("video.estimate", p.PriceNow * VideoDuration, VideoDuration, p.PriceNow)
         : "Brak ceny dla tego modelu";
 
     // Załączniki wymagają modelu, który przyjmuje obrazy
@@ -125,7 +126,7 @@ public sealed partial class MainViewModel
         var model = SelectedVideoModel!;
         var estimate = model.Pricing?.PriceNow * VideoDuration;
         IsBusy = true;
-        Status = "Wysyłanie zadania wideo...";
+        Status = Loc.T("video.msg.sending");
         try
         {
             var attachments = VideoAttachments
@@ -133,7 +134,7 @@ public sealed partial class MainViewModel
                 .ToList();
 
             var result = await _provider.GenerateVideoAsync(model.Id, VideoPrompt, VideoDuration, VideoAspect,
-                                                           attachments, s => Status = $"Wideo: {s}...");
+                                                           attachments, s => Status = Loc.T("video.msg.progress", s));
 
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ImageStudio");
             Directory.CreateDirectory(dir);
@@ -147,17 +148,17 @@ public sealed partial class MainViewModel
                 Prompt = VideoPrompt,
                 Model = model.Id,
                 Kind = "video",
-                Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? $" · {attachments.Count} zał." : ""),
+                Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? Loc.T("video.sizeAttachments", attachments.Count) : ""),
                 FilePath = path,
                 Thumbnail = GalleryStore.Thumbnail(path),
                 CostUsd = result.CostUsd ?? estimate,
                 CostEstimated = result.CostUsd is null && estimate is not null,
             });
-            Status = $"Zapisano wideo: {path}";
+            Status = Loc.T("video.msg.saved", path);
         }
         catch (Exception ex)
         {
-            Status = $"Błąd wideo: {ex.Message}";
+            Status = Loc.T("video.msg.error", ex.Message);
             Log.LogError("{Message}", Status);
         }
         finally

@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -43,7 +44,7 @@ public sealed partial class PresetSaveViewModel : ObservableObject
     private async Task SuggestAsync()
     {
         IsSuggesting = true;
-        Status = "AI wymyśla nazwę...";
+        Status = Loc.T("presetSave.msg.thinking");
         try
         {
             var draft = await _suggest!();
@@ -53,7 +54,7 @@ public sealed partial class PresetSaveViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Status = $"Nie udało się zaproponować nazwy: {ex.Message}";
+            Status = Loc.T("presetSave.msg.failed", ex.Message);
         }
         finally
         {
@@ -81,7 +82,7 @@ public sealed partial class PresetSaveViewModel : ObservableObject
             name = json.Split('\n')[0].Trim().Trim('"');
         }
 
-        if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("Model nie zwrócił nazwy.");
+        if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException(Loc.T("presetSave.err.noName"));
         return new PresetDraft(name.Trim(), description?.Trim() ?? "");
     }
 }

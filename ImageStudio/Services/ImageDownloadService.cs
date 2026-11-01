@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.IO;
 using System.Net.Http;
 using ImageStudio.Configuration;
@@ -21,11 +22,11 @@ public sealed class ImageDownloadService
         response.EnsureSuccessStatusCode();
 
         if (response.Content.Headers.ContentLength is > MaxBytes)
-            throw new InvalidOperationException("Obraz jest większy niż 25 MB.");
+            throw new InvalidOperationException(Loc.T("ref.msg.tooLarge"));
 
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
         if (bytes.Length > MaxBytes)
-            throw new InvalidOperationException("Obraz jest większy niż 25 MB.");
+            throw new InvalidOperationException(Loc.T("ref.msg.tooLarge"));
 
         // Sprawdzamy sygnaturę pliku, nie nagłówek Content-Type (serwery bywają niedokładne)
         var ext = bytes switch

@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -23,7 +24,7 @@ public partial class OutputPanel : UserControl
     {
         Player.Play();
         _playing = true;
-        PlayPauseButton.Content = "⏸ Pauza";
+        PlayPauseButton.Content = Loc.T("out.pause");
         _timer.Start();
     }
 
@@ -31,7 +32,7 @@ public partial class OutputPanel : UserControl
     {
         Player.Pause();
         _playing = false;
-        PlayPauseButton.Content = "▶ Odtwórz";
+        PlayPauseButton.Content = Loc.T("out.play");
         _timer.Stop();
     }
 
@@ -71,7 +72,7 @@ public partial class OutputPanel : UserControl
         // Po końcu klatka zostaje, a przycisk pozwala odtworzyć wideo jeszcze raz
         _playing = false;
         _timer.Stop();
-        PlayPauseButton.Content = "▶ Odtwórz ponownie";
+        PlayPauseButton.Content = Loc.T("out.replay");
         UpdateProgress();
         Seek.Value = Seek.Maximum;  // suwak na końcu: po tym wiemy, że "Odtwórz" ma zacząć od początku
     }
@@ -80,8 +81,8 @@ public partial class OutputPanel : UserControl
     {
         _playing = false;
         _timer.Stop();
-        PlayPauseButton.Content = "▶ Odtwórz";
-        TimeText.Text = "nie można odtworzyć";
+        PlayPauseButton.Content = Loc.T("out.play");
+        TimeText.Text = Loc.T("out.cannotPlay");
     }
 
     // Ukryty podgląd (np. wynik zmienił się na obraz) nie gra w tle

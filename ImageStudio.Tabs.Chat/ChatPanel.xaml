@@ -1,42 +1,43 @@
 <UserControl x:Class="ImageStudio.Tabs.Chat.ChatPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
              xmlns:local="clr-namespace:ImageStudio.Tabs.Chat">
     <!-- Opcje czatu (DataContext = ChatViewModel); sama rozmowa jest po prawej w ChatConversation -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <!-- Filtry (szukaj, dostawca, obraz na wejściu, preferowane) są wspólne z modelami obrazów i leżą w MainViewModel -->
-            <views:ModelPicker Header="Model czatu" HasFilters="True"
+            <views:ModelPicker Header="{loc:T chat.model}" HasFilters="True"
                                FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                ItemsSource="{Binding ModelOptionsView}" SelectedItem="{Binding SelectedModelOption}"/>
 
             <!-- Rozumowanie: tylko dla modeli, które je deklarują (supported_parameters) -->
             <StackPanel Visibility="{Binding SupportsReasoning, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="Rozumowanie modelu" Style="{StaticResource SectionHeader}"/>
-                <CheckBox Content="Włącz rozumowanie" IsChecked="{Binding ReasoningEnabled}"
-                          ToolTip="Model pokaże tok rozumowania (jeśli go zwraca). Część modeli nie da się całkiem wyłączyć"/>
+                <TextBlock Text="{loc:T chat.reasoning}" Style="{StaticResource SectionHeader}"/>
+                <CheckBox Content="{loc:T chat.reasoning.enable}" IsChecked="{Binding ReasoningEnabled}"
+                          ToolTip="{loc:T chat.reasoning.tip}"/>
                 <DockPanel Margin="0,6,0,0" IsEnabled="{Binding ReasoningEnabled}">
-                    <TextBlock Text="Poziom:" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
+                    <TextBlock Text="{loc:T chat.level}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
                     <ComboBox ItemsSource="{Binding ReasoningEfforts}" SelectedItem="{Binding SelectedReasoningEffort}"
-                              ToolTip="low, medium lub high; wysyłane tylko modelom, które obsługują poziom"/>
+                              ToolTip="{loc:T chat.level.tip}"/>
                 </DockPanel>
             </StackPanel>
 
-            <TextBlock Text="Instrukcja systemowa (opcjonalna)" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T chat.system}" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding SystemPrompt, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True" TextWrapping="Wrap" Height="120" VerticalScrollBarVisibility="Auto"
-                     ToolTip="Wysyłana na początku każdej rozmowy, np. rola lub styl odpowiedzi"/>
+                     ToolTip="{loc:T chat.system.tip}"/>
 
             <!-- Sesje: zapisywane na dysku po każdej odpowiedzi; incognito nie jest zapisywana -->
-            <TextBlock Text="Sesje" Style="{StaticResource SectionHeader}" Margin="0,12,0,4"/>
+            <TextBlock Text="{loc:T chat.sessions}" Style="{StaticResource SectionHeader}" Margin="0,12,0,4"/>
             <TextBlock Text="{Binding SessionLabel}" TextWrapping="Wrap" FontWeight="SemiBold"/>
             <UniformGrid Columns="2" Margin="0,6,0,0">
-                <Button Content="Nowa sesja" Margin="0,0,4,0" Command="{Binding NewChatCommand}"
-                        ToolTip="Zaczyna nową rozmowę; poprzednia zostaje zapisana"/>
-                <Button Content="Incognito" Command="{Binding NewIncognitoChatCommand}"
-                        ToolTip="Nowa rozmowa bez zapisu: nic z niej nie trafia na dysk"/>
+                <Button Content="{loc:T chat.newSession}" Margin="0,0,4,0" Command="{Binding NewChatCommand}"
+                        ToolTip="{loc:T chat.newSession.tip}"/>
+                <Button Content="{loc:T chat.incognito}" Command="{Binding NewIncognitoChatCommand}"
+                        ToolTip="{loc:T chat.incognito.tip}"/>
             </UniformGrid>
             <ListBox ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Height="150" Margin="0,6,0,0"
                      IsEnabled="{Binding CanChangeSession}">
@@ -50,12 +51,12 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <Button Content="Usuń sesję" Margin="0,6,0,0" Command="{Binding DeleteSessionCommand}"
-                    Style="{StaticResource SecondaryButton}" ToolTip="Usuwa zaznaczoną sesję z dysku"/>
+            <Button Content="{loc:T chat.deleteSession}" Margin="0,6,0,0" Command="{Binding DeleteSessionCommand}"
+                    Style="{StaticResource SecondaryButton}" ToolTip="{loc:T chat.deleteSession.tip}"/>
 
             <local:ToolsPanel DataContext="{Binding Tools}"/>
 
-            <TextBlock Text="Sesje są zapisywane po każdej odpowiedzi; sesja incognito nie jest zapisywana i znika po zamknięciu. Ctrl+Enter wysyła wiadomość."
+            <TextBlock Text="{loc:T chat.sessions.note}"
                        TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,12,0,0"/>
         </StackPanel>
     </ScrollViewer>

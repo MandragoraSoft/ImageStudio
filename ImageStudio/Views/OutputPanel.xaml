@@ -1,6 +1,7 @@
 <UserControl x:Class="ImageStudio.Views.OutputPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -9,16 +10,16 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="Wyczyść" Width="80" Margin="8,0,0,0"
-                    Command="{Binding ClearResultCommand}" ToolTip="Czyści ekran wyniku (galeria zostaje)"/>
-            <Button DockPanel.Dock="Right" Content="Zapisz jako..." Width="110" Margin="8,0,0,0"
-                    Command="{Binding SaveImageAsCommand}" ToolTip="Zapisz wynik w wybranym miejscu (Ctrl+S)"/>
-            <Button DockPanel.Dock="Right" Content="Kopiuj" Width="90" Margin="8,0,0,0"
-                    Command="{Binding CopyImageCommand}" ToolTip="Kopiuj obraz do schowka"/>
+            <Button DockPanel.Dock="Right" Content="{loc:T common.clear}" Width="80" Margin="8,0,0,0"
+                    Command="{Binding ClearResultCommand}" ToolTip="{loc:T out.clear.tip}"/>
+            <Button DockPanel.Dock="Right" Content="{loc:T voice.saveAs}" Width="110" Margin="8,0,0,0"
+                    Command="{Binding SaveImageAsCommand}" ToolTip="{loc:T out.saveAs.tip}"/>
+            <Button DockPanel.Dock="Right" Content="{loc:T out.copy}" Width="90" Margin="8,0,0,0"
+                    Command="{Binding CopyImageCommand}" ToolTip="{loc:T out.copy.tip}"/>
             <Button DockPanel.Dock="Right" Content="100%" Width="60" Margin="8,0,0,0"
-                    Command="{Binding ResetZoomCommand}" ToolTip="Rzeczywisty rozmiar"/>
-            <Button DockPanel.Dock="Right" Content="Dopasuj" Width="80" Margin="8,0,0,0"
-                    Command="{Binding FitImageCommand}" ToolTip="Dopasuj obraz do okna"/>
+                    Command="{Binding ResetZoomCommand}" ToolTip="{loc:T out.actualSize.tip}"/>
+            <Button DockPanel.Dock="Right" Content="{loc:T out.fit}" Width="80" Margin="8,0,0,0"
+                    Command="{Binding FitImageCommand}" ToolTip="{loc:T out.fit.tip}"/>
             <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" Margin="0,0,12,0" Width="170"/>
             <Slider Minimum="0.1" Maximum="4" Value="{Binding Zoom}" VerticalAlignment="Center"/>
         </DockPanel>
@@ -54,11 +55,11 @@
 
                 <DockPanel x:Name="VideoControls" Grid.Row="1" Margin="8,0,8,8"
                            Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}">
-                    <Button x:Name="PlayPauseButton" DockPanel.Dock="Left" Content="⏸ Pauza" Padding="10,3" Margin="0,0,6,0" MinWidth="86"
+                    <Button x:Name="PlayPauseButton" DockPanel.Dock="Left" Content="{loc:T out.pause}" Padding="10,3" Margin="0,0,6,0" MinWidth="86"
                             Click="PlayPause_Click"/>
-                    <Button DockPanel.Dock="Left" Content="↻ Od początku" Padding="10,3" Margin="0,0,6,0"
-                            Style="{StaticResource SecondaryButton}" Click="Restart_Click" ToolTip="Odtwarza wideo jeszcze raz od początku"/>
-                    <CheckBox x:Name="LoopBox" DockPanel.Dock="Left" Content="Zapętl" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button DockPanel.Dock="Left" Content="{loc:T out.restart}" Padding="10,3" Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButton}" Click="Restart_Click" ToolTip="{loc:T out.restart.tip}"/>
+                    <CheckBox x:Name="LoopBox" DockPanel.Dock="Left" Content="{loc:T out.loop}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <TextBlock x:Name="TimeText" DockPanel.Dock="Right" Text="00:00 / 00:00" VerticalAlignment="Center" Margin="8,0,0,0"
                                FontFamily="Consolas" Style="{StaticResource MutedTextBlock}"/>
                     <Slider x:Name="Seek" Minimum="0" Maximum="1" VerticalAlignment="Center" IsMoveToPointEnabled="True"
@@ -75,7 +76,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Button HorizontalAlignment="Right" Content="Wyczyść galerię" Padding="10,2"
+                <Button HorizontalAlignment="Right" Content="{loc:T voice.clearGallery}" Padding="10,2"
                         Command="{Binding ClearGalleryCommand}"/>
                 <ListBox Grid.Row="1" Margin="0,6,0,0" Height="140"
                          ItemsSource="{Binding Gallery}" SelectedItem="{Binding SelectedGalleryEntry}"
@@ -100,14 +101,14 @@
                                 </StackPanel.ToolTip>
                                 <StackPanel.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Usuń z galerii"
+                                        <MenuItem Header="{loc:T gallery.remove}"
                                                   Command="{Binding PlacementTarget.Tag.RemoveGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="Usuń z galerii i z dysku..."
+                                        <MenuItem Header="{loc:T gallery.removeFile}"
                                                   Command="{Binding PlacementTarget.Tag.DeleteGalleryEntryFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                         <Separator/>
-                                        <MenuItem Header="Kopiuj prompt"
+                                        <MenuItem Header="{loc:T out.gallery.copyPrompt}"
                                                   Command="{Binding PlacementTarget.Tag.CopyGalleryPromptCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                     </ContextMenu>

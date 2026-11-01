@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -62,13 +63,13 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     {
         try
         {
-            Status = "Uruchamianie...";
+            Status = Loc.T("mcpServer.starting");
             await _server.StartAsync(Port, _token());
-            Status = $"Działa: {Endpoint}";
+            Status = Loc.T("mcpServer.running", Endpoint);
         }
         catch (Exception ex)
         {
-            Status = $"Błąd: {ex.Message}";
+            Status = Loc.T("msg.error", ex.Message);
             Log.LogError("Serwer MCP aplikacji: {Message}", ex.Message);
             _silent = true;
             Enabled = false;
@@ -79,7 +80,7 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     private async Task StopAsync()
     {
         await _server.StopAsync();
-        Status = "Zatrzymany";
+        Status = Loc.T("mcpServer.stopped");
     }
 
     // Gotowy fragment konfiguracji klienta MCP (format Claude Desktop) z adresem i tokenem
@@ -99,7 +100,7 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     private void CopyConfig()
     {
         _dialogs.CopyText(ClientConfig);
-        Status = "Skopiowano konfigurację klienta (zawiera token, nie udostępniaj jej).";
+        Status = Loc.T("mcpServer.copied");
     }
 
     public ValueTask DisposeAsync() => _server.DisposeAsync();

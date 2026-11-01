@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -88,7 +89,7 @@ public sealed partial class MainViewModel : IAppControl
     {
         References.Add(new ReferenceItem(ImageOrientation.EnsureUpright(path), Path.GetFileName(path), path));
         if (SourceImage is null) LoadPrimary();
-        Status = $"Referencje: {References.Count}";
+        Status = Loc.T("ref.msg.count", References.Count);
     }
 
     void IAppControl.ClearReferences() => ClearReferences();

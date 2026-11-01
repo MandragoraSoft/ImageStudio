@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -21,12 +22,21 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private GalleryEntry? _selectedGalleryEntry;
 
+    // Etykiety liczone w kodzie nie mają powiązania ze słownikiem: po zmianie języka odświeżamy je ręcznie
+    private void RefreshLanguageTexts()
+    {
+        OnPropertyChanged(nameof(GalleryTotalLabel));
+        OnPropertyChanged(nameof(VideoEstimateLabel));
+        OnPropertyChanged(nameof(VideoHint));
+        Voice.RefreshLanguageTexts();
+    }
+
     public string GalleryTotalLabel
     {
         get
         {
             var total = Gallery.Where(e => e.CostUsd is not null).Sum(e => e.CostUsd!.Value);
-            return $"Galeria: {Gallery.Count} · łącznie ~${total:0.0000}";
+            return Loc.T("gallery.total", Gallery.Count, total);
         }
     }
 
@@ -64,7 +74,7 @@ public sealed partial class MainViewModel
         SelectedGalleryEntry = null;
         _galleryStore.Save(Gallery);
         OnPropertyChanged(nameof(GalleryTotalLabel));
-        Status = "Wyczyszczono galerię (pliki obrazów zostały w folderze zapisów).";
+        Status = Loc.T("gallery.msg.cleared");
     }
 
     // --- Menu kontekstowe miniatury (prawy przycisk) ---
@@ -76,7 +86,7 @@ public sealed partial class MainViewModel
         if (entry is null) return;
 
         RemoveFromGallery(entry);
-        Status = "Usunięto z galerii (plik został w folderze zapisów).";
+        Status = Loc.T("gallery.msg.removed");
     }
 
     // Usuwa wpis razem z plikiem na dysku, po potwierdzeniu
@@ -84,7 +94,7 @@ public sealed partial class MainViewModel
     private void DeleteGalleryEntryFile(GalleryEntry? entry)
     {
         if (entry is null) return;
-        if (!_dialogs.Confirm($"Usunąć z galerii i z dysku?{Environment.NewLine}{Environment.NewLine}{entry.FilePath}", "Usuwanie z dysku")) return;
+        if (!_dialogs.Confirm(Loc.T("gallery.confirmDelete", entry.FilePath), Loc.T("gallery.confirmDelete.title"))) return;
 
         // Wyświetlane wideo trzyma plik otwarty: najpierw zwalniamy podgląd
         if (ShowVideo && VideoSource?.LocalPath == entry.FilePath) ClearResult();
@@ -95,12 +105,12 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Status = $"Nie udało się usunąć pliku: {ex.Message}";
+            Status = Loc.T("gallery.msg.deleteFailed", ex.Message);
             return;
         }
 
         RemoveFromGallery(entry);
-        Status = "Usunięto z galerii i z dysku.";
+        Status = Loc.T("gallery.msg.deleted");
     }
 
     [RelayCommand]
@@ -109,7 +119,7 @@ public sealed partial class MainViewModel
         if (entry is null) return;
 
         _dialogs.CopyText(entry.Prompt);
-        Status = "Skopiowano prompt.";
+        Status = Loc.T("gallery.msg.promptCopied");
     }
 
     private void RemoveFromGallery(GalleryEntry entry)
