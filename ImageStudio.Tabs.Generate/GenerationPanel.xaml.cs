@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace ImageStudio.Views;
+namespace ImageStudio.Tabs.Generate;
 
 public partial class GenerationPanel : UserControl
 {

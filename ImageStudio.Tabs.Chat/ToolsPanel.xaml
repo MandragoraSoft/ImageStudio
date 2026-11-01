@@ -1,4 +1,4 @@
-<UserControl x:Class="ImageStudio.Views.ToolsPanel"
+<UserControl x:Class="ImageStudio.Tabs.Chat.ToolsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- Narzędzia MCP w zakładce Czat (DataContext = ToolsViewModel) -->

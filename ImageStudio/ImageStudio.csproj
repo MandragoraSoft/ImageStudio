@@ -26,6 +26,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
+    <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
+    <!-- Zakładki lewego panelu: osobne projekty, ich DLL-e trafiają do podfolderu tabs\ (jak dostawcy do providers\) -->
+    <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" Private="false" />
     <!-- Dostawcy: Private=false nie kopiuje ich do katalogu głównego; target niżej układa je w providers\ -->
     <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="false" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="false" />
@@ -38,22 +44,28 @@
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
 
-  <!-- Biblioteki dostawców trafiają do podfolderu providers\ (build i publish); wczytuje je App (AssemblyLoadContext.Resolving) -->
-  <Target Name="CollectProviderDlls" DependsOnTargets="ResolveReferences">
+  <!-- Biblioteki dostawców i zakładek trafiają do podfolderów providers\ i tabs\ (build i publish); wczytuje je App
+       (AssemblyLoadContext.Resolving). ImageStudio.Providers.Core i ImageStudio.Shared zostają w katalogu głównym -->
+  <Target Name="CollectPluginDlls" DependsOnTargets="ResolveReferences">
     <ItemGroup>
       <ProviderDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Providers.')) And '%(Filename)' != 'ImageStudio.Providers.Core'" />
       <ProviderFile Include="@(ProviderDll)" />
       <ProviderFile Include="@(ProviderDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
+      <TabDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Tabs.'))" />
+      <TabFile Include="@(TabDll)" />
+      <TabFile Include="@(TabDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
     </ItemGroup>
   </Target>
 
-  <Target Name="CopyProviderDlls" AfterTargets="Build" DependsOnTargets="CollectProviderDlls">
+  <Target Name="CopyPluginDlls" AfterTargets="Build" DependsOnTargets="CollectPluginDlls">
     <Copy SourceFiles="@(ProviderFile)" DestinationFolder="$(OutDir)providers" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(TabFile)" DestinationFolder="$(OutDir)tabs" SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="PublishProviderDlls" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="CollectProviderDlls">
+  <Target Name="PublishPluginDlls" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="CollectPluginDlls">
     <ItemGroup>
       <ResolvedFileToPublish Include="@(ProviderFile)" RelativePath="providers\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="@(TabFile)" RelativePath="tabs\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 

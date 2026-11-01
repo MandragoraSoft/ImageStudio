@@ -4,7 +4,9 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
-using ImageStudio.Views;
+using ImageStudio.Tabs.Chat;
+using ImageStudio.Tabs.Edit;
+using ImageStudio.Tabs.Generate;
 
 namespace ImageStudio.Tests;
 

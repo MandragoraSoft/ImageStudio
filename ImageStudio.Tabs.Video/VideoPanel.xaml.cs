@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace ImageStudio.Views;
+namespace ImageStudio.Tabs.Video;
 
 public partial class VideoPanel : UserControl
 {

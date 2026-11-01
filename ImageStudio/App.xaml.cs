@@ -13,14 +13,19 @@ public partial class App : Application
 {
     private MainViewModel? _viewModel;
 
-    // Biblioteki dostawców leżą w podfolderze providers\ (patrz ImageStudio.csproj); domyślny kontekst ich nie widzi sam
+    // Biblioteki dostawców i zakładek leżą w podfolderach providers\ i tabs\ (patrz ImageStudio.csproj);
+    // domyślny kontekst ich nie widzi sam
     static App()
     {
-        var providersDir = Path.Combine(AppContext.BaseDirectory, "providers");
+        string[] pluginDirs = [Path.Combine(AppContext.BaseDirectory, "providers"), Path.Combine(AppContext.BaseDirectory, "tabs")];
         AssemblyLoadContext.Default.Resolving += (context, name) =>
         {
-            var path = Path.Combine(providersDir, name.Name + ".dll");
-            return File.Exists(path) ? context.LoadFromAssemblyPath(path) : null;
+            foreach (var dir in pluginDirs)
+            {
+                var path = Path.Combine(dir, name.Name + ".dll");
+                if (File.Exists(path)) return context.LoadFromAssemblyPath(path);
+            }
+            return null;
         };
     }
 

@@ -8,6 +8,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Tabs.Chat;
+using ImageStudio.Tabs.Edit;
+using ImageStudio.Tabs.Generate;
+using ImageStudio.Tabs.Video;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;

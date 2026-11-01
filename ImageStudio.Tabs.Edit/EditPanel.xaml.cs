@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace ImageStudio.Views;
+namespace ImageStudio.Tabs.Edit;
 
 public partial class EditPanel : UserControl
 {
