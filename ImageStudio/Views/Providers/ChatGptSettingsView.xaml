@@ -10,8 +10,7 @@
                     Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"
                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
             <Button Content="{loc:T provider.chatgpt.signOut}" Padding="12,4"
-                    Style="{StaticResource SecondaryButton}" Command="{Binding SignOutCommand}"
-                    IsEnabled="{Binding IsSignedIn}"/>
+                    Style="{StaticResource SecondaryButton}" Command="{Binding SignOutCommand}"/>
         </StackPanel>
         <TextBlock Text="{loc:T provider.chatgpt.waiting}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"
                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>

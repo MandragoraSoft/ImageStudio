@@ -258,4 +258,26 @@ public sealed class ChatGptProviderTests
         Assert.Contains("zaloguj", error.Message);
         Assert.Empty(server.Requests);
     }
+
+    [Fact]
+    public async Task Sign_in_and_sign_out_buttons_are_mutually_exclusive()
+    {
+        var signedIn = new ChatGptSession("h", "c", "a", "r", DateTimeOffset.UtcNow.AddHours(1), "x@y", ChatGptSession.PlanScope);
+        var vm = new ImageStudio.ViewModels.ChatGptSettingsViewModel("", (_, _) => Task.FromResult(signedIn));
+
+        Assert.True(vm.SignInCommand.CanExecute(null));
+        Assert.False(vm.SignOutCommand.CanExecute(null));
+
+        await vm.SignInCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsSignedIn);
+        Assert.False(vm.SignInCommand.CanExecute(null));
+        Assert.True(vm.SignOutCommand.CanExecute(null));
+
+        vm.SignOutCommand.Execute(null);
+
+        Assert.False(vm.IsSignedIn);
+        Assert.True(vm.SignInCommand.CanExecute(null));
+        Assert.False(vm.SignOutCommand.CanExecute(null));
+    }
 }

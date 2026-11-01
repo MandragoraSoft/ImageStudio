@@ -96,11 +96,11 @@ public sealed partial class ChatGptSettingsViewModel : ProviderSettingsViewModel
     public override string EnvVar => "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Status), nameof(SessionJson), nameof(IsSignedIn))]
+    [NotifyPropertyChangedFor(nameof(Status), nameof(SessionJson), nameof(IsSignedIn), nameof(CanSignIn), nameof(CanSignOut))]
     private ChatGptSession _session;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanSignIn), nameof(IsNotBusy))]
+    [NotifyPropertyChangedFor(nameof(CanSignIn), nameof(CanSignOut), nameof(IsNotBusy))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -109,7 +109,9 @@ public sealed partial class ChatGptSettingsViewModel : ProviderSettingsViewModel
     public string SessionJson => Session.ToJson();
     public bool IsSignedIn => Session.IsSignedIn;
     public bool IsNotBusy => !IsBusy;
-    public bool CanSignIn => !IsBusy && _signIn is not null;
+    // Zaloguj działa tylko, gdy nie jesteś zalogowany; Wyloguj tylko, gdy jesteś (i nie trwa logowanie)
+    public bool CanSignIn => !IsBusy && !IsSignedIn && _signIn is not null;
+    public bool CanSignOut => !IsBusy && IsSignedIn;
     public string Status => Session.IsSignedIn ? Loc.T("provider.chatgpt.signedIn", Session.Email ?? "—") : Loc.T("provider.chatgpt.signedOut");
 
     [RelayCommand(CanExecute = nameof(CanSignIn))]
@@ -142,14 +144,21 @@ public sealed partial class ChatGptSettingsViewModel : ProviderSettingsViewModel
     private void Cancel() => _cancel?.Cancel();
 
     // Wylogowanie zostawia rejestrację (client_id i identyfikator instalacji), kasuje tokeny
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSignOut))]
     private void SignOut()
     {
         Error = "";
         Session = Session.SignedOut();
     }
 
-    partial void OnIsBusyChanged(bool value) => SignInCommand.NotifyCanExecuteChanged();
+    partial void OnIsBusyChanged(bool value) => NotifyCommands();
+    partial void OnSessionChanged(ChatGptSession value) => NotifyCommands();
+
+    private void NotifyCommands()
+    {
+        SignInCommand.NotifyCanExecuteChanged();
+        SignOutCommand.NotifyCanExecuteChanged();
+    }
 }
 
 // Dostawca skonfigurowany samym kluczem API (stały adres): jeden ViewModel i jeden widok dla Mistrala, Kilo i OpenCode Go
