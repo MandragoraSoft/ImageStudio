@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImageStudio.Services;
+using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
 
@@ -8,7 +9,7 @@ namespace ImageStudio.ViewModels;
 // brak zapisanego urządzenia (odłączone) wraca do pierwszej pozycji, czyli domyślnego urządzenia systemu
 public sealed partial class AudioSettingsTab : ObservableObject, ISettingsTab
 {
-    public string Title => "Dźwięk";
+    public string Title => Loc.T("settings.tab.audio");
     public int Order => 5;
 
     public IReadOnlyList<AudioDevice> Inputs { get; }

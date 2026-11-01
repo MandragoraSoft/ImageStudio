@@ -1,15 +1,15 @@
 <UserControl x:Class="ImageStudio.Views.UberLlmSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views">
     <StackPanel>
-        <TextBlock Text="Adres API (api.uberllm.dev)" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="{loc:T provider.uber.api}" Style="{StaticResource SectionHeader}"/>
         <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"/>
 
-        <TextBlock Text="Adres rynku cen (publiczny)" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="{loc:T provider.uber.market}" Style="{StaticResource SectionHeader}"/>
         <TextBox Text="{Binding MarketUrl, UpdateSourceTrigger=PropertyChanged}"/>
 
-        <TextBlock Text="Klucz API" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="{loc:T provider.apiKey}" Style="{StaticResource SectionHeader}"/>
         <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
     </StackPanel>
 </UserControl>

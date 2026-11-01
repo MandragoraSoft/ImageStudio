@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using Microsoft.Extensions.Logging;
+using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
 
@@ -43,7 +44,7 @@ public sealed partial class MainViewModel
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
                                          EnhancerModels.ToList(), _settings.UseStreaming,
-                                         Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name);
+                                         Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name, _settings.Language);
         Voice.RefreshDevices();
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
@@ -59,13 +60,14 @@ public sealed partial class MainViewModel
         _prefs.Save();
 
         _settingsStore.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
-                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming);
+                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming, result.Language);
         var previous = _settings;
         _settings = _settingsStore.Load();
         if (_settings.Theme != previous.Theme) _themes.Apply(result.Theme);
+        Loc.Set(_settings.Language);
 
         // Zmiana samego motywu lub preferencji nie wymaga nowego providera ani ponownego pobierania list modeli
-        if (_settings with { Theme = "", UseStreaming = true } == previous with { Theme = "", UseStreaming = true })
+        if (_settings with { Theme = "", UseStreaming = true, Language = "" } == previous with { Theme = "", UseStreaming = true, Language = "" })
         {
             PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
             Status = "Zapisano ustawienia.";

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using ImageStudio.Localization;
 using ImageStudio.ViewModels;
 
 namespace ImageStudio;
@@ -13,6 +14,22 @@ public partial class MainWindow : Window
         BuildTabs(tabs.OrderBy(t => t.Order).ToList());
         DataContext = viewModel;
         MainTabs.SelectedIndex = Math.Clamp(viewModel.ActiveTab, 0, MainTabs.Items.Count - 1);
+
+        // Tytuły zakładek są zwykłym tekstem (IMainTab.Title), więc po zmianie języka odświeżamy je ręcznie
+        Loc.LanguageChanged += RefreshTabTitles;
+        Closed += (_, _) => Loc.LanguageChanged -= RefreshTabTitles;
+    }
+
+    // Zdarzenie jest statyczne i może przyjść z dowolnego wątku, a nagłówki należą do wątku okna
+    private void RefreshTabTitles()
+    {
+        if (Dispatcher.HasShutdownStarted) return;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            foreach (TabItem item in MainTabs.Items)
+                if (item.Tag is IMainTab tab) item.Header = tab.Title;
+        });
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
@@ -28,7 +45,7 @@ public partial class MainWindow : Window
                     $"Zakładka {tab.GetType().Name} nie ma widoku: dodaj DataTemplate dla tego typu w MainWindow.xaml.");
 
             // ContentPresenter z zakładką jako treścią sam wybiera DataTemplate po typie i trzyma jedną instancję widoku
-            MainTabs.Items.Add(new TabItem { Header = tab.Title, Content = new ContentPresenter { Content = tab } });
+            MainTabs.Items.Add(new TabItem { Header = tab.Title, Tag = tab, Content = new ContentPresenter { Content = tab } });
         }
     }
 }

@@ -1,6 +1,7 @@
 using System.IO;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using ImageStudio.Localization;
 
 namespace ImageStudio.Services;
 
@@ -87,7 +88,7 @@ public sealed class NAudioRecorder : IAudioRecorder
     {
         var names = AudioNames.Resolve(Enumerable.Range(0, WaveIn.DeviceCount).Select(i => WaveIn.GetCapabilities(i).ProductName).ToList(),
                                        AudioNames.Friendly(DataFlow.Capture));
-        return [new(NAudioPlayer.DefaultDevice, "Domyślne urządzenie systemu"), .. names.Select((n, i) => new AudioDevice(i, n))];
+        return [new(NAudioPlayer.DefaultDevice, Loc.T("audio.default")), .. names.Select((n, i) => new AudioDevice(i, n))];
     }
 
     public void Start(int deviceIndex, string path)
@@ -154,7 +155,7 @@ public sealed class NAudioPlayer : IAudioPlayer
     {
         var names = AudioNames.Resolve(Enumerable.Range(0, WaveOut.DeviceCount).Select(i => WaveOut.GetCapabilities(i).ProductName).ToList(),
                                        AudioNames.Friendly(DataFlow.Render));
-        return [new(DefaultDevice, "Domyślne urządzenie systemu"), .. names.Select((n, i) => new AudioDevice(i, n))];
+        return [new(DefaultDevice, Loc.T("audio.default")), .. names.Select((n, i) => new AudioDevice(i, n))];
     }
 
     public void Play(string path, Action? ended = null, Action<string>? failed = null)

@@ -17,6 +17,7 @@ dotnet publish ImageStudio -p:PublishProfile=Portable    # publish\portable\Imag
 dotnet publish ImageStudio -p:PublishProfile=SelfHosted  # publish\selfhosted\ImageStudio.exe: jeden plik z wbudowanym .NET
 ```
 
+- Spójność tłumaczeń: `pwsh tools/Check-Translations.ps1` (błędy: brak klucza w PL/EN, różne parametry, nieznany klucz w XAML/kodzie, powtórzony klucz; ostrzeżenia: nieużywany klucz, EN równe PL, kolejność kluczy). `-Fix` sortuje i normalizuje pliki, `-Pending` wypisuje teksty wpisane na sztywno, `-Strict` traktuje ostrzeżenia jak błędy (tak działa w pipeline wydania).
 - Przy dziwnych błędach brakujących plików `obj` (np. `BG1002`, `CS2001`) usuń `bin`/`obj` i zbuduj z `-m:1`; równoległy build kilku projektów XAML bywa wyścigiem.
 - Gdy aplikacja jest uruchomiona, jej pliki są zablokowane: buduj do osobnego katalogu (`-p:BaseOutputPath=<katalog>`) i nie zabijaj procesu użytkownika.
 - Wersje pakietów są centralne (`Directory.Packages.props`), a TFM, `UseWPF`, nullable i `PlatformTarget` w `Directory.Build.props`. W csproj dodawaj `PackageReference` bez `Version`. Nie ma lintera.
@@ -33,6 +34,7 @@ dotnet publish ImageStudio -p:PublishProfile=SelfHosted  # publish\selfhosted\Im
 - **Nowy kolor kontrolki** dodawaj do obu palet (`ThemeService`, `App.xaml`); kontrast pilnuje `ThemeContrastTests`.
 - **Nowe okno** musi mieć `Style="{StaticResource WindowBase}"` (zapamiętywanie rozmiaru).
 - **XAML między projektami** wymaga `;assembly=...` (np. `ImageStudio.Providers.Core`, `ImageStudio.Shared`); dostawcy i zakładki mają referencje `Private="$(PluginsInBundle)"`.
+- **Teksty dla użytkownika nie są wpisywane na sztywno:** klucz w obu słownikach (`ImageStudio.Shared/Localization/Strings.pl.json` i `.en.json`) + `{loc:T klucz}` w XAML albo `Loc.T("klucz")` w kodzie; zmiana języka działa bez restartu. Reguły i lista nieprzetłumaczonych ekranów: [docs/dev/localization.md](docs/dev/localization.md).
 - **Klucze API** są szyfrowane przez `SecretStore` (DPAPI); nie zapisuj ich do plików ustawień ani logów.
 - **Testy:** nowy kod = testy w `ImageStudio.Tests` na `TestApp` z atrapami (bez sieci i UI); widoki WPF przez `WpfHost.Run`. Szczegóły i pułapki w [docs/dev/testing.md](docs/dev/testing.md).
 
@@ -49,6 +51,7 @@ Pliki w `docs/dev/` czytaj na żądanie, gdy zadanie dotyka danego obszaru (to z
 | Przebudowa promptu przez AI, edytor promptu, zestawy (presety) | [docs/dev/prompts-and-presets.md](docs/dev/prompts-and-presets.md) |
 | Czat: strumień, sesje, Stop, tokeny, rozumowanie, MCP | [docs/dev/chat.md](docs/dev/chat.md) |
 | Galeria obrazów i wideo, miniatury, zakładka Głos (mowa, mikrofon, galeria głosu) | [docs/dev/media-gallery-voice.md](docs/dev/media-gallery-voice.md) |
+| Tłumaczenia PL/EN: `Loc`, `{loc:T}`, reguły, co zostało do przetłumaczenia | [docs/dev/localization.md](docs/dev/localization.md) |
 | Testy: `TestApp`, atrapy, pułapki | [docs/dev/testing.md](docs/dev/testing.md) |
 | Wydawanie wersji | [docs/RELEASING.md](docs/RELEASING.md) |
 | Starszy opis architektury (może być nieaktualny) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

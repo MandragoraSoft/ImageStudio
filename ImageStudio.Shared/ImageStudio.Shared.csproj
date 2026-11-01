@@ -4,4 +4,10 @@
     <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
   </ItemGroup>
 
+  <!-- Teksty interfejsu: słowniki klucz -> tekst, wbudowane w bibliotekę (WithCulture=false: ".pl" w nazwie pliku MSBuild uznaje za kulturę i wkłada zasób do biblioteki satelickiej; tu mają być w głównej)-->
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Strings.pl.json" LogicalName="ImageStudio.Localization.Strings.pl.json" WithCulture="false" />
+    <EmbeddedResource Include="Localization\Strings.en.json" LogicalName="ImageStudio.Localization.Strings.en.json" WithCulture="false" />
+  </ItemGroup>
+
 </Project>

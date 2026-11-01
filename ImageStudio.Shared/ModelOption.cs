@@ -1,4 +1,5 @@
 using ImageStudio.Services;
+using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
 
@@ -27,17 +28,17 @@ public sealed record ModelOption(
     {
         get
         {
-            if (Pricing is not { } p) return "Brak ceny w katalogu (dostawca podaje ceny tylko dla części modeli).";
+            if (Pricing is not { } p) return Loc.T("model.cost.none");
 
-            var unit = p.Unit == ModelPricing.TokenUnit ? "za 1M tokenów" : $"za {p.Unit ?? "szt."}";
+            var unit = p.Unit == ModelPricing.TokenUnit ? Loc.T("model.cost.perTokens") : Loc.T("model.cost.perUnit", p.Unit ?? Loc.T("model.cost.unitDefault"));
             var lines = p.OutputPrice is { } output
-                ? new List<string> { $"Wejście: ${p.PriceNow:0.####} {unit}", $"Wyjście: ${output:0.####} {unit}" }
-                : new List<string> { $"Cena teraz: ${p.PriceNow:0.####} {unit}" };
-            if (p.CachePrice is { } cache) lines.Add($"Odczyt z cache: ${cache:0.####} {unit}");
-            if (p.ListUsd is { } list) lines.Add($"Cena katalogowa: ${list:0.####}");
-            if (p.DiscountPct is > 0 and var discount) lines.Add($"Rabat: {discount:0.#}%");
-            if (p.MarketOffers is { } offers) lines.Add($"Oferty na rynku: {offers:0}");
-            if (p.Requests24h is { } requests) lines.Add($"Zapytania (24 h): {requests:0}");
+                ? new List<string> { Loc.T("model.cost.in", p.PriceNow, unit), Loc.T("model.cost.out", output, unit) }
+                : new List<string> { Loc.T("model.cost.now", p.PriceNow, unit) };
+            if (p.CachePrice is { } cache) lines.Add(Loc.T("model.cost.cache", cache, unit));
+            if (p.ListUsd is { } list) lines.Add(Loc.T("model.cost.list", list));
+            if (p.DiscountPct is > 0 and var discount) lines.Add(Loc.T("model.cost.discount", discount));
+            if (p.MarketOffers is { } offers) lines.Add(Loc.T("model.cost.offers", offers));
+            if (p.Requests24h is { } requests) lines.Add(Loc.T("model.cost.requests", requests));
             return string.Join(Environment.NewLine, lines);
         }
     }

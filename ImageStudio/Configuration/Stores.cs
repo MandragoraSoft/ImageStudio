@@ -35,7 +35,8 @@ public interface ISettingsStore
     AppSettings Load();
 
     void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
-              string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true);
+              string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true,
+              string language = "system");
 }
 
 // Zapisane sesje czatu (sesja incognito nigdy tu nie trafia)
@@ -86,8 +87,8 @@ public sealed class FileSettingsStore : ISettingsStore
     public AppSettings Load() => AppSettings.Load();
 
     public void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
-                     string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true) =>
-        AppSettings.Save(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey, useStreaming);
+                     string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true, string language = "system") =>
+        AppSettings.Save(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey, useStreaming, language);
 }
 
 public sealed class FileWindowStateStore : IWindowStateStore

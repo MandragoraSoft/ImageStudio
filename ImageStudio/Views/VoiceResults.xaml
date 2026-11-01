@@ -1,6 +1,6 @@
 <UserControl x:Class="ImageStudio.Views.VoiceResults"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <!-- Wyniki zakładki Głos (DataContext = VoiceViewModel): nagrania z syntezy i teksty z rozpoznawania -->
     <Grid>
         <Grid.RowDefinitions>
@@ -8,11 +8,11 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0" Margin="8,8,8,0">
-            <Button DockPanel.Dock="Right" Content="Wyczyść galerię" Padding="12,5" Style="{StaticResource SecondaryButton}"
-                    ToolTip="Usuwa wpisy z galerii; pliki dźwiękowe zostają na dysku" Command="{Binding ClearGalleryCommand}"/>
+            <Button DockPanel.Dock="Right" Content="{loc:T voice.clearGallery}" Padding="12,5" Style="{StaticResource SecondaryButton}"
+                    ToolTip="{loc:T voice.clearGallery.tip}" Command="{Binding ClearGalleryCommand}"/>
             <TextBlock x:Name="GalleryHeader" Text="{Binding GalleryLabel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
         </DockPanel>
-        <TextBlock x:Name="EmptyHint" Grid.Row="1" Text="Tu pojawią się nagrania i teksty. Wpisz tekst do przeczytania albo nagraj głos i rozpoznaj go."
+        <TextBlock x:Name="EmptyHint" Grid.Row="1" Text="{loc:T voice.empty}"
                    TextWrapping="Wrap" HorizontalAlignment="Center"
                    VerticalAlignment="Center" MaxWidth="360" TextAlignment="Center">
             <TextBlock.Resources>
@@ -48,14 +48,14 @@
                             Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
                         <Border.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Usuń z galerii"
+                                <MenuItem Header="{loc:T gallery.remove}"
                                           Command="{Binding PlacementTarget.Tag.RemoveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                <MenuItem Header="Usuń z galerii i z dysku..."
+                                <MenuItem Header="{loc:T gallery.removeFile}"
                                           Command="{Binding PlacementTarget.Tag.DeleteWithFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                 <Separator/>
-                                <MenuItem Header="Kopiuj tekst"
+                                <MenuItem Header="{loc:T voice.copyText}"
                                           Command="{Binding PlacementTarget.Tag.CopyTextCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                             </ContextMenu>
@@ -69,29 +69,29 @@
                                      Background="Transparent" Padding="0" Margin="0,6,0,8" MaxHeight="220"
                                      VerticalScrollBarVisibility="Auto"/>
                             <WrapPanel>
-                                <Button Content="▶ Odtwórz" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:T voice.play}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
                                         Visibility="{Binding HasAudio, Converter={StaticResource BoolToVis}}"
                                         Command="{Binding DataContext.PlayCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
-                                <Button Content="Otwórz w odtwarzaczu" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
-                                        ToolTip="Otwiera plik w domyślnym odtwarzaczu systemu"
+                                <Button Content="{loc:T voice.openExternal}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        ToolTip="{loc:T voice.openExternal.tip}"
                                         Visibility="{Binding HasAudio, Converter={StaticResource BoolToVis}}"
                                         Command="{Binding DataContext.OpenExternallyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
-                                <Button Content="■ Stop" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:T voice.stop}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
                                         Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}"
                                         Command="{Binding DataContext.StopPlaybackCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
-                                <Button Content="Zapisz jako..." Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:T voice.saveAs}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
                                         Command="{Binding DataContext.SaveAsCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
-                                <Button Content="Kopiuj tekst" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:T voice.copyText}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
                                         Command="{Binding DataContext.CopyTextCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
-                                <Button Content="Do syntezy" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
-                                        ToolTip="Wstawia ten tekst do pola mowy z tekstu"
+                                <Button Content="{loc:T voice.toSynth}" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        ToolTip="{loc:T voice.toSynth.tip}"
                                         Command="{Binding DataContext.UseAsSpeechTextCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
-                                <Button Content="Usuń" Padding="12,5" Style="{StaticResource SecondaryButton}"
+                                <Button Content="{loc:T common.remove}" Padding="12,5" Style="{StaticResource SecondaryButton}"
                                         Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                         CommandParameter="{Binding}"/>
                             </WrapPanel>

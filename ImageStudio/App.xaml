@@ -1,6 +1,6 @@
 <Application x:Class="ImageStudio.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:vm="clr-namespace:ImageStudio.ViewModels"
              xmlns:views="clr-namespace:ImageStudio.Views"
              xmlns:shared="clr-namespace:ImageStudio.ViewModels;assembly=ImageStudio.Shared">
@@ -405,22 +405,22 @@
         <DataTemplate x:Key="ModelIconsTemplate" DataType="{x:Type shared:ModelOption}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE91B;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje obraz wejściowy"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="{loc:T model.icon.image}"
                            Visibility="{Binding AcceptsImage, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje pliki (np. PDF)"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="{loc:T model.icon.file}"
                            Visibility="{Binding AcceptsFile, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE720;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje audio"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="{loc:T model.icon.audio}"
                            Visibility="{Binding AcceptsAudio, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje wideo"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="{loc:T model.icon.video}"
                            Visibility="{Binding AcceptsVideo, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE82F;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource AccentBrush}" ToolTip="Rozumowanie (można je włączyć i ustawić poziom)"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="{loc:T model.icon.reasoning}"
                            Visibility="{Binding Reasoning, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D2;" Margin="4,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextMutedBrush}" ToolTip="Zwraca też tekst"
+                           Foreground="{DynamicResource TextMutedBrush}" ToolTip="{loc:T model.icon.text}"
                            Visibility="{Binding ReturnsText, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7BA;" Margin="4,0,0,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource WarningBrush}" ToolTip="NSFW"

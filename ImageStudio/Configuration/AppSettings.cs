@@ -9,7 +9,7 @@ namespace ImageStudio.Configuration;
 public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
                                  string ProviderId = "uberllm", string OpenRouterKey = "",
                                  string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "",
-                                 bool UseStreaming = true)
+                                 bool UseStreaming = true, string Language = "system")
 {
     private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
@@ -31,7 +31,8 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             OpenRouterKey: Secret("OPENROUTER_API_KEY", "openrouter"),
             OpenAiBaseUrl: config["OpenAi:BaseUrl"] ?? "https://api.openai.com",
             OpenAiKey: Secret("OPENAI_API_KEY", "openai"),
-            UseStreaming: !string.Equals(config["Ui:UseStreaming"], "false", StringComparison.OrdinalIgnoreCase));
+            UseStreaming: !string.Equals(config["Ui:UseStreaming"], "false", StringComparison.OrdinalIgnoreCase),
+            Language: config["Ui:Language"] is "pl" or "en" ? config["Ui:Language"]! : "system");
     }
 
     // Gradacja sekretu: niepusta zmienna środowiskowa > zaszyfrowany SecretStore (DPAPI) > pusty
@@ -42,14 +43,14 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
     public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,
                             string providerId = "uberllm", string openRouterKey = "",
                             string openAiBaseUrl = "https://api.openai.com", string openAiKey = "",
-                            bool useStreaming = true)
+                            bool useStreaming = true, string language = "system")
     {
         Directory.CreateDirectory(AppPaths.UserDataDir);
         var json = JsonSerializer.Serialize(
             new
             {
                 Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide },
-                Ui = new { Theme = theme, UseStreaming = useStreaming },
+                Ui = new { Theme = theme, UseStreaming = useStreaming, Language = language },
                 Ai = new { Provider = providerId },
                 OpenAi = new { BaseUrl = openAiBaseUrl },
             },

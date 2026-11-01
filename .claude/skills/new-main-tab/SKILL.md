@@ -21,16 +21,17 @@ Przejdź całą listę, nie tylko to, o co poproszono. Zakładka Głos pominęł
    - `ItemsSource` musi być `ICollectionView` z filtrem z `MainViewModel` (`FilterModel`, albo `FilterAudioModel` dla modeli bez wejścia obrazowego; wtedy też `ShowImageFilter="False"`).
    - Widok odświeżaj w `MainViewModel.RefreshFilters`, a modele uwzględnij w `RefreshOwners` (lista dostawców) i w `OpenModelBrowser` (+ rodzaj w `ModelBrowserViewModel.Kinds`).
    - Pilnuje tego test `Every_model_picker_in_the_main_window_tabs_has_filters`: nie omijaj go.
-3. **`ComboBox` z obiektami**: `ItemTemplate`, nigdy `DisplayMemberPath` (własny szablon ComboBox w `App.xaml` go ignoruje i pokazuje zapis rekordu).
-4. **Panel wyników w prawej kolumnie.** Zakładka z własnym panelem (jak Czat i Głos): dodaj flagę `IsXTab` w `MainViewModel.Generation` i wyklucz ją z `IsOutputTab` (obraz i metryczka modelu są tylko dla zakładek 0-2). Panel dodaj w `MainWindow.xaml` obok `VoiceResults`.
-5. **Indeksy i stan.**
+3. **Teksty tylko przez tłumaczenia.** Tytuł zakładki (`Title => Loc.T("tab.<nazwa>")`), etykiety, dymki i komunikaty ViewModelu: klucze w obu słownikach (`Strings.pl.json`, `Strings.en.json`) i `{loc:T}` / `Loc.T`. Zasady w `docs/dev/localization.md`; test `LocalizationTests` złapie brakujący klucz, nieużywany klucz i różne parametry w PL i EN.
+4. **`ComboBox` z obiektami**: `ItemTemplate`, nigdy `DisplayMemberPath` (własny szablon ComboBox w `App.xaml` go ignoruje i pokazuje zapis rekordu).
+5. **Panel wyników w prawej kolumnie.** Zakładka z własnym panelem (jak Czat i Głos): dodaj flagę `IsXTab` w `MainViewModel.Generation` i wyklucz ją z `IsOutputTab` (obraz i metryczka modelu są tylko dla zakładek 0-2). Panel dodaj w `MainWindow.xaml` obok `VoiceResults`.
+6. **Indeksy i stan.**
    - Indeks zakładki w `TabNames` (`MainViewModel.AppControl`) i w `AppControlTools.Tabs` (+ schemat narzędzia `switch_tab`).
    - Wybory użytkownika w `UserState` (`Configuration/UserState.cs`), zapis w `MainViewModel.SaveState` przez `PropertyChanged` ViewModelu zakładki (wzór: `Voice.PropertyChanged` w konstruktorze `MainViewModel`).
-6. **Sieć i sprzęt.**
+7. **Sieć i sprzęt.**
    - Każde wywołanie sieciowe idące poza `IAiProvider` woła `Activity.Begin("...")` w `using`.
    - Sprzęt i zewnętrzne usługi tylko przez interfejs (jak `IAudioRecorder`/`IAudioPlayer`), z atrapą w `ImageStudio.Tests/TestApp.cs` i `Fakes.cs`.
-7. **Testy** (w `ImageStudio.Tests`): ViewModel na `TestApp`, widok w prawdziwym oknie (`WpfHost.Run`), a istniejące testy liczby i tytułów zakładek (`MainTabsTests`, `CompositionTests`) popraw na nową liczbę. Widoki modeli (`ICollectionView`) zmieniaj w testach tylko z wątku, który je utworzył (bez `Task.Yield` przed zmianą kolekcji).
-8. **Dokumentacja.** Dopisz zakładkę do `docs/dev/tabs-and-settings.md` (zakres indeksów) i, jeśli ma własne zasady, osobny plik w `docs/dev/`.
+8. **Testy** (w `ImageStudio.Tests`): ViewModel na `TestApp`, widok w prawdziwym oknie (`WpfHost.Run`), a istniejące testy liczby i tytułów zakładek (`MainTabsTests`, `CompositionTests`) popraw na nową liczbę. Widoki modeli (`ICollectionView`) zmieniaj w testach tylko z wątku, który je utworzył (bez `Task.Yield` przed zmianą kolekcji).
+9. **Dokumentacja.** Dopisz zakładkę do `docs/dev/tabs-and-settings.md` (zakres indeksów) i, jeśli ma własne zasady, osobny plik w `docs/dev/`.
 
 ## Weryfikacja
 
@@ -48,3 +49,4 @@ Gdy aplikacja jest uruchomiona, pliki są zablokowane: zbuduj do osobnego katalo
 3. Nowe wartości w `SettingsResult` (opcjonalne parametry na końcu rekordu) i ich odczyt w `MainViewModel.OpenSettingsAsync` (lista zakładek podawana do `IDialogService.ShowSettings`).
 4. Testy: `SettingsTabsTests` (wzór: `AudioSettingsTabTests`) i test okna z widokiem zakładki.
 5. Listy z obiektami: `ItemTemplate`, nie `DisplayMemberPath` (jak wyżej).
+6. Tytuł zakładki i wszystkie teksty widoku przez klucze tłumaczeń (`settings.tab.<nazwa>`, `{loc:T}`); tytuły są czytane przy otwarciu okna, więc nowy język zobaczysz po ponownym otwarciu.

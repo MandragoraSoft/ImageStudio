@@ -1,15 +1,15 @@
 <UserControl x:Class="ImageStudio.Views.OpenAiSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views">
     <StackPanel>
-        <TextBlock Text="Adres bazowy" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="{loc:T provider.openai.base}" Style="{StaticResource SectionHeader}"/>
         <TextBox Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}"
-                 ToolTip="Np. https://api.openai.com albo adres proxy / serwera kompatybilnego z OpenAI"/>
+                 ToolTip="{loc:T provider.openai.base.tip}"/>
 
-        <TextBlock Text="Klucz API" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="{loc:T provider.apiKey}" Style="{StaticResource SectionHeader}"/>
         <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
-        <TextBlock Text="Wideo nie jest obsługiwane przez ten provider."
+        <TextBlock Text="{loc:T provider.openai.noVideo}"
                    TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
     </StackPanel>
 </UserControl>

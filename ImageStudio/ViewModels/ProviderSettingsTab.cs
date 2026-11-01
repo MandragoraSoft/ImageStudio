@@ -1,13 +1,14 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Services;
+using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
 
 // Zakładka "Dostawca AI": wybór dostawcy i jego konfiguracja (adresy, klucz, preferowane modele, domyślny model tekstowy)
 public sealed partial class ProviderSettingsTab : ObservableObject, ISettingsTab
 {
-    public string Title => "Dostawca AI";
+    public string Title => Loc.T("settings.tab.provider");
     public int Order => 10;
 
     public IReadOnlyList<ProviderRegistry.ProviderInfo> Providers { get; } = ProviderRegistry.Available;

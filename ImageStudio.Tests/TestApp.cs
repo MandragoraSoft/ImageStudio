@@ -100,11 +100,11 @@ internal sealed class MemorySettingsStore(AppSettings initial) : ISettingsStore
     public AppSettings Load() => Settings;
 
     public void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
-                     string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true)
+                     string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true, string language = "system")
     {
         SaveCalls++;
         Settings = new AppSettings(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey,
-                                   useStreaming);
+                                   useStreaming, language);
     }
 }
 

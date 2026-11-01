@@ -8,6 +8,7 @@ using ImageStudio.Services;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
 using Microsoft.Extensions.DependencyInjection;
+using ImageStudio.Localization;
 
 namespace ImageStudio;
 
@@ -47,6 +48,7 @@ public partial class App : Application
             .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         _services = services;
 
+        Loc.Set(services.GetRequiredService<AppSettings>().Language);
         WindowMemory.Store = services.GetRequiredService<IWindowStateStore>();
         services.GetRequiredService<IThemeService>().Apply(services.GetRequiredService<AppSettings>().Theme);
 

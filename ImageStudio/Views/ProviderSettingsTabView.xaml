@@ -1,6 +1,6 @@
 <UserControl x:Class="ImageStudio.Views.ProviderSettingsTabView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:vm="clr-namespace:ImageStudio.ViewModels"
              xmlns:views="clr-namespace:ImageStudio.Views"
              xmlns:shared="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
@@ -20,7 +20,7 @@
     <!-- Rozwinięty selektor modelu wydłuża zawartość: przewija się w obrębie zakładki -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,8,8,0">
-            <TextBlock Text="Dostawca AI" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T provider.title}" Style="{StaticResource SectionHeader}"/>
             <ComboBox ItemsSource="{Binding Providers}" SelectedValuePath="Id" SelectedValue="{Binding SelectedProvider}">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
@@ -33,20 +33,20 @@
             <ContentControl Content="{Binding ActiveProvider}" Margin="0,4,0,0"/>
             <TextBlock Text="{Binding ActiveProvider.EnvNotice}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
-            <TextBlock Text="Lista modeli tego dostawcy" Style="{StaticResource SectionHeader}"/>
-            <CheckBox Content="Pokazuj tylko preferowane (odznaczone = wszystkie)"
+            <TextBlock Text="{loc:T provider.modelList}" Style="{StaticResource SectionHeader}"/>
+            <CheckBox Content="{loc:T provider.preferredOnly}"
                       IsChecked="{Binding ActiveProvider.PreferredOnly}"
-                      ToolTip="Preferowane wybierasz w oknie „Przeglądaj modele” obok filtrów. Pusta lista preferowanych pokazuje wszystkie modele."/>
+                      ToolTip="{loc:T provider.preferredOnly.tip}"/>
 
-            <shared:ModelPicker Header="Domyślny model tekstowy dostawcy"
+            <shared:ModelPicker Header="{loc:T provider.defaultText}"
                                ItemsSource="{Binding ActiveProvider.TextModels}"
                                SelectedItem="{Binding ActiveProvider.DefaultTextModel}"
                                ReloadCommand="{Binding ReloadTextModelsCommand}"/>
             <TextBlock Text="{Binding TextModelsStatus}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
-            <TextBlock Text="Ulepszanie promptów, czat i nazwy zestawów. Przycisk Odśwież pobiera listę modeli dostawcy z adresem i kluczem wpisanymi powyżej (bez zapisywania)."
+            <TextBlock Text="{loc:T provider.defaultText.note}"
                        TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
 
-            <TextBlock Text="Klucze są szyfrowane (DPAPI) dla bieżącego konta Windows. Nie trafiają do plików projektu ani do repozytorium."
+            <TextBlock Text="{loc:T provider.keysNote}"
                        TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,12,0,0"/>
         </StackPanel>
     </ScrollViewer>

@@ -1,6 +1,6 @@
 <UserControl x:Class="ImageStudio.Views.AudioSettingsTabView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
     <UserControl.Resources>
         <DataTemplate x:Key="AudioDeviceTemplate">
             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
@@ -8,14 +8,14 @@
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,8,8,0">
-            <TextBlock Text="Wejście (mikrofon)" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T audio.input}" Style="{StaticResource SectionHeader}"/>
             <ComboBox ItemsSource="{Binding Inputs}" SelectedItem="{Binding SelectedInput}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
 
-            <TextBlock Text="Wyjście (głośniki, słuchawki)" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{loc:T audio.output}" Style="{StaticResource SectionHeader}"/>
             <ComboBox ItemsSource="{Binding Outputs}" SelectedItem="{Binding SelectedOutput}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
 
             <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,12,0,0"
-                       Text="Urządzenia dotyczą zakładki Głos: nagrywanie z mikrofonu i odtwarzanie nagrań. Domyślne urządzenie systemu zmienia się razem z ustawieniami Windows. Przy wirtualnych urządzeniach (np. SteelSeries Sonar, Steam Streaming) wybierz tu to, na którym faktycznie słychać dźwięk."/>
+                       Text="{loc:T audio.note}"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -1,6 +1,6 @@
 <UserControl x:Class="ImageStudio.Tabs.Voice.VoicePanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <!-- DataContext = VoiceViewModel. Wyniki (odtwarzanie, zapis) są w prawym panelu okna głównego -->
     <UserControl.Resources>
@@ -13,35 +13,35 @@
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Expander Header="Mowa z tekstu" IsExpanded="True">
+            <Expander Header="{loc:T voice.speech}" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
                     <TextBox Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                              TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>
 
-                    <views:ModelPicker Header="Model mowy" HasFilters="True" ShowImageFilter="False"
+                    <views:ModelPicker Header="{loc:T voice.speechModel}" HasFilters="True" ShowImageFilter="False"
                                        FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                        ReloadCommand="{Binding ReloadModelsCommand}"
                                        ItemsSource="{Binding SpeechModelsView}" SelectedItem="{Binding SelectedSpeechModel}"/>
 
-                    <TextBlock Text="Głos" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.voice}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}"/>
 
-                    <TextBlock Text="{Binding Speed, StringFormat='Prędkość: {0:0.0}×'}" Margin="0,8,0,0"/>
+                    <TextBlock Margin="0,8,0,0"><Run Text="{loc:T voice.speed}"/><Run Text="{Binding Speed, Mode=OneWay, StringFormat='{}{0:0.0}×'}"/></TextBlock>
                     <Slider Minimum="0.5" Maximum="2" Value="{Binding Speed}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
 
-                    <TextBlock Text="Język mowy" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.language}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedSpeechLanguage}"
                               ItemTemplate="{StaticResource LanguageTemplate}"
-                              ToolTip="Modele mowy czytają tekst w jego języku. Wybrany język: tekst jest najpierw tłumaczony modelem tekstowym"/>
+                              ToolTip="{loc:T voice.language.tip}"/>
                     <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Text="Wybór języka tłumaczy tekst modelem tekstowym (osobny, tani koszt tokenów) i czyta tłumaczenie. Głos powinien obsługiwać ten język, inaczej mówi z obcym akcentem."/>
+                               Text="{loc:T voice.language.note}"/>
 
-                    <TextBlock Text="Format" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.format}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}"/>
 
-                    <TextBlock Text="Wyjście dźwięku" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.output}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}"
-                              ToolTip="Urządzenie, na którym grają nagrania"/>
+                              ToolTip="{loc:T voice.output.tip}"/>
 
                     <TextBlock Text="{Binding SpeechEstimateLabel}" Style="{StaticResource MutedTextBlock}"
                                TextWrapping="Wrap" Margin="0,10,0,10"/>
@@ -50,46 +50,45 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Content="Generuj mowę" Height="34" Command="{Binding SynthesizeCommand}"/>
-                        <Button Grid.Column="1" Content="Anuluj" Height="34" Margin="6,0,0,0" Padding="14,0"
+                        <Button Content="{loc:T voice.generate}" Height="34" Command="{Binding SynthesizeCommand}"/>
+                        <Button Grid.Column="1" Content="{loc:T common.cancel}" Height="34" Margin="6,0,0,0" Padding="14,0"
                                 Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"/>
                     </Grid>
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Rozpoznawanie mowy" IsExpanded="True" Margin="0,10,0,0">
+            <Expander Header="{loc:T voice.recognition}" IsExpanded="True" Margin="0,10,0,0">
                 <StackPanel Margin="0,4,0,0">
                     <Button Content="{Binding RecordButtonText}" Height="34" Command="{Binding ToggleRecordingCommand}"/>
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding RecordLevel}" Height="6" Margin="0,6,0,0"
                                  Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"/>
-                    <TextBlock Text="{Binding RecordSeconds, StringFormat='Nagrywanie: {0} s'}" Style="{StaticResource MutedTextBlock}"
-                               Margin="0,4,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"><Run Text="{loc:T voice.recordingFor}"/><Run Text="{Binding RecordSeconds, Mode=OneWay}"/><Run Text=" s"/></TextBlock>
 
-                    <TextBlock Text="Mikrofon" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.mic}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
 
-                    <TextBlock Text="Albo plik" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.orFile}" Style="{StaticResource SectionHeader}"/>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Wybierz..." Padding="12,6" Margin="6,0,0,0"
+                        <Button DockPanel.Dock="Right" Content="{loc:T common.choose}" Padding="12,6" Margin="6,0,0,0"
                                 Style="{StaticResource SecondaryButton}" Command="{Binding PickAudioCommand}"/>
                         <TextBlock Text="{Binding AudioFileName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                    ToolTip="{Binding AudioPath}"/>
                     </DockPanel>
 
-                    <views:ModelPicker Header="Model rozpoznawania" HasFilters="True" ShowImageFilter="False"
+                    <views:ModelPicker Header="{loc:T voice.sttModel}" HasFilters="True" ShowImageFilter="False"
                                        FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                        ReloadCommand="{Binding ReloadModelsCommand}"
                                        ItemsSource="{Binding TranscriptionModelsView}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
 
-                    <TextBlock Text="Język (kod, np. pl; puste = automatycznie)" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.sttLanguage}" Style="{StaticResource SectionHeader}"/>
                     <TextBox Text="{Binding Language, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Text="Podpowiedź (nazwy własne, słowa)" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Text="{loc:T voice.sttHint}" Style="{StaticResource SectionHeader}"/>
                     <TextBox Text="{Binding TranscriptionHint, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MinHeight="44"
                              AcceptsReturn="True"/>
 
                     <TextBlock Text="{Binding TranscriptionPriceLabel}" Style="{StaticResource MutedTextBlock}"
                                TextWrapping="Wrap" Margin="0,10,0,10"/>
-                    <Button Content="Rozpoznaj tekst" Height="34" Command="{Binding TranscribeCommand}"/>
+                    <Button Content="{loc:T voice.transcribe}" Height="34" Command="{Binding TranscribeCommand}"/>
                 </StackPanel>
             </Expander>
         </StackPanel>

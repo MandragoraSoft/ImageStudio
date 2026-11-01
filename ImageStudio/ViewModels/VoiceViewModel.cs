@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
 
@@ -38,7 +39,7 @@ public sealed partial class VoiceItem : ObservableObject
     public string Id { get; }
     public DateTime Created { get; }
     public bool HasAudio => Path is not null && File.Exists(Path);
-    public string Kind => IsSpeech ? "Mowa" : "Transkrypcja";
+    public string Kind => Loc.T(IsSpeech ? "voice.kind.speech" : "voice.kind.transcript");
     public string Footer => $"{Created:HH:mm:ss} · {Model}" + (CostUsd is { } c ? $" · ${c:0.####}" : "") + (Note is null ? "" : $" · {Note}");
 
     [ObservableProperty]
@@ -64,7 +65,10 @@ public sealed partial class VoiceItem : ObservableObject
 }
 
 // Język odczytu: Code null = bez tłumaczenia (model czyta tekst tak, jak go wpisano). English trafia do polecenia tłumaczenia
-public sealed record LanguageOption(string? Code, string Name, string English = "");
+public sealed record LanguageOption(string? Code, string English = "")
+{
+    public string Name => Loc.T(Code is null ? "voice.lang.none" : $"lang.{Code}");
+}
 
 // Zakładka Głos: synteza mowy (tekst -> plik dźwiękowy) i rozpoznawanie mowy (plik albo mikrofon -> tekst).
 // Wyniki są na liście w prawym panelu; pliki leżą w katalogu wyjściowym. Dostawca bez dźwięku daje puste listy modeli
@@ -145,12 +149,12 @@ public sealed partial class VoiceViewModel : ObservableObject
     // modelem tekstowym przed odczytem (osobne, tanie wywołanie czatu)
     public IReadOnlyList<LanguageOption> Languages { get; } =
     [
-        new(null, "Jak w tekście (bez tłumaczenia)"),
-        new("pl", "Polski", "Polish"), new("en", "Angielski", "English"), new("de", "Niemiecki", "German"),
-        new("fr", "Francuski", "French"), new("es", "Hiszpański", "Spanish"), new("it", "Włoski", "Italian"),
-        new("pt", "Portugalski", "Portuguese"), new("ru", "Rosyjski", "Russian"), new("uk", "Ukraiński", "Ukrainian"),
-        new("cs", "Czeski", "Czech"), new("ja", "Japoński", "Japanese"), new("zh", "Chiński", "Mandarin Chinese"),
-        new("ko", "Koreański", "Korean"),
+        new(null),
+        new("pl", "Polish"), new("en", "English"), new("de", "German"),
+        new("fr", "French"), new("es", "Spanish"), new("it", "Italian"),
+        new("pt", "Portuguese"), new("ru", "Russian"), new("uk", "Ukrainian"),
+        new("cs", "Czech"), new("ja", "Japanese"), new("zh", "Mandarin Chinese"),
+        new("ko", "Korean"),
     ];
 
     [ObservableProperty]
@@ -179,10 +183,10 @@ public sealed partial class VoiceViewModel : ObservableObject
     {
         get
         {
-            if (SelectedSpeechModel?.Pricing is not { } p) return "Brak ceny dla tego modelu";
-            if (SpeechText.Length == 0) return $"${p.PriceNow:0.####} za 1000 znaków";
+            if (SelectedSpeechModel?.Pricing is not { } p) return Loc.T("voice.price.none");
+            if (SpeechText.Length == 0) return Loc.T("voice.estimate.per1k", p.PriceNow);
             var blocks = (int)Math.Ceiling(SpeechText.Length / 1000.0);  // rozliczenie za każde rozpoczęte 1000 znaków
-            return $"Szacunek: ~${p.PriceNow * blocks:0.####} ({SpeechText.Length} znaków)";
+            return Loc.T("voice.estimate.total", p.PriceNow * blocks, SpeechText.Length);
         }
     }
 
@@ -222,11 +226,11 @@ public sealed partial class VoiceViewModel : ObservableObject
     [ObservableProperty]
     private int _recordSeconds;
 
-    public string AudioFileName => AudioPath is null ? "Nie wybrano nagrania" : Path.GetFileName(AudioPath);
-    public string RecordButtonText => IsRecording ? "■ Zatrzymaj nagrywanie" : "● Nagrywaj z mikrofonu";
+    public string AudioFileName => AudioPath is null ? Loc.T("voice.file.none") : Path.GetFileName(AudioPath);
+    public string RecordButtonText => IsRecording ? Loc.T("voice.record.stop") : Loc.T("voice.record.start");
     public string TranscriptionPriceLabel => SelectedTranscriptionModel?.Pricing is { } p
-        ? $"${p.PriceNow:0.####} za minutę nagrania"
-        : "Brak ceny dla tego modelu";
+        ? Loc.T("voice.price.perMinute", p.PriceNow)
+        : Loc.T("voice.price.none");
 
     // Wyjście dźwięku odtwarzacza (domyślne urządzenie albo konkretne); wybór jest zapamiętywany
     public ObservableCollection<AudioDevice> Speakers { get; } = [];
@@ -264,7 +268,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report($"Nie udało się odczytać listy wyjść dźwięku: {ex.Message}", true);
+            Report(Loc.T("voice.err.speakers", ex.Message), true);
         }
 
         SelectedSpeaker = Speakers.FirstOrDefault(d => d.Matches(_savedSpeaker)) ?? Speakers.FirstOrDefault();
@@ -275,9 +279,9 @@ public sealed partial class VoiceViewModel : ObservableObject
     {
         var model = _textModel();
         if (string.IsNullOrEmpty(model))
-            throw new InvalidOperationException("Brak modelu tekstowego do tłumaczenia. Wybierz go w zakładce Czat albo w Ustawieniach.");
+            throw new InvalidOperationException(Loc.T("voice.err.noTextModel"));
 
-        Report($"Tłumaczenie na: {language.Name}...");
+        Report(Loc.T("voice.status.translating", language.Name));
         var reply = await _provider().ChatAsync(model,
         [
             new ChatMessage("system", $"Translate the user's text into {language.English}. Reply with the translation only: no quotes, " +
@@ -286,7 +290,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             new ChatMessage("user", text),
         ], ct: ct);
         var translated = reply.Content.Trim();
-        return translated.Length > 0 ? translated : throw new InvalidOperationException("Model nie zwrócił tłumaczenia.");
+        return translated.Length > 0 ? translated : throw new InvalidOperationException(Loc.T("voice.err.emptyTranslation"));
     }
 
     // --- Wyniki ---
@@ -362,7 +366,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Report($"Nie udało się pobrać głosów: {ex.Message}", true);
+                Report(Loc.T("voice.err.voices", ex.Message), true);
             }
         }
 
@@ -387,7 +391,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         {
             if (language is not null) text = await TranslateAsync(text, language, cts.Token);
             var estimate = model.Pricing is { } p ? p.PriceNow * (decimal)Math.Ceiling(text.Length / 1000.0) : (decimal?)null;
-            Report("Synteza mowy...");
+            Report(Loc.T("voice.status.synth"));
             var result = await _provider().SynthesizeAsync(model.Id, text, SelectedVoice, Math.Abs(Speed - 1.0) < 0.001 ? null : Speed,
                                                            Format, cts.Token);
             Directory.CreateDirectory(OutputDir);
@@ -395,18 +399,18 @@ public sealed partial class VoiceViewModel : ObservableObject
             await File.WriteAllBytesAsync(path, result.Bytes, cts.Token);
 
             var item = new VoiceItem(true, VoiceItem.Shorten(text), text, path, model.Id, result.CostUsd ?? estimate,
-                                language is null ? null : $"przetłumaczono: {language.Name}");
+                                language is null ? null : Loc.T("voice.note.translated", language.Name));
             AddToGallery(item);
-            Report($"Zapisano nagranie: {path}");
+            Report(Loc.T("voice.status.saved", path));
             Play(item);
         }
         catch (OperationCanceledException)
         {
-            Report("Anulowano.");
+            Report(Loc.T("voice.status.cancelled"));
         }
         catch (Exception ex)
         {
-            Report($"Błąd syntezy mowy: {ex.Message}", true);
+            Report(Loc.T("voice.err.synth", ex.Message), true);
         }
         finally
         {
@@ -433,7 +437,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report($"Nie udało się odczytać listy mikrofonów: {ex.Message}", true);
+            Report(Loc.T("voice.err.mics", ex.Message), true);
         }
 
         SelectedMicrophone = Microphones.FirstOrDefault(m => m.Matches(_savedMicrophone)) ?? Microphones.FirstOrDefault();
@@ -449,13 +453,13 @@ public sealed partial class VoiceViewModel : ObservableObject
             IsRecording = false;
             RecordLevel = 0;
             AudioPath = _recordingPath;
-            Report($"Nagranie ({RecordSeconds} s) gotowe do rozpoznania.");
+            Report(Loc.T("voice.status.recorded", RecordSeconds));
             return;
         }
 
         if (SelectedMicrophone is null)
         {
-            Report("Nie znaleziono mikrofonu. Sprawdź podłączenie i Ustawienia Windows → Prywatność → Mikrofon.", true);
+            Report(Loc.T("voice.err.noMic"), true);
             return;
         }
 
@@ -467,14 +471,14 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report($"Nie udało się uruchomić mikrofonu: {ex.Message}. Sprawdź Ustawienia Windows → Prywatność → Mikrofon.", true);
+            Report(Loc.T("voice.err.micStart", ex.Message), true);
             return;
         }
 
         RecordSeconds = 0;
         _recordingClock.Restart();
         IsRecording = true;
-        Report("Nagrywanie...");
+        Report(Loc.T("voice.status.recording"));
     }
 
     // --- Rozpoznawanie ---
@@ -488,32 +492,32 @@ public sealed partial class VoiceViewModel : ObservableObject
         var path = AudioPath!;
         if (!File.Exists(path))
         {
-            Report($"Nie ma pliku: {path}", true);
+            Report(Loc.T("voice.err.noFile", path), true);
             return;
         }
 
         if (new FileInfo(path).Length > MaxAudioBytes)
         {
-            Report("Plik jest większy niż 40 MB (limit API). Wybierz krótsze nagranie.", true);
+            Report(Loc.T("voice.err.tooBig"), true);
             return;
         }
 
         using var cts = Begin();
         try
         {
-            Report("Rozpoznawanie mowy...");
+            Report(Loc.T("voice.status.transcribing"));
             var result = await _provider().TranscribeAsync(model.Id, path, Language, TranscriptionHint, cts.Token);
             var text = result.Text.Trim();
-            AddToGallery(new VoiceItem(false, Path.GetFileName(path), text.Length == 0 ? "(brak rozpoznanego tekstu)" : text, path, model.Id, result.CostUsd));
-            Report("Rozpoznano tekst.");
+            AddToGallery(new VoiceItem(false, Path.GetFileName(path), text.Length == 0 ? Loc.T("voice.transcript.empty") : text, path, model.Id, result.CostUsd));
+            Report(Loc.T("voice.status.transcribed"));
         }
         catch (OperationCanceledException)
         {
-            Report("Anulowano.");
+            Report(Loc.T("voice.status.cancelled"));
         }
         catch (Exception ex)
         {
-            Report($"Błąd rozpoznawania mowy: {ex.Message}", true);
+            Report(Loc.T("voice.err.transcribe", ex.Message), true);
         }
         finally
         {
@@ -546,7 +550,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         StopPlayback();
         item.IsPlaying = true;
         _player.Play(item.Path, () => Post(() => item.IsPlaying = false),
-                     reason => Post(() => Report($"Nie udało się odtworzyć nagrania: {reason}. Użyj „Otwórz w odtwarzaczu”.", true)));
+                     reason => Post(() => Report(Loc.T("voice.err.play", reason), true)));
     }
 
     // Zapasowa droga: domyślny odtwarzacz systemu (gdy wbudowany nie radzi sobie z plikiem albo urządzeniem dźwiękowym)
@@ -562,7 +566,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
-            Report($"Nie udało się otworzyć pliku: {ex.Message}", true);
+            Report(Loc.T("voice.err.open", ex.Message), true);
         }
     }
 
@@ -581,19 +585,19 @@ public sealed partial class VoiceViewModel : ObservableObject
         if (item.IsSpeech && item.Path is not null)
         {
             var ext = Path.GetExtension(item.Path);
-            if (_dialogs.ChooseSaveFileAs(Path.GetFileName(item.Path), "Zapisz nagranie", $"Dźwięk|*{ext}") is { } target)
+            if (_dialogs.ChooseSaveFileAs(Path.GetFileName(item.Path), Loc.T("voice.save.title"), Loc.T("voice.save.filterAudio", ext)) is { } target)
                 CopyFile(item.Path, target);
         }
-        else if (_dialogs.ChooseSaveFileAs($"transkrypcja-{item.Created:yyyyMMdd-HHmmss}.txt", "Zapisz tekst", "Tekst|*.txt") is { } target)
+        else if (_dialogs.ChooseSaveFileAs(Loc.T("voice.save.transcriptName", item.Created), Loc.T("voice.save.textTitle"), Loc.T("voice.save.filterText")) is { } target)
         {
             try
             {
                 File.WriteAllText(target, item.Text);
-                Report($"Zapisano: {target}");
+                Report(Loc.T("voice.status.savedTo", target));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Report($"Nie udało się zapisać pliku: {ex.Message}", true);
+                Report(Loc.T("voice.err.save", ex.Message), true);
             }
         }
     }
@@ -603,11 +607,11 @@ public sealed partial class VoiceViewModel : ObservableObject
         try
         {
             File.Copy(source, target, overwrite: true);
-            Report($"Zapisano: {target}");
+            Report(Loc.T("voice.status.savedTo", target));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Report($"Nie udało się zapisać pliku: {ex.Message}", true);
+            Report(Loc.T("voice.err.save", ex.Message), true);
         }
     }
 
@@ -616,7 +620,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     {
         if (item is null) return;
         _dialogs.CopyText(item.Text);
-        Report("Skopiowano tekst.");
+        Report(Loc.T("voice.status.copied"));
     }
 
     // Tekst wyniku trafia do pola syntezy (np. transkrypcja do ponownego odczytania)
@@ -633,7 +637,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         get
         {
             var total = Items.Where(i => i.CostUsd is not null).Sum(i => i.CostUsd!.Value);
-            return $"Galeria głosu: {Items.Count} · łącznie ~${total:0.0000}";
+            return Loc.T("voice.gallery.label", Items.Count, total);
         }
     }
 
@@ -665,7 +669,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     {
         // CanExecute chroni menu, ale RelayCommand.Execute go nie sprawdza: kasowanie cudzego pliku musi być wykluczone tutaj
         if (!CanDeleteFile(item) || item?.Path is null) return;
-        if (!_dialogs.Confirm($"Usunąć z galerii i z dysku?{Environment.NewLine}{Environment.NewLine}{item.Path}", "Usuwanie z dysku")) return;
+        if (!_dialogs.Confirm(Loc.T("voice.delete.confirm", Environment.NewLine, item.Path), Loc.T("voice.delete.title"))) return;
 
         StopPlayback();  // odtwarzacz trzyma plik otwarty
         try
@@ -674,13 +678,13 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Report($"Nie udało się usunąć pliku: {ex.Message}", true);
+            Report(Loc.T("voice.err.delete", ex.Message), true);
             return;
         }
 
         Items.Remove(item);
         SaveGallery();
-        Report("Usunięto z galerii i z dysku.");
+        Report(Loc.T("voice.status.deleted"));
     }
 
     // Czyści galerię; pliki zostają na dysku (jak "Wyczyść galerię" przy obrazach)
@@ -690,7 +694,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         StopPlayback();
         Items.Clear();
         SaveGallery();
-        Report("Wyczyszczono galerię głosu (pliki zostały na dysku).");
+        Report(Loc.T("voice.status.cleared"));
     }
 
     // Wybory do zapisania w UserState
