@@ -20,8 +20,8 @@
                                           Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Bd" Background="{DynamicResource SurfaceBrush}" BorderThickness="1" CornerRadius="4"
-                                                BorderBrush="{DynamicResource BorderSoftBrush}" Padding="8,5">
+                                        <Border x:Name="Bd" Background="{DynamicResource ControlBrush}" BorderThickness="1" CornerRadius="4"
+                                                BorderBrush="{DynamicResource ControlBorderBrush}" Padding="8,5">
                                             <DockPanel LastChildFill="True">
                                                 <Path x:Name="Arrow" DockPanel.Dock="Left" Data="M 0 0 L 4 4 L 8 0 Z" VerticalAlignment="Center"
                                                       Fill="{DynamicResource TextMutedBrush}" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
