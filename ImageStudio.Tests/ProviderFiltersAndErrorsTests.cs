@@ -52,7 +52,7 @@ public sealed class ModelOwnerFilterTests
     [Fact]
     public void Filter_bar_lists_only_providers_that_have_models_in_this_picker()
     {
-        Sta.Run(() =>
+        WpfHost.Run(() =>
         {
             var models = new ObservableCollection<ModelOption> { Option("a", "openai"), Option("b", "OpenAI"), Option("c", "venice") };
             var bar = new ModelFilterBar { ModelsSource = models };
@@ -68,7 +68,7 @@ public sealed class ModelOwnerFilterTests
     [Fact]
     public void Selected_provider_stays_on_the_list_even_without_models_here()
     {
-        Sta.Run(() =>
+        WpfHost.Run(() =>
         {
             var bar = new ModelFilterBar { ModelsSource = new[] { Option("a", "openai") }, ActiveProvider = "xai" };
 

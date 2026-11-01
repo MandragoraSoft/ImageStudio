@@ -80,6 +80,61 @@ public sealed class ImageGenerationService : IDisposable
         return new ImageModels(generation, edit);
     }
 
+    // Ceny z katalogu modeli (pole pricing w /v1/models?type=image|video|chat): uzupełniają rynek, który nie wycenia modeli
+    // bez aktywnych ofert (np. qwen/venice-qwen-image-2-1-turbo ma tylko media_list_usd). Awaria jednego katalogu nie psuje reszty
+    public async Task<IReadOnlyDictionary<string, ModelPricing>> GetCatalogPricingAsync(CancellationToken ct = default)
+    {
+        var prices = new Dictionary<string, ModelPricing>();
+        foreach (var type in new[] { "image", "video", "chat" })
+        {
+            try
+            {
+                using var response = await _http.GetAsync($"/v1/models?type={type}", ct);
+                if (!response.IsSuccessStatusCode) continue;
+                foreach (var (id, price) in ParseCatalogPricing(await response.Content.ReadAsStringAsync(ct))) prices.TryAdd(id, price);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
+            {
+                // brak ceny z katalogu to tylko brak ceny
+            }
+        }
+
+        return prices;
+    }
+
+    // pricing: media mają usd (cena teraz, bywa pominięta) i list_usd (cena producenta) za unit (image, second...);
+    // modele tekstowe input_usd / output_usd / cache_read_usd za "1M tokens"
+    public static IReadOnlyDictionary<string, ModelPricing> ParseCatalogPricing(string body)
+    {
+        static decimal? Number(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDecimal() : null;
+
+        var prices = new Dictionary<string, ModelPricing>();
+        using var doc = JsonDocument.Parse(body);
+        foreach (var model in doc.RootElement.GetProperty("data").EnumerateArray())
+        {
+            if (!model.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Object) continue;
+
+            var id = model.GetProperty("id").GetString()!;
+            var unit = pricing.TryGetProperty("unit", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : null;
+            if (unit == "1M tokens")
+            {
+                if (Number(pricing, "input_usd") is { } input)
+                    prices[id] = new ModelPricing(input, Number(pricing, "list_input_usd"), null, ModelPricing.TokenUnit, null, null,
+                                                  Number(pricing, "output_usd"), Number(pricing, "cache_read_usd"));
+                continue;
+            }
+
+            var list = Number(pricing, "list_usd");
+            if ((Number(pricing, "usd") ?? list) is not { } now) continue;
+
+            decimal? discount = list is > 0 && now < list ? Math.Round((1 - now / list.Value) * 100, 1) : null;
+            prices[id] = new ModelPricing(now, list, discount, unit, null, null);
+        }
+
+        return prices;
+    }
+
     // Opis modelu z /v1/models, jeśli API go zwraca; brak = UI pokaże opis z atrybutów
     private static string? Describe(JsonElement model) =>
         model.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;

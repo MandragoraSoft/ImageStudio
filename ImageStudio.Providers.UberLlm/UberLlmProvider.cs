@@ -25,8 +25,13 @@ public sealed class UberLlmProvider : IAiProvider
 
     public Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) => _api.GetChatModelsAsync(ct);
 
-    public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
-        _market.GetPricingAsync(ct);
+    // Ceny z rynku (na żywo, z ofertami) mają pierwszeństwo; modele, których rynek nie wycenia, dostają cenę z katalogu modeli
+    public async Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default)
+    {
+        var prices = new Dictionary<string, ModelPricing>(await _market.GetPricingAsync(ct));
+        foreach (var (id, price) in await _api.GetCatalogPricingAsync(ct)) prices.TryAdd(id, price);
+        return prices;
+    }
 
     public async Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                       CancellationToken ct = default) =>
