@@ -33,8 +33,11 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "Zła wersja: $VERSION"; exit 1; }
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
+      - name: Build
+        run: dotnet build ImageStudio.slnx -c Release -m:1
+
       - name: Testy
-        run: dotnet test ImageStudio.Tests -m:1
+        run: dotnet test ImageStudio.slnx -c Release --no-build
 
       - name: Publikacja (zwykła i samodzielna)
         run: |
