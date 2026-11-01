@@ -13,11 +13,7 @@
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <Expander Header="Wyjście dźwięku" IsExpanded="False" ToolTip="Urządzenie, na którym grają nagrania">
-                <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}" Margin="0,4,0,0"/>
-            </Expander>
-
-            <Expander Header="Mowa z tekstu" IsExpanded="True" Margin="0,10,0,0">
+            <Expander Header="Mowa z tekstu" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
                     <TextBox Text="{Binding SpeechText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                              TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto"/>
@@ -42,6 +38,10 @@
 
                     <TextBlock Text="Format" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}"/>
+
+                    <TextBlock Text="Wyjście dźwięku" Style="{StaticResource SectionHeader}"/>
+                    <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}"
+                              ToolTip="Urządzenie, na którym grają nagrania"/>
 
                     <TextBlock Text="{Binding SpeechEstimateLabel}" Style="{StaticResource MutedTextBlock}"
                                TextWrapping="Wrap" Margin="0,10,0,10"/>

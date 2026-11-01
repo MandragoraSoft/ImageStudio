@@ -55,6 +55,10 @@ public sealed class VoiceWindowTests
             Flush(window.Dispatcher);
             var texts = FindAll<TextBlock>(panel).Select(t => t.Text).ToList();
             Assert.Contains("Mikrofon testowy", texts);
+            Assert.Contains("Wyjście dźwięku", texts);
+            Assert.Contains("Słuchawki", FindAll<ComboBox>(panel).SelectMany(c => c.Items.OfType<AudioDevice>()).Select(d => d.Name));  // lista wyjść w sekcji mowy
+            var speech = FindAll<Expander>(panel).First(e => e.Header as string == "Mowa z tekstu");
+            Assert.Contains("Wyjście dźwięku", FindAll<TextBlock>(speech).Select(t => t.Text));  // wyjście należy do sekcji mowy z tekstu
             Assert.Contains("Jak w tekście (bez tłumaczenia)", texts);  // pole języka mowy
             Assert.DoesNotContain(texts, t => t.Contains("AudioDevice {"));
 
