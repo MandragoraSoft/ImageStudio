@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ImageStudio.Configuration;
 
@@ -15,7 +16,11 @@ public sealed class ModelPreferences
 {
     public Dictionary<string, ProviderModelPrefs> Providers { get; set; } = [];
 
-    private static string FilePath => Path.Combine(AppPaths.UserDataDir, "models.json");
+    // Własna ścieżka pliku zamiast profilu użytkownika (testy); null = domyślny models.json
+    [JsonIgnore]
+    public string? PathOverride { get; set; }
+
+    private static string DefaultPath => Path.Combine(AppPaths.UserDataDir, "models.json");
 
     public ProviderModelPrefs For(string providerId)
     {
@@ -24,24 +29,28 @@ public sealed class ModelPreferences
         return prefs;
     }
 
-    public static ModelPreferences Load()
+    public static ModelPreferences Load(string? path = null)
     {
-        if (!File.Exists(FilePath)) return new ModelPreferences();
+        var file = path ?? DefaultPath;
+        if (!File.Exists(file)) return new ModelPreferences { PathOverride = path };
 
         try
         {
-            return JsonSerializer.Deserialize<ModelPreferences>(File.ReadAllText(FilePath)) ?? new ModelPreferences();
+            var loaded = JsonSerializer.Deserialize<ModelPreferences>(File.ReadAllText(file)) ?? new ModelPreferences();
+            loaded.PathOverride = path;
+            return loaded;
         }
         catch (JsonException)
         {
             // Uszkodzony plik nie blokuje startu; lista modeli zostaje pełna
-            return new ModelPreferences();
+            return new ModelPreferences { PathOverride = path };
         }
     }
 
     public void Save()
     {
-        Directory.CreateDirectory(AppPaths.UserDataDir);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        var file = PathOverride ?? DefaultPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
