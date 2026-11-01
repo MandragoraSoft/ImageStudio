@@ -14,6 +14,21 @@ internal sealed class MemoryUserStateStore : IUserStateStore
     public void Save(UserState state) => State = state;
 }
 
+internal sealed class MemoryVoiceGalleryStore : IVoiceGalleryStore
+{
+    public List<GalleryEntry> Entries { get; } = [];
+    public int Saves { get; private set; }
+    public IReadOnlyList<GalleryEntry> Load() => Entries.ToList();
+
+    public void Save(IEnumerable<GalleryEntry> entries)
+    {
+        var snapshot = entries.ToList();
+        Entries.Clear();
+        Entries.AddRange(snapshot);
+        Saves++;
+    }
+}
+
 internal sealed class MemoryGalleryStore : IGalleryStore
 {
     public List<GalleryEntry> Entries { get; } = [];
@@ -154,6 +169,8 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<IUserStateStore, MemoryUserStateStore>();
         services.AddSingleton<IGalleryStore, MemoryGalleryStore>();
         services.AddSingleton<IChatSessionStore, MemoryChatSessionStore>();
+        services.AddSingleton<MemoryVoiceGalleryStore>();
+        services.AddSingleton<IVoiceGalleryStore>(sp => sp.GetRequiredService<MemoryVoiceGalleryStore>());
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
         services.AddSingleton<ISecretStore, MemorySecretStore>();
         services.AddSingleton<IWindowStateStore, MemoryWindowStateStore>();

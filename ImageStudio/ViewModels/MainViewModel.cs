@@ -118,7 +118,8 @@ public sealed partial class MainViewModel : ObservableObject
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
-                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder)
+                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
+                         IVoiceGalleryStore voiceGallery)
     {
         _provider = provider;
         _providers = providers;
@@ -162,7 +163,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
-                                   () => SelectedEnhancerModel, FilterAudioModel);
+                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery);
         Voice.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)

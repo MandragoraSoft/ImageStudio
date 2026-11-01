@@ -3,7 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- Wyniki zakładki Głos (DataContext = VoiceViewModel): nagrania z syntezy i teksty z rozpoznawania -->
     <Grid>
-        <TextBlock x:Name="EmptyHint" Text="Tu pojawią się nagrania i teksty. Wpisz tekst do przeczytania albo nagraj głos i rozpoznaj go."
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="8,8,8,0">
+            <Button DockPanel.Dock="Right" Content="Wyczyść galerię" Padding="12,5" Style="{StaticResource SecondaryButton}"
+                    ToolTip="Usuwa wpisy z galerii; pliki dźwiękowe zostają na dysku" Command="{Binding ClearGalleryCommand}"/>
+            <TextBlock x:Name="GalleryHeader" Text="{Binding GalleryLabel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+        </DockPanel>
+        <TextBlock x:Name="EmptyHint" Grid.Row="1" Text="Tu pojawią się nagrania i teksty. Wpisz tekst do przeczytania albo nagraj głos i rozpoznaj go."
                    TextWrapping="Wrap" HorizontalAlignment="Center"
                    VerticalAlignment="Center" MaxWidth="360" TextAlignment="Center">
             <TextBlock.Resources>
@@ -17,7 +26,7 @@
                 </Style>
             </TextBlock.Resources>
         </TextBlock>
-        <ListBox x:Name="ResultList" ItemsSource="{Binding Items}" HorizontalContentAlignment="Stretch" BorderThickness="0"
+        <ListBox x:Name="ResultList" Grid.Row="1" ItemsSource="{Binding Items}" HorizontalContentAlignment="Stretch" BorderThickness="0"
                  Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
@@ -35,7 +44,22 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Border Margin="8,8,8,0" Padding="12,10" CornerRadius="8" BorderThickness="1"
-                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
+                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
+                            Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
+                        <Border.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Usuń z galerii"
+                                          Command="{Binding PlacementTarget.Tag.RemoveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                <MenuItem Header="Usuń z galerii i z dysku..."
+                                          Command="{Binding PlacementTarget.Tag.DeleteWithFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                <Separator/>
+                                <MenuItem Header="Kopiuj tekst"
+                                          Command="{Binding PlacementTarget.Tag.CopyTextCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            </ContextMenu>
+                        </Border.ContextMenu>
                         <StackPanel>
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Right" Text="{Binding Footer}" FontSize="11" Style="{StaticResource MutedTextBlock}"/>

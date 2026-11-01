@@ -13,8 +13,11 @@ namespace ImageStudio.ViewModels;
 // Wynik w zakładce Głos: nagranie z syntezy mowy albo tekst z rozpoznawania. Path wskazuje plik dźwiękowy (może go nie być)
 public sealed partial class VoiceItem : ObservableObject
 {
-    public VoiceItem(bool isSpeech, string title, string text, string? path, string model, decimal? costUsd, string? note = null)
+    public VoiceItem(bool isSpeech, string title, string text, string? path, string model, decimal? costUsd, string? note = null,
+                     string? id = null, DateTime? created = null)
     {
+        Id = id ?? Guid.NewGuid().ToString("N");
+        Created = created ?? DateTime.Now;
         Note = note;
         IsSpeech = isSpeech;
         Title = title;
@@ -32,13 +35,32 @@ public sealed partial class VoiceItem : ObservableObject
     public string? Path { get; }
     public string Model { get; }
     public decimal? CostUsd { get; }
-    public DateTime Created { get; } = DateTime.Now;
+    public string Id { get; }
+    public DateTime Created { get; }
     public bool HasAudio => Path is not null && File.Exists(Path);
     public string Kind => IsSpeech ? "Mowa" : "Transkrypcja";
     public string Footer => $"{Created:HH:mm:ss} · {Model}" + (CostUsd is { } c ? $" · ${c:0.####}" : "") + (Note is null ? "" : $" · {Note}");
 
     [ObservableProperty]
     private bool _isPlaying;
+
+    public GalleryEntry ToEntry() => new()
+    {
+        Id = Id,
+        CreatedUtc = Created.ToUniversalTime(),
+        Prompt = Text,
+        Model = Model,
+        Kind = IsSpeech ? "speech" : "transcript",
+        Size = Note ?? "",
+        CostUsd = CostUsd,
+        FilePath = Path ?? "",
+    };
+
+    public static VoiceItem FromEntry(GalleryEntry entry) =>
+        new(entry.Kind == "speech", Shorten(entry.Prompt), entry.Prompt, entry.FilePath.Length > 0 ? entry.FilePath : null, entry.Model,
+            entry.CostUsd, entry.Size.Length > 0 ? entry.Size : null, entry.Id, entry.CreatedUtc.ToLocalTime());
+
+    public static string Shorten(string text) => text.Length > 60 ? text[..60] + "..." : text;
 }
 
 // Język odczytu: Code null = bez tłumaczenia (model czyta tekst tak, jak go wpisano). English trafia do polecenia tłumaczenia
@@ -60,6 +82,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     private readonly Action<string, bool> _report;
     private readonly Action _reload;
     private readonly Func<string?> _textModel;
+    private readonly IVoiceGalleryStore? _gallery;
     private readonly SynchronizationContext? _ui = SynchronizationContext.Current;
     private readonly Stopwatch _recordingClock = new();
     private CancellationTokenSource? _cts;
@@ -68,8 +91,12 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     public VoiceViewModel(Func<IAiProvider> provider, IDialogService dialogs, IAudioPlayer player, IAudioRecorder recorder,
                           Action<string, bool> report, Action reload, string outputDir, UserState state,
-                          Func<string?>? textModel = null, Func<object, bool>? modelFilter = null)
+                          Func<string?>? textModel = null, Func<object, bool>? modelFilter = null, IVoiceGalleryStore? gallery = null)
     {
+        _gallery = gallery;
+        if (gallery is not null)
+            foreach (var entry in gallery.Load()) Items.Add(VoiceItem.FromEntry(entry));
+        Items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(GalleryLabel));
         SpeechModelsView = CollectionViewSource.GetDefaultView(SpeechModels);
         TranscriptionModelsView = CollectionViewSource.GetDefaultView(TranscriptionModels);
         if (modelFilter is not null)
@@ -367,9 +394,9 @@ public sealed partial class VoiceViewModel : ObservableObject
             var path = Path.Combine(OutputDir, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}");
             await File.WriteAllBytesAsync(path, result.Bytes, cts.Token);
 
-            var item = new VoiceItem(true, text.Length > 60 ? text[..60] + "..." : text, text, path, model.Id, result.CostUsd ?? estimate,
+            var item = new VoiceItem(true, VoiceItem.Shorten(text), text, path, model.Id, result.CostUsd ?? estimate,
                                 language is null ? null : $"przetłumaczono: {language.Name}");
-            Items.Insert(0, item);
+            AddToGallery(item);
             Report($"Zapisano nagranie: {path}");
             Play(item);
         }
@@ -477,7 +504,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             Report("Rozpoznawanie mowy...");
             var result = await _provider().TranscribeAsync(model.Id, path, Language, TranscriptionHint, cts.Token);
             var text = result.Text.Trim();
-            Items.Insert(0, new VoiceItem(false, Path.GetFileName(path), text.Length == 0 ? "(brak rozpoznanego tekstu)" : text, path, model.Id, result.CostUsd));
+            AddToGallery(new VoiceItem(false, Path.GetFileName(path), text.Length == 0 ? "(brak rozpoznanego tekstu)" : text, path, model.Id, result.CostUsd));
             Report("Rozpoznano tekst.");
         }
         catch (OperationCanceledException)
@@ -599,12 +626,71 @@ public sealed partial class VoiceViewModel : ObservableObject
         if (item is not null) SpeechText = item.Text;
     }
 
+    // --- Galeria: zapis na dysku, usuwanie, łączny koszt ---
+
+    public string GalleryLabel
+    {
+        get
+        {
+            var total = Items.Where(i => i.CostUsd is not null).Sum(i => i.CostUsd!.Value);
+            return $"Galeria głosu: {Items.Count} · łącznie ~${total:0.0000}";
+        }
+    }
+
+    private void AddToGallery(VoiceItem item)
+    {
+        Items.Insert(0, item);
+        while (Items.Count > FileVoiceGalleryStore.MaxEntries) Items.RemoveAt(Items.Count - 1);
+        SaveGallery();
+    }
+
+    private void SaveGallery() => _gallery?.Save(Items.Select(i => i.ToEntry()));
+
+    // Usuwa wpis z galerii; plik zostaje na dysku
     [RelayCommand]
     private void Remove(VoiceItem? item)
     {
         if (item is null) return;
         if (item.IsPlaying) StopPlayback();
         Items.Remove(item);
+        SaveGallery();
+    }
+
+    // Plik wolno kasować tylko z katalogu aplikacji (nasze nagrania i wyniki mowy), nigdy plik wskazany przez użytkownika
+    private bool CanDeleteFile(VoiceItem? item) =>
+        item?.Path is { } path && Path.GetFullPath(path).StartsWith(Path.GetFullPath(OutputDir) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+    [RelayCommand(CanExecute = nameof(CanDeleteFile))]
+    private void DeleteWithFile(VoiceItem? item)
+    {
+        // CanExecute chroni menu, ale RelayCommand.Execute go nie sprawdza: kasowanie cudzego pliku musi być wykluczone tutaj
+        if (!CanDeleteFile(item) || item?.Path is null) return;
+        if (!_dialogs.Confirm($"Usunąć z galerii i z dysku?{Environment.NewLine}{Environment.NewLine}{item.Path}", "Usuwanie z dysku")) return;
+
+        StopPlayback();  // odtwarzacz trzyma plik otwarty
+        try
+        {
+            if (File.Exists(item.Path)) File.Delete(item.Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Report($"Nie udało się usunąć pliku: {ex.Message}", true);
+            return;
+        }
+
+        Items.Remove(item);
+        SaveGallery();
+        Report("Usunięto z galerii i z dysku.");
+    }
+
+    // Czyści galerię; pliki zostają na dysku (jak "Wyczyść galerię" przy obrazach)
+    [RelayCommand]
+    private void ClearGallery()
+    {
+        StopPlayback();
+        Items.Clear();
+        SaveGallery();
+        Report("Wyczyszczono galerię głosu (pliki zostały na dysku).");
     }
 
     // Wybory do zapisania w UserState

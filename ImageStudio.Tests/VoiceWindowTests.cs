@@ -95,7 +95,7 @@ public sealed class VoiceWindowTests
                 Flush(window.Dispatcher);
 
                 Assert.False(hint.IsVisible);
-                var buttons = FindAll<Button>(results).Where(b => b.IsVisible).Select(b => b.Content as string).ToList();
+                var buttons = FindAll<Button>((ListBox)results.FindName("ResultList")).Where(b => b.IsVisible).Select(b => b.Content as string).ToList();
                 Assert.Equal(["▶ Odtwórz", "Otwórz w odtwarzaczu", "Zapisz jako...", "Kopiuj tekst", "Do syntezy", "Usuń"], buttons);
                 Assert.Contains(FindAll<TextBox>(results), t => t.Text == "tekst wyniku");
             }
