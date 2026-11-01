@@ -33,7 +33,7 @@
                 </StackPanel>
             </Expander>
 
-            <views:ModelPicker Header="Model wideo" ReloadCommand="{Binding ReloadModelsCommand}" ItemsSource="{Binding VideoModels}" SelectedItem="{Binding SelectedVideoModel}"/>
+            <views:ModelPicker Header="Model wideo" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" ItemsSource="{Binding VideoModelsView}" SelectedItem="{Binding SelectedVideoModel}"/>
 
             <Expander Header="Czas i proporcje" IsExpanded="True" Margin="0,8,0,0">
                 <StackPanel Margin="0,4,0,0">

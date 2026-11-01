@@ -109,6 +109,19 @@ internal sealed class FakeThemeService : IThemeService
     public void Apply(string theme) => Applied.Add(theme);
 }
 
+internal static class TestPorts
+{
+    // Wolny port TCP wskazany przez system (HttpListener nie umie port 0)
+    public static int Free()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+}
+
 // Fabryka zwraca tę samą atrapę: zmiana dostawcy w teście nie sięga do prawdziwych klientów HTTP
 internal sealed class FakeProviderFactory(FakeProvider provider) : IProviderFactory
 {

@@ -171,6 +171,8 @@ public sealed partial class MainViewModel : ObservableObject
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
         ModelsView.Filter = FilterModel;
         EditModelsView.Filter = FilterModel;
+        VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
+        VideoModelsView.Filter = FilterModel;
         References.CollectionChanged += (_, _) => EditCommand.NotifyCanExecuteChanged();
         VideoAttachments.CollectionChanged += (_, _) =>
         {
@@ -296,6 +298,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ModelsView.Refresh();
         EditModelsView.Refresh();
+        VideoModelsView.Refresh();
         ChatModelsView.Refresh();
     }
 

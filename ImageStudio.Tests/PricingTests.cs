@@ -22,7 +22,7 @@ public sealed class PricingTests
     private static async Task<IReadOnlyDictionary<string, ModelPricing>> FetchAsync(string json)
     {
         using var listener = new HttpListener();
-        var port = new Random().Next(20000, 40000);
+        var port = TestPorts.Free();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();
         var serving = Task.Run(async () =>

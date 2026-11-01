@@ -41,7 +41,7 @@ public sealed class RejectedParameterTests
 
         public ScriptedServer(params (int Status, string Body)[] script)
         {
-            var port = new Random().Next(40001, 60000);
+            var port = TestPorts.Free();
             Url = $"http://127.0.0.1:{port}";
             _listener.Prefixes.Add(Url + "/");
             _listener.Start();

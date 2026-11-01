@@ -47,6 +47,13 @@ public partial class ModelPicker : UserControl
         InitializeComponent();
     }
 
+    // Wybór użytkownika trafia do SelectedItem. Gdy filtr ukryje wybraną pozycję, lista zgłasza brak zaznaczenia, ale to nie jest
+    // decyzja użytkownika: wybrany model zostaje (nagłówek dalej go pokazuje), a lista pokazuje tylko przefiltrowane pozycje
+    private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (List.SelectedItem is { } item && !Equals(item, SelectedItem)) SelectedItem = item;
+    }
+
     // Klik w pozycję zwija akordeon; klik w pasek przewijania czy puste miejsce go nie rusza
     private void List_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {

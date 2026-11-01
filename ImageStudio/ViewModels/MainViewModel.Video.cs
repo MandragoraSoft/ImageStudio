@@ -17,6 +17,9 @@ public sealed partial class MainViewModel
     // --- Wideo ---
 
     public ObservableCollection<ModelOption> VideoModels { get; } = [];
+
+    // Lista modeli wideo z tymi samymi filtrami co modele obrazów
+    public ICollectionView VideoModelsView { get; }
     public IReadOnlyList<string> VideoAspects { get; } = ["16:9", "9:16", "1:1", "4:3"];
 
     [ObservableProperty]

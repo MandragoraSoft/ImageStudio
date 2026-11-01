@@ -73,17 +73,20 @@
             </Expander.Header>
             <StackPanel Margin="0,4,0,0">
                 <DockPanel Margin="0,0,0,4">
-                    <Button x:Name="ReloadButton" DockPanel.Dock="Right" Content="&#x27F3; Odśwież" Padding="10,2" Visibility="Collapsed"
+                    <Button x:Name="ReloadButton" DockPanel.Dock="Right" Content="&#x27F3; Odśwież" Padding="10,3" Visibility="Collapsed"
+                            Style="{StaticResource SecondaryButton}"
                             Command="{Binding ReloadCommand, ElementName=Picker}"
                             ToolTip="Pobiera ponownie listy modeli i ceny od dostawcy"/>
-                    <ToggleButton x:Name="FiltersToggle" Content="Filtry modeli" Padding="10,2" HorizontalAlignment="Left"
+                    <ToggleButton x:Name="FiltersToggle" Content="Filtry modeli" Padding="10,3" HorizontalAlignment="Left"
+                                  Style="{StaticResource FilterToggleButton}"
                                   Visibility="{Binding HasFilters, ElementName=Picker, Converter={StaticResource BoolToVis}}"/>
                 </DockPanel>
                 <views:ModelFilterBar x:Name="FilterBar" Margin="0,0,0,4"
                                       Visibility="{Binding IsChecked, ElementName=FiltersToggle, Converter={StaticResource BoolToVis}}"/>
                 <ListBox x:Name="List" MaxHeight="260" HorizontalContentAlignment="Stretch"
                          ItemsSource="{Binding ItemsSource, ElementName=Picker}"
-                         SelectedItem="{Binding SelectedItem, ElementName=Picker}"
+                         SelectedItem="{Binding SelectedItem, ElementName=Picker, Mode=OneWay}"
+                         SelectionChanged="List_SelectionChanged"
                          PreviewMouseLeftButtonUp="List_PreviewMouseLeftButtonUp" PreviewKeyDown="List_PreviewKeyDown">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
