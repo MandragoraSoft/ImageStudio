@@ -38,16 +38,23 @@
                     <TabItem Header="Wideo">
                         <views:VideoPanel/>
                     </TabItem>
+                    <TabItem Header="Czat">
+                        <views:ChatPanel DataContext="{Binding Chat}"/>
+                    </TabItem>
                 </TabControl>
 
-                <views:ModelMetricsPanel Grid.Row="1" Margin="0,8,0,0"/>
+                <views:ModelMetricsPanel Grid.Row="1" Margin="0,8,0,0"
+                                         Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
             </Grid>
 
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           ResizeBehavior="PreviousAndNext" Background="{DynamicResource BorderSoftBrush}"/>
 
             <!-- OUTPUT: wynik z zachowaniem proporcji -->
-            <views:OutputPanel Grid.Column="2"/>
+            <views:OutputPanel Grid.Column="2" Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
+            <Grid Grid.Column="2" Visibility="{Binding IsChatTab, Converter={StaticResource BoolToVis}}">
+                <views:ChatConversation DataContext="{Binding Chat}"/>
+            </Grid>
         </Grid>
 
         <!-- Pasek stanu -->

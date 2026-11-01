@@ -22,6 +22,9 @@ public interface IAiProvider : IDisposable
     Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                          IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                          Action<string>? progress = null, CancellationToken ct = default);
+    // Zwykła rozmowa: cała historia (system, user, assistant) na wejściu, odpowiedź modelu na wyjściu
+    Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default);
+
     Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                          IReadOnlyDictionary<string, object> parameters, CancellationToken ct = default);
 }

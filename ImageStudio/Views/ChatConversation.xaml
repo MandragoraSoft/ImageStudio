@@ -1,0 +1,70 @@
+<UserControl x:Class="ImageStudio.Views.ChatConversation"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svc="clr-namespace:ImageStudio.Services">
+    <!-- Rozmowa i pole wpisywania (DataContext = ChatViewModel) -->
+    <UserControl.Resources>
+        <DataTemplate DataType="{x:Type svc:ChatMessage}">
+            <Border x:Name="Bubble" Margin="0,0,0,8" Padding="10,6" CornerRadius="8" MaxWidth="680"
+                    HorizontalAlignment="Left" BorderThickness="1"
+                    Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
+                <StackPanel>
+                    <TextBlock Text="{Binding RoleLabel}" FontSize="11" Style="{StaticResource MutedTextBlock}"/>
+                    <!-- TextBox tylko do odczytu, żeby dało się zaznaczać i kopiować fragmenty odpowiedzi -->
+                    <TextBox Text="{Binding Content, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                             BorderThickness="0" Padding="0" Background="Transparent"/>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsUser}" Value="True">
+                    <Setter TargetName="Bubble" Property="HorizontalAlignment" Value="Right"/>
+                    <Setter TargetName="Bubble" Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="6"
+                Background="{DynamicResource SurfaceBrush}">
+            <Grid>
+                <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" Padding="12">
+                    <ItemsControl ItemsSource="{Binding Messages}"/>
+                </ScrollViewer>
+                <TextBlock Text="Napisz wiadomość poniżej, aby zacząć rozmowę." HorizontalAlignment="Center"
+                           VerticalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Messages.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+                     MinHeight="56" MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding SendCommand}"/>
+                </TextBox.InputBindings>
+            </TextBox>
+            <Button Grid.Column="1" Content="Wyślij" Width="90" Margin="8,0,0,0" VerticalAlignment="Stretch"
+                    Command="{Binding SendCommand}" ToolTip="Ctrl+Enter"/>
+        </Grid>
+    </Grid>
+</UserControl>

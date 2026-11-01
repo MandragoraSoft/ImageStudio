@@ -20,6 +20,8 @@ public sealed class UserState
     public string? GenerationModel { get; set; }
     public string? EditModel { get; set; }
     public string? EnhancerModel { get; set; }
+    public string? ChatModel { get; set; }
+    public string? ChatSystemPrompt { get; set; }
     public string? EnhancerInstruction { get; set; }
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }

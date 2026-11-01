@@ -16,6 +16,13 @@ public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IRead
 // Model czatu z listą parametrów, które deklaruje (supported_parameters)
 public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters);
 
+// Wiadomość czatu (role: system, user, assistant); IsUser i RoleLabel służą szablonowi rozmowy
+public sealed record ChatMessage(string Role, string Content)
+{
+    public bool IsUser => Role == "user";
+    public string RoleLabel => Role switch { "user" => "Ty", "assistant" => "Model", _ => "System" };
+}
+
 // Wynik generowania/edycji: bajty obrazu i koszt z API (null, gdy API go nie zwróciło)
 public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
 
@@ -123,6 +130,24 @@ public sealed class ImageGenerationService : IDisposable
             .ToList();
     }
 
+    public Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default) =>
+        ChatAsync(_http, "/v1/chat/completions", model, messages, ct);
+
+    // Wspólne dla providerów: /chat/completions z pełną historią; zwraca treść odpowiedzi
+    internal static async Task<string> ChatAsync(HttpClient http, string path, string model,
+                                                 IReadOnlyList<ChatMessage> messages, CancellationToken ct)
+    {
+        var body = new { model, messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList() };
+        using var response = await http.PostAsJsonAsync(path, body, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
+
+        using var doc = JsonDocument.Parse(text);
+        return doc.RootElement.GetProperty("choices")[0].GetProperty("message")
+            .GetProperty("content").GetString() ?? "";
+    }
+
     // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).
     // Model zwraca JSON; przy błędzie parsowania koncept to surowa odpowiedź, a system zostaje bez zmian.
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
@@ -179,8 +204,9 @@ public sealed class ImageGenerationService : IDisposable
                 : "";
             return new PromptParts(system, concept);
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
+            // Nie-JSON albo JSON niebędący obiektem (np. sam tekst w cudzysłowie): traktujemy jak surową odpowiedź
             return new PromptParts(fallbackSystem.Trim(), content.Trim().Trim('"'));
         }
     }
