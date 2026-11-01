@@ -16,8 +16,10 @@ public partial class ChatConversation : UserControl
         // Nowa wiadomość przewija rozmowę na dół
         DataContextChanged += (_, e) =>
         {
-            if (e.NewValue is ChatViewModel vm)
-                vm.Messages.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(Scroll.ScrollToEnd, DispatcherPriority.Background);
+            if (e.NewValue is not ChatViewModel vm) return;
+            vm.Messages.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(Scroll.ScrollToEnd, DispatcherPriority.Background);
+            // Odpowiedź strumieniowa rośnie w miejscu: też przewija na dół
+            vm.MessageUpdated += () => Dispatcher.BeginInvoke(Scroll.ScrollToEnd, DispatcherPriority.Background);
         };
     }
 

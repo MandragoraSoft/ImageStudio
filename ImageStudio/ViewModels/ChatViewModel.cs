@@ -27,6 +27,10 @@ public sealed partial class ChatViewModel : ObservableObject
     private readonly ChatImageSupport? _images;
     private readonly Func<string, ChatModelInfo?>? _modelInfo;
     private readonly IActivityTracker? _activity;
+    private readonly Func<bool>? _useStreaming;
+
+    // Treść ostatniej wiadomości zmieniła się w trakcie strumienia (widok przewija rozmowę na dół)
+    public event Action? MessageUpdated;
 
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -35,8 +39,10 @@ public sealed partial class ChatViewModel : ObservableObject
                          IToolHost? tools = null, Func<ToolCall, bool>? confirm = null,
                          ChatImageSupport? images = null, Func<string, ChatModelInfo?>? modelInfo = null,
                          bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
-                         IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null)
+                         IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null,
+                         Func<bool>? useStreaming = null)
     {
+        _useStreaming = useStreaming;
         ModelOptions = modelOptions ?? [];
         ModelOptionsView = CollectionViewSource.GetDefaultView(ModelOptions);
         ModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedModelOption));
@@ -142,27 +148,48 @@ public sealed partial class ChatViewModel : ObservableObject
         Attachments.Clear();
         IsSending = true;
         _report("Model odpowiada...", false);
+        ChatMessage? live = null;
         try
         {
             var definitions = Tools?.Tools ?? [];
             for (var round = 0; ; round++)
             {
-                var reply = await _provider().ChatAsync(SelectedModel!, BuildHistory(), definitions.Count > 0 ? definitions : null,
-                                                         options: BuildOptions());
+                var history = BuildHistory();
+                var tools = definitions.Count > 0 ? definitions : null;
+                ChatReply reply;
+                if (_useStreaming?.Invoke() == true)
+                {
+                    // Pusta wiadomość pojawia się od razu i rośnie z każdym kawałkiem; historia powstała przed jej dodaniem
+                    var message = live = new ChatMessage("assistant", "");
+                    Messages.Add(message);
+                    reply = await _provider().ChatStreamAsync(SelectedModel!, history, tools, delta =>
+                    {
+                        if (delta.Content is { Length: > 0 }) message.Content += delta.Content;
+                        if (delta.Reasoning is { Length: > 0 }) message.Reasoning = (message.Reasoning ?? "") + delta.Reasoning;
+                        MessageUpdated?.Invoke();
+                    }, options: BuildOptions());
+                }
+                else
+                {
+                    live = null;
+                    reply = await _provider().ChatAsync(SelectedModel!, history, tools, options: BuildOptions());
+                }
+
                 if (reply.ToolCalls.Count == 0)
                 {
-                    Messages.Add(new ChatMessage("assistant", reply.Content, Reasoning: reply.Reasoning, Usage: reply.Usage));
+                    Complete(live, new ChatMessage("assistant", reply.Content), reply);
                     break;
                 }
 
                 // Wywołania ponad limit odrzucamy w całości: wiadomość z tool_calls bez wyników zepsułaby historię
                 if (round >= MaxToolRounds)
                 {
+                    if (live is not null) Messages.Remove(live);
                     Messages.Add(new ChatMessage("assistant", "Przerwano: model zbyt wiele razy z rzędu prosił o narzędzia."));
                     break;
                 }
 
-                Messages.Add(new ChatMessage("assistant", reply.Content, reply.ToolCalls, Reasoning: reply.Reasoning, Usage: reply.Usage));
+                Complete(live, new ChatMessage("assistant", reply.Content, reply.ToolCalls), reply);
                 foreach (var call in reply.ToolCalls)
                     Messages.Add(new ChatMessage("tool", await RunToolAsync(call), ToolCallId: call.Id, ToolName: call.Name));
                 _report("Model odpowiada...", false);
@@ -172,6 +199,9 @@ public sealed partial class ChatViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            // Pusta wiadomość ze strumienia, który nic nie dostarczył, nie zostaje w rozmowie
+            if (live is not null && live.Content.Length == 0 && !live.HasToolCalls) Messages.Remove(live);
+
             // Po wykonanych narzędziach zostawiamy rozmowę, żeby ponowienie nie uruchomiło ich drugi raz
             if (Messages.Count == start + 1)
             {
@@ -186,6 +216,18 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             IsSending = false;
         }
+    }
+
+    // Zamyka odpowiedź: w trybie strumieniowym uzupełnia już widoczną wiadomość pełnymi danymi, inaczej dodaje nową
+    private void Complete(ChatMessage? live, ChatMessage fresh, ChatReply reply)
+    {
+        var target = live ?? fresh;
+        target.Content = reply.Content;
+        target.Reasoning = reply.Reasoning;
+        target.Usage = reply.Usage;
+        if (fresh.HasToolCalls) target.ToolCalls = fresh.ToolCalls;
+        if (live is null) Messages.Add(target);
+        MessageUpdated?.Invoke();
     }
 
     private List<ChatMessage> BuildHistory()

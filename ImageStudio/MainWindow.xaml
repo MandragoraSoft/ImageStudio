@@ -112,7 +112,7 @@
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Activity.IsActive}" Value="True">
+                            <DataTrigger Binding="{Binding Activity.DimsResponse}" Value="True">
                                 <Setter Property="Opacity" Value="0.45"/>
                             </DataTrigger>
                         </Style.Triggers>

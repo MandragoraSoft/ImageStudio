@@ -8,7 +8,7 @@ using ImageStudio.ViewModels;
 namespace ImageStudio.Tests;
 
 // Provider do testów ViewModelu: tylko czat jest zaimplementowany, reszta rzuca wyjątek
-internal sealed class FakeProvider : IAiProvider
+internal class FakeProvider : IAiProvider
 {
     public Func<string, IReadOnlyList<ChatMessage>, string> OnChat { get; set; } = (_, _) => "";
 
@@ -82,6 +82,31 @@ internal sealed class FakeProvider : IAiProvider
 
     public void Dispose()
     {
+    }
+}
+
+// Dostawca ze strumieniem: wysyła zadane kawałki, a po każdym wywołuje AfterDelta (test podgląda stan w trakcie),
+// potem zwraca zwykłą odpowiedź (OnReply / OnChat). Bazowy FakeProvider nie ma strumienia i używa domyślnej implementacji
+internal sealed class StreamingFakeProvider : FakeProvider, IAiProvider
+{
+    public List<ChatDelta> Deltas { get; } = [];
+    public Action<ChatDelta>? AfterDelta { get; set; }
+    public Exception? FailAfterDeltas { get; set; }
+    public int StreamCalls { get; private set; }
+
+    async Task<ChatReply> IAiProvider.ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                                       IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                                       CancellationToken ct, ChatOptions? options)
+    {
+        StreamCalls++;
+        foreach (var delta in Deltas)
+        {
+            onDelta(delta);
+            AfterDelta?.Invoke(delta);
+        }
+
+        if (FailAfterDeltas is { } error) throw error;
+        return await ChatAsync(model, messages, tools, ct, options);
     }
 }
 

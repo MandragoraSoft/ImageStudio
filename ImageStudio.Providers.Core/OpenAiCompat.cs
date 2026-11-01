@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -14,20 +16,7 @@ public static class OpenAiCompat
                                                     IReadOnlyList<ToolDefinition>? tools, CancellationToken ct,
                                                     ChatOptions? options = null)
     {
-        var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
-        if (tools is { Count: > 0 })
-            body["tools"] = tools.Select(t => new
-            {
-                type = "function",
-                function = new
-                {
-                    name = t.Name,
-                    description = t.Description,
-                    parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersJson),
-                },
-            }).ToList();
-
-        ApplyReasoning(body, options);
+        var body = BuildChatBody(model, messages, tools, options);
 
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
@@ -76,6 +65,106 @@ public static class OpenAiCompat
         cached ??= Int(usage, "prompt_cache_hit_tokens") ?? Int(usage, "cache_read_input_tokens") ?? Int(usage, "cached_tokens");
 
         return input is null && output is null && cached is null ? null : new TokenUsage(input, output, cached);
+    }
+
+    // Ciało żądania czatu: model, historia, narzędzia i (gdy podano) sterowanie rozumowaniem
+    private static Dictionary<string, object?> BuildChatBody(string model, IReadOnlyList<ChatMessage> messages,
+                                                              IReadOnlyList<ToolDefinition>? tools, ChatOptions? options)
+    {
+        var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
+        if (tools is { Count: > 0 })
+            body["tools"] = tools.Select(t => new
+            {
+                type = "function",
+                function = new
+                {
+                    name = t.Name,
+                    description = t.Description,
+                    parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersJson),
+                },
+            }).ToList();
+
+        ApplyReasoning(body, options);
+        return body;
+    }
+
+    // Odpowiedź strumieniowa (SSE): linie "data: {...}" z kawałkami delta, na końcu kawałek z usage (stream_options) i "[DONE]".
+    // Komentarze ": ping" są pomijane. Wywołania narzędzi składają się z fragmentów wg indeksu
+    public static async Task<ChatReply> ChatStreamAsync(HttpClient http, string path, string model,
+                                                        IReadOnlyList<ChatMessage> messages,
+                                                        IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                                        CancellationToken ct = default, ChatOptions? options = null)
+    {
+        var body = BuildChatBody(model, messages, tools, options);
+        body["stream"] = true;
+        body["stream_options"] = new { include_usage = true };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var content = new StringBuilder();
+        var reasoning = new StringBuilder();
+        var calls = new SortedDictionary<int, (string? Id, string? Name, StringBuilder Args)>();
+        TokenUsage? usage = null;
+
+        while (await reader.ReadLineAsync(ct) is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+            var data = line[5..].Trim();
+            if (data.Length == 0) continue;
+            if (data == "[DONE]") break;
+
+            using var doc = JsonDocument.Parse(data);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("error", out var error)) throw new InvalidOperationException(error.ToString());
+            if (ReadUsage(root) is { } u) usage = u;
+            if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array
+                || choices.GetArrayLength() == 0) continue;
+            if (!choices[0].TryGetProperty("delta", out var delta) || delta.ValueKind != JsonValueKind.Object) continue;
+
+            // Kawałki bywają samymi spacjami, więc nie przycinamy ich ani nie pomijamy "pustych"
+            var text = StringProperty(delta, "content");
+            var think = StringProperty(delta, "reasoning_content") ?? StringProperty(delta, "reasoning");
+            AddToolCallFragments(delta, calls);
+
+            if (text is { Length: > 0 }) content.Append(text);
+            if (think is { Length: > 0 }) reasoning.Append(think);
+            if (text is { Length: > 0 } || think is { Length: > 0 }) onDelta(new ChatDelta(text, think));
+        }
+
+        var toolCalls = calls.Values.Where(c => c.Name is not null)
+            .Select(c => new ToolCall(c.Id ?? Guid.NewGuid().ToString("N"), c.Name!, c.Args.Length == 0 ? "{}" : c.Args.ToString()))
+            .ToList();
+        return new ChatReply(content.ToString(), toolCalls, reasoning.Length > 0 ? reasoning.ToString() : null, usage);
+    }
+
+    private static string? StringProperty(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    // tool_calls w strumieniu: pierwszy fragment niesie id i nazwę, kolejne dopisują argumenty; łączy je index
+    private static void AddToolCallFragments(JsonElement delta, SortedDictionary<int, (string? Id, string? Name, StringBuilder Args)> calls)
+    {
+        if (!delta.TryGetProperty("tool_calls", out var fragments) || fragments.ValueKind != JsonValueKind.Array) return;
+
+        foreach (var fragment in fragments.EnumerateArray())
+        {
+            var index = fragment.TryGetProperty("index", out var i) && i.TryGetInt32(out var n) ? n : calls.Count;
+            calls.TryGetValue(index, out var current);
+            var args = current.Args ?? new StringBuilder();
+            var id = StringProperty(fragment, "id") ?? current.Id;
+            var name = current.Name;
+            if (fragment.TryGetProperty("function", out var function) && function.ValueKind == JsonValueKind.Object)
+            {
+                name = StringProperty(function, "name") ?? name;
+                if (StringProperty(function, "arguments") is { } part) args.Append(part);
+            }
+
+            calls[index] = (id, name, args);
+        }
     }
 
     // Poziom i włączenie rozumowania wg parametru, który model deklaruje; bez options żądanie jest bez zmian

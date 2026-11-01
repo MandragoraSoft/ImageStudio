@@ -40,7 +40,7 @@ public sealed partial class MainViewModel
                                          _settings.OpenAiBaseUrl, _secrets.Load("openai") ?? "",
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
-                                         EnhancerModels.ToList());
+                                         EnhancerModels.ToList(), _settings.UseStreaming);
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current), new ProviderSettingsTab(current, LoadTextModelsAsync)]);
         if (result is null) return;
 
@@ -51,13 +51,13 @@ public sealed partial class MainViewModel
         _prefs.Save();
 
         _settingsStore.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
-                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
+                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming);
         var previous = _settings;
         _settings = _settingsStore.Load();
         if (_settings.Theme != previous.Theme) _themes.Apply(result.Theme);
 
         // Zmiana samego motywu lub preferencji nie wymaga nowego providera ani ponownego pobierania list modeli
-        if (_settings with { Theme = "" } == previous with { Theme = "" })
+        if (_settings with { Theme = "", UseStreaming = true } == previous with { Theme = "", UseStreaming = true })
         {
             PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
             Status = "Zapisano ustawienia.";

@@ -45,6 +45,11 @@ public sealed class UberLlmProvider : IAiProvider
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
         _api.ChatAsync(model, messages, tools, ct, options);
+    public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                           CancellationToken ct = default, ChatOptions? options = null) =>
+        _api.ChatStreamAsync(model, messages, tools, onDelta, ct, options);
+
 
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,

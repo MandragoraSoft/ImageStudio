@@ -46,10 +46,84 @@ public static class ReasoningSupport
 
 // Wiadomość czatu (role: system, user, assistant, tool). Wiadomość asystenta może nieść ToolCalls,
 // a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
-public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
-                                 string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null,
-                                 string? Reasoning = null, TokenUsage? Usage = null)
+// Przy odpowiedzi strumieniowej wiadomość powstaje pusta i jest uzupełniana kawałkami (ChatDelta)
+public sealed class ChatMessage : System.ComponentModel.INotifyPropertyChanged
 {
+    private string _content;
+    private IReadOnlyList<ToolCall>? _toolCalls;
+    private string? _reasoning;
+    private TokenUsage? _usage;
+
+    public ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null, string? ToolCallId = null,
+                       string? ToolName = null, IReadOnlyList<ChatImage>? Images = null, string? Reasoning = null,
+                       TokenUsage? Usage = null)
+    {
+        this.Role = Role;
+        _content = Content;
+        _toolCalls = ToolCalls;
+        this.ToolCallId = ToolCallId;
+        this.ToolName = ToolName;
+        this.Images = Images;
+        _reasoning = Reasoning;
+        _usage = Usage;
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private void Raise(params string[] names)
+    {
+        foreach (var name in names) PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+    }
+
+    public string Role { get; }
+    public string? ToolCallId { get; }
+    public string? ToolName { get; }
+    public IReadOnlyList<ChatImage>? Images { get; }
+
+    // Treść, rozumowanie, wywołania narzędzi i zużycie są ustawialne: odpowiedź strumieniowa dopisuje je na bieżąco,
+    // a widok (wiązanie) odświeża się sam
+    public string Content
+    {
+        get => _content;
+        set
+        {
+            if (_content == value) return;
+            _content = value;
+            Raise(nameof(Content), nameof(DisplayText));
+        }
+    }
+
+    public IReadOnlyList<ToolCall>? ToolCalls
+    {
+        get => _toolCalls;
+        set
+        {
+            _toolCalls = value;
+            Raise(nameof(ToolCalls), nameof(HasToolCalls), nameof(RoleLabel), nameof(DisplayText));
+        }
+    }
+
+    public string? Reasoning
+    {
+        get => _reasoning;
+        set
+        {
+            if (_reasoning == value) return;
+            _reasoning = value;
+            Raise(nameof(Reasoning), nameof(HasReasoning));
+        }
+    }
+
+    public TokenUsage? Usage
+    {
+        get => _usage;
+        set
+        {
+            _usage = value;
+            Raise(nameof(Usage), nameof(HasUsage), nameof(UsageText));
+        }
+    }
+
     // Tokeny wejścia, wyjścia i z cache pod odpowiedzią modelu; "—" = API nie podało wartości
     public bool HasUsage => Usage is not null;
 
@@ -121,3 +195,6 @@ public sealed record ModelPricing(
 // (aplikacja zostawia wtedy poprzednią listę), a przyczyna trafia do Warnings. Pricing bywa pusty (modele bez cen)
 public sealed record ProviderCatalog(ImageModels? Image, IReadOnlyList<ImageModelInfo>? Video, IReadOnlyList<ChatModelInfo>? Chat,
                                      IReadOnlyDictionary<string, ModelPricing> Pricing, IReadOnlyList<string> Warnings);
+
+// Kawałek odpowiedzi strumieniowej: dopisywany tekst i/lub rozumowanie (null = brak w tym kawałku)
+public sealed record ChatDelta(string? Content, string? Reasoning);

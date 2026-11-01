@@ -11,11 +11,16 @@ public sealed class ActivityTests
         public List<string> Started { get; } = [];
         public int Open { get; private set; }
         public bool IsActive => Open > 0;
+        public bool DimsResponse => Open > 0 && !_noDim;
+        private bool _noDim;
+        public List<bool> DimFlags { get; } = [];
         public string Label => Started.LastOrDefault() ?? "";
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged { add { } remove { } }
 
-        public IDisposable Begin(string label)
+        public IDisposable Begin(string label, bool dimResponse = true)
         {
+            DimFlags.Add(dimResponse);
+            _noDim = !dimResponse;
             Started.Add(label);
             Open++;
             return new Lease(this);
@@ -59,7 +64,7 @@ public sealed class ActivityTests
 
         using (tracker.Begin("x")) { }
 
-        Assert.Equal(["IsActive", "Label", "IsActive", "Label"], raised);
+        Assert.Equal(["IsActive", "Label", "DimsResponse", "IsActive", "Label", "DimsResponse"], raised);
     }
 
     private sealed class CapturingContext : SynchronizationContext

@@ -158,7 +158,7 @@ public sealed partial class MainViewModel : ObservableObject
                                                       () => _settings.MaxSide),
                                  id => _chatModels.GetValueOrDefault(id),
                                  _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
-                                 activity, ChatModelOptions);
+                                 activity, ChatModelOptions, () => _settings.UseStreaming);
         Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)

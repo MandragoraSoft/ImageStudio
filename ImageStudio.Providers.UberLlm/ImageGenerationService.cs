@@ -118,6 +118,11 @@ public sealed class ImageGenerationService : IDisposable
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
         OpenAiCompat.ChatAsync(_http, "/v1/chat/completions", model, messages, tools, ct, options);
+    public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                           CancellationToken ct = default, ChatOptions? options = null) =>
+        OpenAiCompat.ChatStreamAsync(_http, "/v1/chat/completions", model, messages, tools, onDelta, ct, options);
+
 
 
     // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).

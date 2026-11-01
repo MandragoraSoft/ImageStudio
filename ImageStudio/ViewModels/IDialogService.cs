@@ -12,7 +12,8 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "",
                                    IReadOnlyDictionary<string, bool>? PreferredOnly = null,
                                    IReadOnlyDictionary<string, string?>? DefaultTextModels = null,
-                                   IReadOnlyList<string>? ActiveTextModels = null);
+                                   IReadOnlyList<string>? ActiveTextModels = null,
+                                   bool UseStreaming = true);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);

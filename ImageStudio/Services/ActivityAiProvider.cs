@@ -8,9 +8,9 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
     public string DisplayName => inner.DisplayName;
     public string? DefaultTextModel => inner.DefaultTextModel;
 
-    private async Task<T> Track<T>(string label, Func<Task<T>> call)
+    private async Task<T> Track<T>(string label, Func<Task<T>> call, bool dimResponse = true)
     {
-        using var _ = activity.Begin(label);
+        using var _ = activity.Begin(label, dimResponse);
         return await call();
     }
 
@@ -46,6 +46,12 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
         Track("Odpowiedź modelu", () => inner.ChatAsync(model, messages, tools, ct, options));
+
+    // Strumień widać w stopce, ale okno z napływającym tekstem nie jest przyciemniane
+    public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                           CancellationToken ct = default, ChatOptions? options = null) =>
+        Track("Odpowiedź modelu (strumień)", () => inner.ChatStreamAsync(model, messages, tools, onDelta, ct, options), dimResponse: false);
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,

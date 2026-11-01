@@ -61,6 +61,18 @@ public interface IAiProvider : IDisposable
                               IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                               ChatOptions? options = null);
 
+    // Odpowiedź strumieniowa: onDelta dostaje kolejne kawałki tekstu i rozumowania w miarę napływu (na wątku, z którego
+    // wywołano metodę), a wynik to ta sama odpowiedź co z ChatAsync (pełny tekst, narzędzia, zużycie). Dostawca bez
+    // strumienia dostaje domyślną implementację: jedno wywołanie ChatAsync i jeden kawałek z całą odpowiedzią
+    async Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                          IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                          CancellationToken ct = default, ChatOptions? options = null)
+    {
+        var reply = await ChatAsync(model, messages, tools, ct, options);
+        if (reply.Content.Length > 0 || reply.Reasoning is { Length: > 0 }) onDelta(new ChatDelta(reply.Content, reply.Reasoning));
+        return reply;
+    }
+
     Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                          IReadOnlyDictionary<string, object> parameters,
                                          IReadOnlyList<PromptRevision>? history = null, CancellationToken ct = default);

@@ -35,7 +35,7 @@ public interface ISettingsStore
     AppSettings Load();
 
     void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
-              string openRouterKey, string openAiBaseUrl, string openAiKey);
+              string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true);
 }
 
 public interface IWindowStateStore
@@ -77,8 +77,8 @@ public sealed class FileSettingsStore : ISettingsStore
     public AppSettings Load() => AppSettings.Load();
 
     public void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
-                     string openRouterKey, string openAiBaseUrl, string openAiKey) =>
-        AppSettings.Save(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey);
+                     string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true) =>
+        AppSettings.Save(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey, useStreaming);
 }
 
 public sealed class FileWindowStateStore : IWindowStateStore

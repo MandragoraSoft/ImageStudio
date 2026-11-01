@@ -8,7 +8,8 @@ namespace ImageStudio.Configuration;
 // Klucz API: zmienna UBERLLM_API_KEY (ma pierwszeństwo) albo SecretStore.
 public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
                                  string ProviderId = "uberllm", string OpenRouterKey = "",
-                                 string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "")
+                                 string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "",
+                                 bool UseStreaming = true)
 {
     private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
@@ -29,7 +30,8 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             ProviderId: config["Ai:Provider"] ?? "uberllm",
             OpenRouterKey: Secret("OPENROUTER_API_KEY", "openrouter"),
             OpenAiBaseUrl: config["OpenAi:BaseUrl"] ?? "https://api.openai.com",
-            OpenAiKey: Secret("OPENAI_API_KEY", "openai"));
+            OpenAiKey: Secret("OPENAI_API_KEY", "openai"),
+            UseStreaming: !string.Equals(config["Ui:UseStreaming"], "false", StringComparison.OrdinalIgnoreCase));
     }
 
     // Gradacja sekretu: niepusta zmienna środowiskowa > zaszyfrowany SecretStore (DPAPI) > pusty
@@ -39,14 +41,15 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
     // Adresy, limit wymiarów, motyw i provider trafiają do settings.json użytkownika, klucz do sekretów
     public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,
                             string providerId = "uberllm", string openRouterKey = "",
-                            string openAiBaseUrl = "https://api.openai.com", string openAiKey = "")
+                            string openAiBaseUrl = "https://api.openai.com", string openAiKey = "",
+                            bool useStreaming = true)
     {
         Directory.CreateDirectory(AppPaths.UserDataDir);
         var json = JsonSerializer.Serialize(
             new
             {
                 Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide },
-                Ui = new { Theme = theme },
+                Ui = new { Theme = theme, UseStreaming = useStreaming },
                 Ai = new { Provider = providerId },
                 OpenAi = new { BaseUrl = openAiBaseUrl },
             },

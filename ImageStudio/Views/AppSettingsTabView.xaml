@@ -6,6 +6,10 @@
             <TextBlock Text="Maksymalny długi bok obrazu źródłowego (px)" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>
 
+            <TextBlock Text="Czat" Style="{StaticResource SectionHeader}"/>
+            <CheckBox Content="Używaj odpowiedzi strumieniowej" IsChecked="{Binding UseStreaming}"
+                      ToolTip="Tekst odpowiedzi (i rozumowanie) pojawia się w czacie na bieżąco, w miarę jak model go generuje. Wyłączone: odpowiedź pokazuje się dopiero po zakończeniu"/>
+
             <TextBlock Text="Motyw" Style="{StaticResource SectionHeader}"/>
             <ComboBox ItemsSource="{Binding Themes}" SelectedValuePath="Code" SelectedValue="{Binding SelectedTheme}">
                 <ComboBox.ItemTemplate>

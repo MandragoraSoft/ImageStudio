@@ -24,11 +24,16 @@ public sealed partial class AppSettingsTab : ObservableObject, ISettingsTab
     [ObservableProperty]
     private string _selectedTheme;
 
+    // Odpowiedzi czatu napływają na bieżąco (SSE) zamiast po zakończeniu generowania
+    [ObservableProperty]
+    private bool _useStreaming;
+
     public AppSettingsTab(SettingsResult current)
     {
         _maxSide = current.MaxSide;
         _selectedTheme = current.Theme;
+        _useStreaming = current.UseStreaming;
     }
 
-    public SettingsResult Apply(SettingsResult result) => result with { MaxSide = MaxSide, Theme = SelectedTheme };
+    public SettingsResult Apply(SettingsResult result) => result with { MaxSide = MaxSide, Theme = SelectedTheme, UseStreaming = UseStreaming };
 }

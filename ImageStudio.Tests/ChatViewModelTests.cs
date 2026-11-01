@@ -25,7 +25,7 @@ public class ChatViewModelTests
 
         await vm.SendCommand.ExecuteAsync(null);
 
-        Assert.Equal([new ChatMessage("user", "cześć"), new ChatMessage("assistant", "hej")], vm.Messages);
+        Assert.Equal([("user", "cześć"), ("assistant", "hej")], vm.Messages.Select(m => (m.Role, m.Content)));
         Assert.Equal("", vm.Input);
         Assert.False(vm.IsSending);
         Assert.Equal("m1", provider.LastModel);

@@ -212,6 +212,11 @@ public sealed class OpenRouterProvider : IAiProvider
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
         OpenAiCompat.ChatAsync(_http, ChatPath, model, messages, tools, ct, options);
+    public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
+                                           CancellationToken ct = default, ChatOptions? options = null) =>
+        OpenAiCompat.ChatStreamAsync(_http, ChatPath, model, messages, tools, onDelta, ct, options);
+
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
