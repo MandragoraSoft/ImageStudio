@@ -18,7 +18,7 @@ dotnet publish ImageStudio -c Release -r win-x64 --self-contained   # wersja sam
 
 Publikacja do jednego pliku (Windows 10+ x64), profile w `ImageStudio/Properties/PublishProfiles`: `dotnet publish ImageStudio -p:PublishProfile=Portable` (`publish\portable\ImageStudio.exe`, ok. 3 MB, wymaga .NET 10 Desktop i ASP.NET Core Runtime) albo `-p:PublishProfile=SelfHosted` (`publish\selfhosted\ImageStudio.exe`, ok. 75 MB, z wbudowanym .NET). Profile ustawiają `PluginsInBundle`: dostawcy i zakładki wchodzą do exe zamiast do `providers\`/`tabs\`, a `appsettings.json` jest zasobem wbudowanym (czytanym z manifestu, nie z katalogu).
 
-Wydanie robi `.github/workflows/release.yml` (windows-latest): ręczne uruchomienie z wersją (np. 1.2.0) albo push tagu `v*`; pipeline uruchamia testy, publikuje oba profile, tworzy tag i wydanie GitHub z dwoma exe oraz artefakt przebiegu.
+Wydanie robi `.github/workflows/release.yml` (windows-latest): ręczne uruchomienie z wersją (np. 1.2.0) albo push tagu `v*`; pipeline uruchamia testy, publikuje oba profile, buduje instalator Inno Setup (`installer/ImageStudio.iss`, per-użytkownik, z samodzielnego exe), tworzy tag i wydanie GitHub z instalatorem i dwoma exe oraz artefakt przebiegu.
 
 Przy dziwnych błędach brakujących plików `obj` (np. `BG1002`, `CS2001`) usuń katalogi `bin`/`obj` i zbuduj z `-m:1`; równoległy build kilku projektów XAML bywa wyścigiem.
 
