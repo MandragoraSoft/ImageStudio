@@ -56,7 +56,26 @@ public static class OpenAiCompat
             }
         }
 
-        return new ChatReply(content, calls, ReadReasoning(message));
+        return new ChatReply(content, calls, ReadReasoning(message), ReadUsage(doc.RootElement));
+    }
+
+    // Zużycie z pola usage; tokeny z cache raportują różne API: prompt_tokens_details.cached_tokens (OpenAI, OpenRouter, Venice),
+    // prompt_cache_hit_tokens (DeepSeek), cache_read_input_tokens (styl Anthropic) lub cached_tokens
+    private static TokenUsage? ReadUsage(JsonElement root)
+    {
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object) return null;
+
+        static int? Int(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : null;
+
+        var input = Int(usage, "prompt_tokens") ?? Int(usage, "input_tokens");
+        var output = Int(usage, "completion_tokens") ?? Int(usage, "output_tokens");
+        var cached = usage.TryGetProperty("prompt_tokens_details", out var details) && details.ValueKind == JsonValueKind.Object
+            ? Int(details, "cached_tokens")
+            : null;
+        cached ??= Int(usage, "prompt_cache_hit_tokens") ?? Int(usage, "cache_read_input_tokens") ?? Int(usage, "cached_tokens");
+
+        return input is null && output is null && cached is null ? null : new TokenUsage(input, output, cached);
     }
 
     // Poziom i włączenie rozumowania wg parametru, który model deklaruje; bez options żądanie jest bez zmian

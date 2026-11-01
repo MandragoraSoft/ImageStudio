@@ -151,7 +151,7 @@ public sealed partial class ChatViewModel : ObservableObject
                                                          options: BuildOptions());
                 if (reply.ToolCalls.Count == 0)
                 {
-                    Messages.Add(new ChatMessage("assistant", reply.Content, Reasoning: reply.Reasoning));
+                    Messages.Add(new ChatMessage("assistant", reply.Content, Reasoning: reply.Reasoning, Usage: reply.Usage));
                     break;
                 }
 
@@ -162,7 +162,7 @@ public sealed partial class ChatViewModel : ObservableObject
                     break;
                 }
 
-                Messages.Add(new ChatMessage("assistant", reply.Content, reply.ToolCalls, Reasoning: reply.Reasoning));
+                Messages.Add(new ChatMessage("assistant", reply.Content, reply.ToolCalls, Reasoning: reply.Reasoning, Usage: reply.Usage));
                 foreach (var call in reply.ToolCalls)
                     Messages.Add(new ChatMessage("tool", await RunToolAsync(call), ToolCallId: call.Id, ToolName: call.Name));
                 _report("Model odpowiada...", false);

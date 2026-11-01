@@ -21,7 +21,11 @@ public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
 
 // Odpowiedź modelu: tekst i/lub prośby o narzędzia
 // Reasoning: widoczne rozumowanie modelu, jeśli API je zwraca (reasoning_content / reasoning), inaczej null
-public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls, string? Reasoning = null);
+public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls, string? Reasoning = null, TokenUsage? Usage = null);
+
+// Zużycie tokenów w jednym wywołaniu czatu; null = API nie podało danej wartości.
+// Cached to część tokenów wejścia obsłużona z pamięci podręcznej dostawcy
+public sealed record TokenUsage(int? Input, int? Output, int? Cached);
 
 // Rozumowanie w żądaniu czatu. Parameter to parametr, który model deklaruje w supported_parameters
 // ("reasoning_effort", "reasoning" albo "include_reasoning"); Enabled włącza lub wyłącza, Effort ustawia poziom
@@ -44,8 +48,20 @@ public static class ReasoningSupport
 // a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
 public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
                                  string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null,
-                                 string? Reasoning = null)
+                                 string? Reasoning = null, TokenUsage? Usage = null)
 {
+    // Tokeny wejścia, wyjścia i z cache pod odpowiedzią modelu; "—" = API nie podało wartości
+    public bool HasUsage => Usage is not null;
+
+    public string UsageText
+    {
+        get
+        {
+            static string Format(int? value) => value is { } v ? v.ToString("N0") : "—";
+            return Usage is { } u ? $"Tokeny: wejście {Format(u.Input)} · wyjście {Format(u.Output)} · cache {Format(u.Cached)}" : "";
+        }
+    }
+
     // Rozumowanie jest tylko do podglądu: nie wraca do API w historii rozmowy
     public bool HasReasoning => !string.IsNullOrWhiteSpace(Reasoning);
     public bool IsUser => Role == "user";
