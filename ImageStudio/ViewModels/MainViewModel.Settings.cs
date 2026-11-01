@@ -96,6 +96,7 @@ public sealed partial class MainViewModel
         SelectedModel = null;
         SelectedEditModel = null;
         SelectedVideoModel = null;
+        Voice.Reset();
         await InitializeAsync();
     }
 

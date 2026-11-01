@@ -5,6 +5,7 @@
         xmlns:edit="clr-namespace:ImageStudio.Tabs.Edit;assembly=ImageStudio.Tabs.Edit"
         xmlns:video="clr-namespace:ImageStudio.Tabs.Video;assembly=ImageStudio.Tabs.Video"
         xmlns:chat="clr-namespace:ImageStudio.Tabs.Chat;assembly=ImageStudio.Tabs.Chat"
+        xmlns:voice="clr-namespace:ImageStudio.Tabs.Voice;assembly=ImageStudio.Tabs.Voice"
         xmlns:views="clr-namespace:ImageStudio.Views"
         xmlns:shared="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
         Style="{StaticResource WindowBase}"
@@ -23,6 +24,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type chat:ChatTab}">
             <chat:ChatPanel DataContext="{Binding Content}"/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type voice:VoiceTab}">
+            <voice:VoicePanel DataContext="{Binding Content}"/>
         </DataTemplate>
     </Window.Resources>
 
@@ -101,7 +105,7 @@
                 <TabControl x:Name="MainTabs" Grid.Row="0" SelectedIndex="{Binding ActiveTab}"/>
 
                 <views:ModelMetricsPanel Grid.Row="1" Margin="0,8,0,0"
-                                         Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
+                                         Visibility="{Binding IsOutputTab, Converter={StaticResource BoolToVis}}"/>
             </Grid>
 
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
@@ -118,10 +122,12 @@
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <views:OutputPanel Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
+                <views:OutputPanel Visibility="{Binding IsOutputTab, Converter={StaticResource BoolToVis}}"/>
                 <Grid Visibility="{Binding IsChatTab, Converter={StaticResource BoolToVis}}">
                     <views:ChatConversation DataContext="{Binding Chat}"/>
                 </Grid>
+                <views:VoiceResults DataContext="{Binding Voice}"
+                                    Visibility="{Binding DataContext.IsVoiceTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
             </Grid>
         </Grid>
     </DockPanel>

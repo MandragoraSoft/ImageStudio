@@ -284,6 +284,68 @@ public sealed class ImageGenerationService : IDisposable
         }
     }
 
+    // Dźwięk: modele mowy (type=speech) i transkrypcji (type=transcription); cena jest w opisie modelu (pricing.usd za unit)
+    public Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
+        GetAudioModelsAsync("speech", OpenAiAudio.SpeechPath, ct);
+
+    public Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
+        GetAudioModelsAsync("transcription", OpenAiAudio.TranscriptionPath, ct);
+
+    private async Task<IReadOnlyList<AudioModelInfo>> GetAudioModelsAsync(string type, string endpoint, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync($"/v1/models?type={type}", ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.GetProperty("data").EnumerateArray()
+            .Where(m => m.TryGetProperty("available", out var a) && a.ValueKind == JsonValueKind.True)
+            .Where(m => m.TryGetProperty("endpoints", out var ep) && ep.EnumerateArray().Any(e => "/" + endpoint == e.GetString()))
+            .Select(m => new AudioModelInfo(
+                m.GetProperty("id").GetString()!,
+                m.TryGetProperty("owned_by", out var owner) && owner.ValueKind == JsonValueKind.String ? owner.GetString() : null,
+                AudioPricing(m),
+                m.TryGetProperty("display_name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString() : Describe(m)))
+            .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static ModelPricing? AudioPricing(JsonElement model)
+    {
+        if (!model.TryGetProperty("pricing", out var p) || !p.TryGetProperty("usd", out var usd) || usd.ValueKind != JsonValueKind.Number)
+            return null;
+
+        var list = p.TryGetProperty("list_usd", out var l) && l.ValueKind == JsonValueKind.Number ? l.GetDecimal() : (decimal?)null;
+        var price = usd.GetDecimal();
+        return new ModelPricing(price, list, list is > 0 ? Math.Round((list.Value - price) / list.Value * 100, 1) : null,
+                                p.TryGetProperty("unit", out var u) ? u.GetString() : null, null, null);
+    }
+
+    // Głosy modelu mowy ze schematu żądania (GET /v1/models/<id>, parameters.properties.voice.enum); pobierane raz na model
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<string>> _voices = new();
+
+    public async Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default)
+    {
+        if (_voices.TryGetValue(model, out var cached)) return cached;
+
+        using var response = await _http.GetAsync($"/v1/models/{model}", ct);
+        if (!response.IsSuccessStatusCode) return [];
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        return _voices[model] = doc.RootElement.TryGetProperty("parameters", out var parameters)
+            ? OpenAiAudio.VoicesFromSchema(parameters)
+            : [];
+    }
+
+    public Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                             CancellationToken ct = default) =>
+        OpenAiAudio.SynthesizeAsync(_http, model, text, voice, speed, format, ct);
+
+    public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                                  CancellationToken ct = default) =>
+        OpenAiAudio.TranscribeAsync(_http, model, filePath, language, prompt, ct);
+
     public void Dispose() => _http.Dispose();
 
     private async Task<ImageResult> ReadImageAsync(HttpResponseMessage response, CancellationToken ct)

@@ -82,6 +82,38 @@ internal class FakeProvider : IAiProvider
 
     public IReadOnlyList<PromptRevision>? LastHistory { get; private set; }
 
+    // Dźwięk: katalogi i odpowiedzi zadane przez test; domyślnie dostawca "nie ma dźwięku" (puste listy)
+    public List<AudioModelInfo> SpeechCatalog { get; } = [];
+    public List<AudioModelInfo> TranscriptionCatalog { get; } = [];
+    public Dictionary<string, string[]> VoiceCatalog { get; } = [];
+    public Func<string, string, string?, double?, string, AudioResult>? OnSynthesize { get; set; }
+    public Func<string, string, string?, string?, TranscriptResult>? OnTranscribe { get; set; }
+    public (string Model, string Text, string? Voice, double? Speed, string Format)? LastSpeech { get; private set; }
+    public (string Model, string Path, string? Language, string? Prompt)? LastTranscription { get; private set; }
+
+    public Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AudioModelInfo>>(SpeechCatalog);
+
+    public Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AudioModelInfo>>(TranscriptionCatalog);
+
+    public Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(VoiceCatalog.GetValueOrDefault(model) ?? []);
+
+    public Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                             CancellationToken ct = default)
+    {
+        LastSpeech = (model, text, voice, speed, format);
+        return OnSynthesize is { } run ? Task.FromResult(run(model, text, voice, speed, format)) : throw new NotSupportedException();
+    }
+
+    public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                                  CancellationToken ct = default)
+    {
+        LastTranscription = (model, filePath, language, prompt);
+        return OnTranscribe is { } run ? Task.FromResult(run(model, filePath, language, prompt)) : throw new NotSupportedException();
+    }
+
     public Func<string, string, string, PromptParts?>? Enhance { get; set; }
 
     public void Dispose()
@@ -126,6 +158,10 @@ internal sealed class FakeDialogs : IDialogService
     public BitmapSource? GetClipboardImage() => Clipboard;
 
     public string? ChooseSaveFile(string suggestedFileName) => throw new NotSupportedException();
+    public string? AudioPick { get; set; }
+    public string? SaveAsAnswer { get; set; }
+    public string? PickAudioFile() => AudioPick;
+    public string? ChooseSaveFileAs(string suggestedFileName, string title, string filter) => SaveAsAnswer;
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
@@ -238,4 +274,50 @@ internal static class Sta
         thread.Join();
         if (error is not null) throw new AggregateException(error);
     }
+}
+
+// Odtwarzacz i nagrywarka bez sprzętu: zapamiętują wywołania, a test wywołuje zakończenie odtwarzania i poziom sam
+internal sealed class FakeAudioPlayer : IAudioPlayer
+{
+    public List<string> Played { get; } = [];
+    public int Stops { get; private set; }
+    private Action? _ended;
+
+    public void Play(string path, Action? ended = null)
+    {
+        Played.Add(path);
+        _ended = ended;
+    }
+
+    public void Stop() => Stops++;
+    public void FinishPlayback() => _ended?.Invoke();
+}
+
+internal sealed class FakeAudioRecorder : IAudioRecorder
+{
+    public List<AudioDevice> Mics { get; } = [new(0, "Mikrofon testowy")];
+    public string? StartedPath { get; private set; }
+    public int? StartedDevice { get; private set; }
+    public Exception? StartError { get; set; }
+    public bool Stopped { get; private set; }
+
+    public event Action<double>? LevelChanged;
+
+    public IReadOnlyList<AudioDevice> Devices() => Mics;
+
+    public void Start(int deviceIndex, string path)
+    {
+        if (StartError is not null) throw StartError;
+        (StartedDevice, StartedPath, Stopped) = (deviceIndex, path, false);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, [1, 2, 3]);  // plik, który nagrywarka zostawiłaby na dysku
+    }
+
+    public Task StopAsync()
+    {
+        Stopped = true;
+        return Task.CompletedTask;
+    }
+
+    public void Level(double value) => LevelChanged?.Invoke(value);
 }

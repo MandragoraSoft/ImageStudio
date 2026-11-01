@@ -8,7 +8,7 @@ namespace ImageStudio.ViewModels;
 // Sterowanie aplikacją z zewnątrz (model w czacie i klienci MCP): te same operacje, które wykonuje użytkownik w oknie
 public sealed partial class MainViewModel : IAppControl
 {
-    private static readonly string[] TabNames = ["generate", "edit", "video", "chat"];
+    private static readonly string[] TabNames = ["generate", "edit", "video", "chat", "voice"];
 
     // Narzędzia dotykają widoków, więc połączenia z wątków serwera wracają na wątek interfejsu
     // Kontekst przechwycony w konstruktorze (wątek UI); bez kontekstu (testy) akcja idzie od razu

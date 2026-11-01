@@ -21,6 +21,7 @@
     <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Voice\ImageStudio.Tabs.Voice.csproj" />
   </ItemGroup>
 
   <ItemGroup>

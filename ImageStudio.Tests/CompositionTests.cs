@@ -34,7 +34,7 @@ public sealed class CompositionTests
             Assert.Same(vm, services.GetRequiredService<MainViewModel>());  // singleton
             Assert.IsType<WpfDialogService>(services.GetRequiredService<IDialogService>());
             Assert.IsType<FilePresetStore>(services.GetRequiredService<IPresetStore>());
-            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat"],
+            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Głos"],
                          services.GetServices<IMainTab>().OrderBy(t => t.Order).Select(t => t.Title));
         });
     }
@@ -50,7 +50,7 @@ public sealed class CompositionTests
             var window = services.GetRequiredService<ImageStudio.MainWindow>();
 
             var tabs = (System.Windows.Controls.TabControl)window.FindName("MainTabs");
-            Assert.Equal(4, tabs.Items.Count);
+            Assert.Equal(5, tabs.Items.Count);
             Assert.Same(services.GetRequiredService<MainViewModel>(), window.DataContext);
             window.Close();
         });

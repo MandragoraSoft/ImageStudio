@@ -118,7 +118,7 @@ public sealed partial class MainViewModel : ObservableObject
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
-                         IActivityTracker activity, IChatSessionStore chatSessions)
+                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder)
     {
         _provider = provider;
         _providers = providers;
@@ -159,6 +159,15 @@ public sealed partial class MainViewModel : ObservableObject
                                  id => _chatModels.GetValueOrDefault(id),
                                  _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
                                  activity, ChatModelOptions, () => _settings.UseStreaming, chatSessions);
+        Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
+                                   () => _ = InitializeAsync(),
+                                   Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state);
+        Voice.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)
+                or nameof(VoiceViewModel.Speed) or nameof(VoiceViewModel.Format) or nameof(VoiceViewModel.SelectedTranscriptionModel)
+                or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone)) SaveState();
+        };
         Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)
@@ -371,6 +380,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Brak modeli tekstowych nie blokuje generowania, tylko wyłącza ulepszanie promptu
         if (catalog.Chat is { } chat) ApplyChatModels(chat, pricing);
+        Voice.ApplyCatalog(catalog);
 
         RefreshOwners();
         Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
@@ -442,6 +452,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.ChatSystemPrompt = Chat.SystemPrompt;
         _state.ChatReasoningEnabled = Chat.ReasoningEnabled;
         _state.ChatReasoningEffort = Chat.SelectedReasoningEffort;
+        Voice.Capture(_state);
         _state.UseTools = Tools.UseTools;
         _state.RequireToolApproval = Tools.RequireApproval;
         _state.McpEnabled = Tools.EnabledServers.ToList();

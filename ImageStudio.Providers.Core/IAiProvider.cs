@@ -44,8 +44,27 @@ public interface IAiProvider : IDisposable
                                                                               new Dictionary<string, ModelPricing>());
         var video = await Part("modele wideo", () => GetVideoModelsAsync(ct));
         var chat = await Part("modele tekstowe", () => GetChatModelsAsync(ct));
-        return new ProviderCatalog(image, video, chat, pricing ?? new Dictionary<string, ModelPricing>(), warnings);
+        var speech = await Part("modele mowy", () => GetSpeechModelsAsync(ct));
+        var transcription = await Part("modele transkrypcji", () => GetTranscriptionModelsAsync(ct));
+        return new ProviderCatalog(image, video, chat, pricing ?? new Dictionary<string, ModelPricing>(), warnings, speech, transcription);
     }
+
+    // Dźwięk (zakładka Głos). Dostawca bez dźwięku nie implementuje niczego: listy są puste, a wywołanie rzuca wyjątek.
+    // Mowa z tekstu: modele i ich głosy (puste = model nie ma listy głosów, zostaje domyślny)
+    Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AudioModelInfo>>([]);
+    Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
+    Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                      CancellationToken ct = default) =>
+        throw new NotSupportedException($"{DisplayName} nie obsługuje syntezy mowy.");
+
+    // Tekst z nagrania (plik na dysku: mp3, wav, ogg, flac, m4a, webm); language i prompt są opcjonalnymi podpowiedziami
+    Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AudioModelInfo>>([]);
+    Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                           CancellationToken ct = default) =>
+        throw new NotSupportedException($"{DisplayName} nie obsługuje rozpoznawania mowy.");
 
     Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                          CancellationToken ct = default);

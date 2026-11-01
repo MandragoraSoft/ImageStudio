@@ -53,6 +53,23 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
                                            CancellationToken ct = default, ChatOptions? options = null) =>
         Track("Odpowiedź modelu (strumień)", () => inner.ChatStreamAsync(model, messages, tools, onDelta, ct, options), dimResponse: false);
 
+    public Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
+        Track("Pobieranie modeli mowy", () => inner.GetSpeechModelsAsync(ct));
+
+    public Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
+        Track("Pobieranie modeli transkrypcji", () => inner.GetTranscriptionModelsAsync(ct));
+
+    public Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) =>
+        Track("Pobieranie głosów", () => inner.GetSpeechVoicesAsync(model, ct), dimResponse: false);
+
+    public Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                             CancellationToken ct = default) =>
+        Track("Synteza mowy", () => inner.SynthesizeAsync(model, text, voice, speed, format, ct));
+
+    public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                                  CancellationToken ct = default) =>
+        Track("Rozpoznawanie mowy", () => inner.TranscribeAsync(model, filePath, language, prompt, ct));
+
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,

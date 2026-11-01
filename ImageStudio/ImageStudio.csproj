@@ -35,6 +35,7 @@
     <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Voice\ImageStudio.Tabs.Voice.csproj" Private="$(PluginsInBundle)" />
     <!-- Dostawcy: Private=false nie kopiuje ich do katalogu głównego; target niżej układa je w providers\ -->
     <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="$(PluginsInBundle)" />
@@ -43,6 +44,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="NAudio" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>

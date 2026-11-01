@@ -27,6 +27,10 @@ public interface IDialogService
 {
     string[]? PickImageFiles();
     string? ChooseSaveFile(string suggestedFileName);
+
+    // Plik dźwiękowy do rozpoznania (null = anulowano) i zapis dowolnego pliku (filter w formacie okna systemowego: "Dźwięk|*.mp3")
+    string? PickAudioFile();
+    string? ChooseSaveFileAs(string suggestedFileName, string title, string filter);
     void CopyImage(BitmapSource image);
     BitmapSource? GetClipboardImage();
 // Zakładki okna są wstrzykiwane (ISettingsTab); wynik składa się z wartości wszystkich zakładek

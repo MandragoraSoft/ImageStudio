@@ -32,6 +32,22 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickAudioFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Wybierz nagranie",
+            Filter = "Nagrania|*.mp3;*.wav;*.ogg;*.flac;*.m4a;*.mp4;*.webm;*.aac|Wszystkie pliki|*.*",
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? ChooseSaveFileAs(string suggestedFileName, string title, string filter)
+    {
+        var dialog = new SaveFileDialog { Title = title, FileName = suggestedFileName, Filter = filter };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public void CopyImage(BitmapSource image) => Clipboard.SetImage(image);
 
     // Obraz ze schowka (np. zrzut ekranu); null, gdy schowek nie zawiera obrazu

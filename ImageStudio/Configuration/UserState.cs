@@ -24,6 +24,14 @@ public sealed class UserState
     public string? ChatSystemPrompt { get; set; }
     public bool? ChatReasoningEnabled { get; set; }
     public string? ChatReasoningEffort { get; set; }
+    // Zakładka Głos: ostatnie wybory (model mowy, głos, prędkość, format, model rozpoznawania, język, mikrofon)
+    public string? VoiceSpeechModel { get; set; }
+    public string? VoiceName { get; set; }
+    public double? VoiceSpeed { get; set; }
+    public string? VoiceFormat { get; set; }
+    public string? VoiceTranscriptionModel { get; set; }
+    public string? VoiceLanguage { get; set; }
+    public string? VoiceMicrophone { get; set; }
     public bool UseTools { get; set; }
     public bool? RequireToolApproval { get; set; }
     public List<string> McpEnabled { get; set; } = [];

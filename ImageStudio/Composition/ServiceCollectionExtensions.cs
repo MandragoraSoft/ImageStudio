@@ -4,6 +4,7 @@ using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
 using ImageStudio.Tabs.Generate;
 using ImageStudio.Tabs.Video;
+using ImageStudio.Tabs.Voice;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMainTab>(sp => new EditTab(sp.GetRequiredService<MainViewModel>()));
         services.AddSingleton<IMainTab>(sp => new VideoTab(sp.GetRequiredService<MainViewModel>()));
         services.AddSingleton<IMainTab>(sp => new ChatTab(sp.GetRequiredService<MainViewModel>().Chat));
+        services.AddSingleton<IMainTab>(sp => new VoiceTab(sp.GetRequiredService<MainViewModel>().Voice));
 
         services.AddTransient<MainWindow>();
         return services;
@@ -58,6 +60,8 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<IThemeService, WpfThemeService>();
+        services.AddSingleton<IAudioPlayer, WpfAudioPlayer>();
+        services.AddSingleton<IAudioRecorder, NAudioRecorder>();
         return services;
     }
 }

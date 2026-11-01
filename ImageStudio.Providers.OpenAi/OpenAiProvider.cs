@@ -60,6 +60,29 @@ public sealed class OpenAiProvider : IAiProvider
                   .ToList();
     }
 
+    // Dźwięk: API nie podaje typu modelu, więc klasyfikacja po nazwie; głosy są stałe (wspólne dla modeli tts)
+    private static readonly string[] SpeechVoices = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"];
+
+    public async Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
+        (await GetModelIdsAsync(ct)).Where(id => id.Contains("tts", StringComparison.OrdinalIgnoreCase))
+                                    .Select(id => new AudioModelInfo(id, "OpenAI")).ToList();
+
+    public Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(SpeechVoices);
+
+    public Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                             CancellationToken ct = default) =>
+        OpenAiAudio.SynthesizeAsync(_http, model, text, voice, speed, format, ct);
+
+    public async Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
+        (await GetModelIdsAsync(ct)).Where(id => id.Contains("whisper", StringComparison.OrdinalIgnoreCase)
+                                                 || id.Contains("transcribe", StringComparison.OrdinalIgnoreCase))
+                                    .Select(id => new AudioModelInfo(id, "OpenAI")).ToList();
+
+    public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                                  CancellationToken ct = default) =>
+        OpenAiAudio.TranscribeAsync(_http, model, filePath, language, prompt, ct);
+
     public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyDictionary<string, ModelPricing>>(new Dictionary<string, ModelPricing>());
 

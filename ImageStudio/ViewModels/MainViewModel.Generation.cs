@@ -173,15 +173,19 @@ public sealed partial class MainViewModel
 
     // Indeks zakładki w panelu wejściowym: 0 = generowanie, 1 = edycja
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ActiveModel), nameof(IsChatTab), nameof(IsNotChatTab))]
+    [NotifyPropertyChangedFor(nameof(ActiveModel), nameof(IsChatTab), nameof(IsVoiceTab), nameof(IsOutputTab))]
     private int _activeTab;
 
     // Zakładka czatu (indeks 3) zastępuje podgląd wyniku rozmową i chowa metryczkę modelu obrazowego
     public bool IsChatTab => ActiveTab == 3;
-    public bool IsNotChatTab => !IsChatTab;
+    public bool IsVoiceTab => ActiveTab == 4;
+
+    // Zakładki z obrazem lub wideo w prawym panelu (wynik, galeria, metryczka modelu); czat i głos mają własny panel
+    public bool IsOutputTab => ActiveTab < 3;
 
     public ToolsViewModel Tools { get; }
     public ChatViewModel Chat { get; }
+    public VoiceViewModel Voice { get; }
 
     // --- Ulepszanie promptu ---
 

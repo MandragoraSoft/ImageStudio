@@ -193,8 +193,19 @@ public sealed record ModelPricing(
 
 // Katalog dostawcy pobrany jednym wywołaniem ReloadAsync. Część katalogu, której nie udało się pobrać, jest null
 // (aplikacja zostawia wtedy poprzednią listę), a przyczyna trafia do Warnings. Pricing bywa pusty (modele bez cen)
+// Speech / Transcription: modele dźwięku (mowa z tekstu, tekst z nagrania); null = dostawca ich nie obsługuje albo pobranie się nie udało
 public sealed record ProviderCatalog(ImageModels? Image, IReadOnlyList<ImageModelInfo>? Video, IReadOnlyList<ChatModelInfo>? Chat,
-                                     IReadOnlyDictionary<string, ModelPricing> Pricing, IReadOnlyList<string> Warnings);
+                                     IReadOnlyDictionary<string, ModelPricing> Pricing, IReadOnlyList<string> Warnings,
+                                     IReadOnlyList<AudioModelInfo>? Speech = null, IReadOnlyList<AudioModelInfo>? Transcription = null);
+
+// Model dźwięku (mowa albo transkrypcja). Cena jest w opisie modelu (nie na rynku): jednostka to "1K characters" albo "minute"
+public sealed record AudioModelInfo(string Id, string? OwnedBy, ModelPricing? Pricing = null, string? Description = null);
+
+// Wynik syntezy mowy: gotowy plik (Extension bez kropki, np. "mp3") i koszt z odpowiedzi (null = dostawca go nie podaje)
+public sealed record AudioResult(byte[] Bytes, string Extension, decimal? CostUsd);
+
+// Wynik rozpoznawania mowy: tekst i koszt (null = nieznany)
+public sealed record TranscriptResult(string Text, decimal? CostUsd);
 
 // Kawałek odpowiedzi strumieniowej: dopisywany tekst i/lub rozumowanie (null = brak w tym kawałku)
 public sealed record ChatDelta(string? Content, string? Reasoning);

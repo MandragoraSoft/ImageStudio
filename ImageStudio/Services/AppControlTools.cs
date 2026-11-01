@@ -19,7 +19,7 @@ public sealed class AppControlTools
     };
 
     private static readonly string[] Kinds = ["generate", "edit", "video"];
-    private static readonly string[] Tabs = ["generate", "edit", "video", "chat"];
+    private static readonly string[] Tabs = ["generate", "edit", "video", "chat", "voice"];
 
     private sealed record Tool(string Name, string Description, string Schema, bool Costly, Func<JsonElement, Task<string>> Run);
 
@@ -108,7 +108,7 @@ public sealed class AppControlTools
 
         yield return new Tool("switch_tab",
             "Przełącza zakładkę aplikacji. Wynik generowania widać w zakładce odpowiedniej dla rodzaju (generate, edit, video).",
-            Schema(("tab", $$"""{"type":"string","enum":["generate","edit","video","chat"]}""", true)),
+            Schema(("tab", $$"""{"type":"string","enum":["generate","edit","video","chat","voice"]}""", true)),
             false, args =>
             {
                 var tab = RequiredString(args, "tab");

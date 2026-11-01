@@ -16,6 +16,7 @@
     <Project Path="ImageStudio.Tabs.Edit/ImageStudio.Tabs.Edit.csproj" />
     <Project Path="ImageStudio.Tabs.Generate/ImageStudio.Tabs.Generate.csproj" />
     <Project Path="ImageStudio.Tabs.Video/ImageStudio.Tabs.Video.csproj" />
+    <Project Path="ImageStudio.Tabs.Voice/ImageStudio.Tabs.Voice.csproj" />
   </Folder>
   <Project Path="ImageStudio/ImageStudio.csproj" />
 </Solution>

@@ -157,6 +157,10 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
         services.AddSingleton<ISecretStore, MemorySecretStore>();
         services.AddSingleton<IWindowStateStore, MemoryWindowStateStore>();
+        services.AddSingleton<FakeAudioPlayer>();
+        services.AddSingleton<IAudioPlayer>(sp => sp.GetRequiredService<FakeAudioPlayer>());
+        services.AddSingleton<FakeAudioRecorder>();
+        services.AddSingleton<IAudioRecorder>(sp => sp.GetRequiredService<FakeAudioRecorder>());
         services.AddSingleton(settings);
         services.AddSingleton<ISettingsStore>(new MemorySettingsStore(settings));
         services.AddSingleton(new ModelPreferences { PathOverride = Path.Combine(_dir, "models.json") });

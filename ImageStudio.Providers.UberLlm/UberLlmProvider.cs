@@ -57,6 +57,20 @@ public sealed class UberLlmProvider : IAiProvider
                                                       CancellationToken ct = default) =>
         await _api.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct);
 
+    public Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) => _api.GetSpeechModelsAsync(ct);
+
+    public Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) => _api.GetSpeechVoicesAsync(model, ct);
+
+    public Task<AudioResult> SynthesizeAsync(string model, string text, string? voice, double? speed, string format,
+                                             CancellationToken ct = default) =>
+        _api.SynthesizeAsync(model, text, voice, speed, format, ct);
+
+    public Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) => _api.GetTranscriptionModelsAsync(ct);
+
+    public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
+                                                  CancellationToken ct = default) =>
+        _api.TranscribeAsync(model, filePath, language, prompt, ct);
+
     public void Dispose()
     {
         _api.Dispose();

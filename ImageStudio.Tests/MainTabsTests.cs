@@ -7,6 +7,7 @@ using ImageStudio.ViewModels;
 using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
 using ImageStudio.Tabs.Generate;
+using ImageStudio.Tabs.Voice;
 
 namespace ImageStudio.Tests;
 
@@ -37,9 +38,10 @@ public sealed class MainTabsTests
             using var app = TestApp.Create(services => services.AddSingleton<IMainTab>(new UnknownTab()));
             var vm = app.Vm;
 
-            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Nieznana"], app.Tabs.Select(t => t.Title));
+            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Głos", "Nieznana"], app.Tabs.Select(t => t.Title));
             Assert.Same(vm, ((GenerateTab)app.Tabs[0]).Content);
             Assert.Same(vm.Chat, ((ChatTab)app.Tabs[3]).Content);
+            Assert.Same(vm.Voice, ((VoiceTab)app.Tabs[4]).Content);
         });
     }
 
@@ -56,8 +58,8 @@ public sealed class MainTabsTests
             window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
             var tabs = (TabControl)window.FindName("MainTabs");
-            Assert.Equal(4, tabs.Items.Count);
-            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat"],
+            Assert.Equal(5, tabs.Items.Count);
+            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Głos"],
                          tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
 
             var first = FindAll<GenerationPanel>(window).Single();

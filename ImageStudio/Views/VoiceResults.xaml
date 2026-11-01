@@ -1,0 +1,75 @@
+<UserControl x:Class="ImageStudio.Views.VoiceResults"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Wyniki zakładki Głos (DataContext = VoiceViewModel): nagrania z syntezy i teksty z rozpoznawania -->
+    <Grid>
+        <TextBlock x:Name="EmptyHint" Text="Tu pojawią się nagrania i teksty. Wpisz tekst do przeczytania albo nagraj głos i rozpoznaj go."
+                   TextWrapping="Wrap" HorizontalAlignment="Center"
+                   VerticalAlignment="Center" MaxWidth="360" TextAlignment="Center">
+            <TextBlock.Resources>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Resources>
+        </TextBlock>
+        <ListBox x:Name="ResultList" ItemsSource="{Binding Items}" HorizontalContentAlignment="Stretch" BorderThickness="0"
+                 Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="8,8,8,0" Padding="12,10" CornerRadius="8" BorderThickness="1"
+                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Footer}" FontSize="11" Style="{StaticResource MutedTextBlock}"/>
+                                <TextBlock Text="{Binding Kind}" FontWeight="SemiBold"/>
+                            </DockPanel>
+                            <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
+                                     Background="Transparent" Padding="0" Margin="0,6,0,8" MaxHeight="220"
+                                     VerticalScrollBarVisibility="Auto"/>
+                            <WrapPanel>
+                                <Button Content="▶ Odtwórz" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        Visibility="{Binding HasAudio, Converter={StaticResource BoolToVis}}"
+                                        Command="{Binding DataContext.PlayCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
+                                <Button Content="■ Stop" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}"
+                                        Command="{Binding DataContext.StopPlaybackCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+                                <Button Content="Zapisz jako..." Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding DataContext.SaveAsCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
+                                <Button Content="Kopiuj tekst" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding DataContext.CopyTextCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
+                                <Button Content="Do syntezy" Padding="12,5" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}"
+                                        ToolTip="Wstawia ten tekst do pola mowy z tekstu"
+                                        Command="{Binding DataContext.UseAsSpeechTextCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
+                                <Button Content="Usuń" Padding="12,5" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>
