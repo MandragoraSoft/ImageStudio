@@ -101,8 +101,12 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _preferredOnly;
 
+    // Zakładki lewego panelu: wbudowane (Generowanie, Edycja, Wideo, Czat) plus wstrzyknięte w konstruktorze
+    public IReadOnlyList<IMainTab> Tabs { get; }
+
     public MainViewModel(IAiProvider provider, IDialogService dialogs,
-                         ImageDownloadService downloads, AppSettings settings)
+                         ImageDownloadService downloads, AppSettings settings,
+                         IEnumerable<IMainTab>? extraTabs = null)
     {
         _provider = provider;
         _dialogs = dialogs;
@@ -129,6 +133,9 @@ public sealed partial class MainViewModel : ObservableObject
                                  new ChatImageSupport(_dialogs,
                                                       id => _chatModels.TryGetValue(id, out var info) ? info.AcceptsImage : null,
                                                       () => _settings.MaxSide));
+
+        Tabs = new IMainTab[] { new GenerateTab(this), new EditTab(this), new VideoTab(this), new ChatTab(Chat) }
+            .Concat(extraTabs ?? []).OrderBy(t => t.Order).ToList();
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
