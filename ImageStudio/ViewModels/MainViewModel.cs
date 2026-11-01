@@ -123,7 +123,10 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedQuality = _state.Quality ?? "auto";
         Tools = new ToolsViewModel(new McpToolHost(), _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled);
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
-                                 Tools, _dialogs.ConfirmToolCall);
+                                 Tools, _dialogs.ConfirmToolCall,
+                                 new ChatImageSupport(_dialogs,
+                                                      id => _chatModels.TryGetValue(id, out var info) ? info.AcceptsImage : null,
+                                                      () => _settings.MaxSide));
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);

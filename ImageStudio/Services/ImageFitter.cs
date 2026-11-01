@@ -9,6 +9,30 @@ namespace ImageStudio.Services;
 // Używane przy edycji, bo endpoint edycji nie respektuje parametru rozmiaru.
 public static class ImageFitter
 {
+    // Zmniejsza obraz tak, by dłuższy bok nie przekraczał maxSide (PNG); mniejszy zostaje bez zmian (oryginalne bajty).
+    // Dekodowanie przy okazji sprawdza, że to obraz: inne dane kończą się wyjątkiem.
+    public static (byte[] Bytes, string Mime) Downscale(byte[] source, int maxSide)
+    {
+        var frame = BitmapDecoder.Create(new MemoryStream(source), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+        var longest = Math.Max(frame.PixelWidth, frame.PixelHeight);
+        if (maxSide <= 0 || longest <= maxSide) return (source, MimeOf(source));
+
+        var scale = maxSide / (double)longest;
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(new TransformedBitmap(frame, new ScaleTransform(scale, scale))));
+        using var output = new MemoryStream();
+        encoder.Save(output);
+        return (output.ToArray(), "image/png");
+    }
+
+    internal static string MimeOf(byte[] bytes) => bytes switch
+    {
+        [0xFF, 0xD8, ..] => "image/jpeg",
+        [0x47, 0x49, 0x46, ..] => "image/gif",
+        [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x57, 0x45, 0x42, 0x50, ..] => "image/webp",
+        _ => "image/png",
+    };
+
     public static byte[] FitTo(byte[] source, int width, int height)
     {
         var frame = BitmapDecoder.Create(new MemoryStream(source), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];

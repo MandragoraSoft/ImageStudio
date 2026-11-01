@@ -1,24 +1,35 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
 
-// Klasyczny czat z modelem tekstowym i opcjonalnymi narzędziami (MCP): historia rozmowy żyje tylko w pamięci,
-// wybór modelu i instrukcja systemowa są zapamiętywane
+// Co czat potrzebuje do obrazów: okna wyboru pliku i schowek, informacja, czy model przyjmuje obrazy (null = nie wiadomo),
+// i limit dłuższego boku (większe obrazy są zmniejszane przed wysłaniem)
+public sealed record ChatImageSupport(IDialogService Dialogs, Func<string, bool?> AcceptsImage, Func<int> MaxSide);
+
+// Klasyczny czat z modelem tekstowym, obrazami (modele z wejściem obrazowym) i opcjonalnymi narzędziami (MCP):
+// historia rozmowy żyje tylko w pamięci, wybór modelu i instrukcja systemowa są zapamiętywane
 public sealed partial class ChatViewModel : ObservableObject
 {
     // Tyle razy model może z rzędu poprosić o narzędzia w jednej odpowiedzi, zanim przerwiemy pętlę
     private const int MaxToolRounds = 8;
+    private const int DefaultMaxSide = 1536;
 
     private readonly Func<IAiProvider> _provider;
     private readonly Action<string, bool> _report;
     private readonly Func<ToolCall, bool>? _confirm;
+    private readonly ChatImageSupport? _images;
+
+    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
     public ChatViewModel(Func<IAiProvider> provider, ObservableCollection<string> models,
                          Action<string, bool> report, string systemPrompt,
-                         IToolHost? tools = null, Func<ToolCall, bool>? confirm = null)
+                         IToolHost? tools = null, Func<ToolCall, bool>? confirm = null,
+                         ChatImageSupport? images = null)
     {
         _provider = provider;
         Models = models;
@@ -26,6 +37,12 @@ public sealed partial class ChatViewModel : ObservableObject
         _systemPrompt = systemPrompt;
         Tools = tools;
         _confirm = confirm;
+        _images = images;
+        Attachments.CollectionChanged += (_, _) =>
+        {
+            SendCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(ImageWarning));
+        };
     }
 
     // Wspólna z ulepszaniem promptu lista modeli czatu aktywnego dostawcy
@@ -36,8 +53,12 @@ public sealed partial class ChatViewModel : ObservableObject
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
 
+    // Obrazy czekające na wysłanie z następną wiadomością
+    public ObservableCollection<ChatImage> Attachments { get; } = [];
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    [NotifyPropertyChangedFor(nameof(ImageWarning))]
     private string? _selectedModel;
 
     [ObservableProperty]
@@ -48,21 +69,29 @@ public sealed partial class ChatViewModel : ObservableObject
     private string _input = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(NewChatCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(NewChatCommand), nameof(AttachImagesCommand), nameof(PasteImageCommand))]
     private bool _isSending;
 
-    private bool CanSend => !IsSending && !string.IsNullOrWhiteSpace(Input) && SelectedModel is not null;
+    // Ostrzeżenie, gdy dołączono obraz, a katalog mówi, że wybrany model obrazów nie przyjmuje
+    public string ImageWarning =>
+        Attachments.Count > 0 && SelectedModel is { } model && _images?.AcceptsImage(model) == false
+            ? "Ten model nie przyjmuje obrazów: wiadomość może zostać odrzucona. Wybierz model z obsługą obrazu."
+            : "";
+
+    private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null;
 
     // Wysyła całą historię (z instrukcją systemową na początku). Gdy model prosi o narzędzia, wykonuje je (po zgodzie)
-    // i odsyła wyniki, aż model odpowie tekstem. Błąd bez żadnego wykonanego narzędzia przywraca wiadomość do pola.
+    // i odsyła wyniki, aż model odpowie tekstem. Błąd bez żadnego wykonanego narzędzia przywraca wiadomość i obrazy do pól.
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
     {
         var question = Input.Trim();
-        var sent = new ChatMessage("user", question);
+        var images = Attachments.ToList();
+        var sent = new ChatMessage("user", question, Images: images.Count > 0 ? images : null);
         var start = Messages.Count;
         Messages.Add(sent);
         Input = "";
+        Attachments.Clear();
         IsSending = true;
         _report("Model odpowiada...", false);
         try
@@ -99,6 +128,7 @@ public sealed partial class ChatViewModel : ObservableObject
             {
                 Messages.Remove(sent);
                 Input = question;
+                foreach (var image in images) Attachments.Add(image);
             }
 
             _report($"Błąd czatu: {ex.Message}", true);
@@ -131,6 +161,75 @@ public sealed partial class ChatViewModel : ObservableObject
         catch (Exception ex)
         {
             return $"Błąd narzędzia: {ex.Message}";
+        }
+    }
+
+    // --- Obrazy ---
+
+    private bool CanAttach => !IsSending && _images is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAttach))]
+    private void AttachImages()
+    {
+        if (_images!.Dialogs.PickImageFiles() is { } files) AddFiles(files);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAttach))]
+    private void PasteImage()
+    {
+        try
+        {
+            if (_images!.Dialogs.GetClipboardImage() is not { } image)
+            {
+                _report("Schowek nie zawiera obrazu.", false);
+                return;
+            }
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            AddImage(stream.ToArray(), "schowka");
+        }
+        catch (Exception ex)
+        {
+            _report($"Nie udało się wkleić obrazu: {ex.Message}", true);
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveAttachment(ChatImage? image)
+    {
+        if (image is not null) Attachments.Remove(image);
+    }
+
+    // Pliki z okna wyboru i z przeciągnięcia; inne typy plików są pomijane
+    public void AddFiles(IEnumerable<string> paths)
+    {
+        foreach (var path in paths.Where(p => ImageExtensions.Contains(Path.GetExtension(p).ToLowerInvariant())))
+        {
+            try
+            {
+                AddImage(File.ReadAllBytes(path), Path.GetFileName(path));
+            }
+            catch (Exception ex)
+            {
+                _report($"Nie udało się wczytać {Path.GetFileName(path)}: {ex.Message}", true);
+            }
+        }
+    }
+
+    // Dekodowanie sprawdza, że to obraz; duże obrazy są zmniejszane do limitu dłuższego boku
+    private void AddImage(byte[] bytes, string name)
+    {
+        try
+        {
+            var (fitted, mime) = ImageFitter.Downscale(bytes, _images?.MaxSide() ?? DefaultMaxSide);
+            Attachments.Add(new ChatImage(fitted, mime));
+        }
+        catch (Exception ex) when (ex is NotSupportedException or FileFormatException or InvalidOperationException)
+        {
+            _report($"Nie udało się wczytać obrazu {name}: {ex.Message}", true);
         }
     }
 

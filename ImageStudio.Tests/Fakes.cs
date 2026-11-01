@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using ImageStudio.Services;
+using ImageStudio.ViewModels;
 
 namespace ImageStudio.Tests;
 
@@ -53,6 +56,54 @@ internal sealed class FakeProvider : IAiProvider
 
     public void Dispose()
     {
+    }
+}
+
+// Okna dialogowe do testów: wybór plików i schowek z góry zadane
+internal sealed class FakeDialogs : IDialogService
+{
+    public string[]? PickResult { get; set; }
+    public BitmapSource? Clipboard { get; set; }
+
+    public string[]? PickImageFiles() => PickResult;
+    public BitmapSource? GetClipboardImage() => Clipboard;
+
+    public string? ChooseSaveFile(string suggestedFileName) => throw new NotSupportedException();
+    public void CopyImage(BitmapSource image) => throw new NotSupportedException();
+    public SettingsResult? ShowSettings(SettingsResult current) => throw new NotSupportedException();
+    public PresetDraft? ShowSavePreset(string defaultName) => throw new NotSupportedException();
+    public ImageStudio.Configuration.Preset? ShowPresets() => throw new NotSupportedException();
+    public bool ConfirmToolCall(ToolCall call) => true;
+    public void ShowModelBrowser(ModelBrowserViewModel viewModel) => throw new NotSupportedException();
+}
+
+// Obrazy testowe generowane w pamięci
+internal static class TestImages
+{
+    public static BitmapSource Bitmap(int width, int height)
+    {
+        var pixels = new byte[width * height * 3];
+        Array.Fill(pixels, (byte)180);
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgr24, null, pixels, width * 3);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    public static byte[] Png(int width, int height) => Encode(new PngBitmapEncoder(), width, height);
+    public static byte[] Jpeg(int width, int height) => Encode(new JpegBitmapEncoder(), width, height);
+
+    private static byte[] Encode(BitmapEncoder encoder, int width, int height)
+    {
+        encoder.Frames.Add(BitmapFrame.Create(Bitmap(width, height)));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
+    }
+
+    public static (int Width, int Height) Size(byte[] bytes)
+    {
+        var frame = BitmapDecoder.Create(new MemoryStream(bytes), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+        return (frame.PixelWidth, frame.PixelHeight);
     }
 }
 

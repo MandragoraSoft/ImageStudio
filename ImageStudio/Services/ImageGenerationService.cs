@@ -14,7 +14,8 @@ public sealed record ImageModelInfo(string Id, string? OwnedBy, bool Nsfw, IRead
 public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IReadOnlyList<ImageModelInfo> Edit);
 
 // Model czatu z listą parametrów, które deklaruje (supported_parameters)
-public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters);
+// AcceptsImage: czy katalog deklaruje wejście obrazowe (null = katalog nic o tym nie mówi)
+public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters, bool? AcceptsImage = null);
 
 // Narzędzie dla modelu: nazwa, opis i schemat parametrów (JSON Schema jako tekst)
 public sealed record ToolDefinition(string Name, string Description, string ParametersJson);
@@ -28,9 +29,10 @@ public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls
 // Wiadomość czatu (role: system, user, assistant, tool). Wiadomość asystenta może nieść ToolCalls,
 // a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
 public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
-                                 string? ToolCallId = null, string? ToolName = null)
+                                 string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null)
 {
     public bool IsUser => Role == "user";
+    public bool HasImages => Images is { Count: > 0 };
     public bool HasToolCalls => ToolCalls is { Count: > 0 };
 
     public string RoleLabel => Role switch
@@ -150,7 +152,10 @@ public sealed class ImageGenerationService : IDisposable
                 m.GetProperty("id").GetString()!,
                 m.TryGetProperty("supported_parameters", out var sp) && sp.ValueKind == JsonValueKind.Array
                     ? sp.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
-                    : []))
+                    : [],
+                m.TryGetProperty("input_modalities", out var modalities) && modalities.ValueKind == JsonValueKind.Array
+                    ? modalities.EnumerateArray().Any(x => x.GetString() == "image")
+                    : null))
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -225,6 +230,14 @@ public sealed class ImageGenerationService : IDisposable
                 type = "function",
                 function = new { name = call.Name, arguments = call.ArgumentsJson },
             }).ToList();
+        }
+        else if (m.Role == "user" && m.HasImages)
+        {
+            // Wiadomość z obrazami: lista części (tekst, potem obrazy jako data URI)
+            var parts = new List<object>();
+            if (!string.IsNullOrEmpty(m.Content)) parts.Add(new { type = "text", text = m.Content });
+            parts.AddRange(m.Images!.Select(image => new { type = "image_url", image_url = new { url = image.DataUri } }));
+            wire["content"] = parts;
         }
         else
         {

@@ -66,7 +66,7 @@ public sealed class OpenRouterProvider : IAiProvider
     {
         var models = await GetModelsAsync(ct);
         return models.Where(m => m.Output.Contains("text"))
-                     .Select(m => new ChatModelInfo(m.Id, m.Supported))
+                     .Select(m => new ChatModelInfo(m.Id, m.Supported, m.Input.Contains("image")))
                      .ToList();
     }
 
