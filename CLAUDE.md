@@ -16,6 +16,8 @@ dotnet run --project ImageStudio                    # Debug otwiera też konsol�
 dotnet publish ImageStudio -c Release -r win-x64 --self-contained   # wersja samodzielna
 ```
 
+Publikacja do jednego pliku (Windows 10+ x64), profile w `ImageStudio/Properties/PublishProfiles`: `dotnet publish ImageStudio -p:PublishProfile=Portable` (`publish\portable\ImageStudio.exe`, ok. 3 MB, wymaga .NET 10 Desktop i ASP.NET Core Runtime) albo `-p:PublishProfile=SelfHosted` (`publish\selfhosted\ImageStudio.exe`, ok. 75 MB, z wbudowanym .NET). Profile ustawiają `PluginsInBundle`: dostawcy i zakładki wchodzą do exe zamiast do `providers\`/`tabs\`, a `appsettings.json` jest zasobem wbudowanym (czytanym z manifestu, nie z katalogu).
+
 Przy dziwnych błędach brakujących plików `obj` (np. `BG1002`, `CS2001`) usuń katalogi `bin`/`obj` i zbuduj z `-m:1`; równoległy build kilku projektów XAML bywa wyścigiem.
 
 Wersje pakietów są centralne (`Directory.Packages.props`), a TFM, `UseWPF`, nullable i `PlatformTarget` w `Directory.Build.props`. W csproj dodawaj `PackageReference` bez `Version`. Nie ma lintera.

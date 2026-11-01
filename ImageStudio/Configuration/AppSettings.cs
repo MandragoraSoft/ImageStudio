@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace ImageStudio.Configuration;
 
-// Ustawienia: appsettings.json (domyślne, w katalogu aplikacji) + settings.json użytkownika (nadpisuje)
+// Ustawienia: appsettings.json (domyślne, wbudowane w exe) + settings.json użytkownika (nadpisuje)
 // Klucz API: zmienna UBERLLM_API_KEY (ma pierwszeństwo) albo SecretStore.
 public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
                                  string ProviderId = "uberllm", string OpenRouterKey = "",
@@ -15,9 +15,9 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
 
     public static AppSettings Load()
     {
+        using var defaults = typeof(AppSettings).Assembly.GetManifestResourceStream("appsettings.json")!;
         var config = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonStream(defaults)
             .AddJsonFile(UserSettingsPath, optional: true)
             .Build();
 

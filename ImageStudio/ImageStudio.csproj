@@ -7,6 +7,10 @@
     <RootNamespace>ImageStudio</RootNamespace>
     <AssemblyName>ImageStudio</AssemblyName>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- Publikacja do jednego pliku (profile w Properties\PublishProfiles): dostawcy i zakładki wchodzą do paczki,
+         więc nie ma podfolderów providers\ i tabs\ -->
+    <PluginsInBundle Condition="'$(PublishSingleFile)' == 'true'">true</PluginsInBundle>
+    <PluginsInBundle Condition="'$(PluginsInBundle)' == ''">false</PluginsInBundle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,9 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <!-- Wbudowany, żeby publikacja do jednego pliku nie zostawiała pliku obok exe -->
+    <EmbeddedResource Include="appsettings.json" LogicalName="appsettings.json" />
     <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
@@ -28,14 +31,14 @@
     <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
     <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
     <!-- Zakładki lewego panelu: osobne projekty, ich DLL-e trafiają do podfolderu tabs\ (jak dostawcy do providers\) -->
-    <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" Private="false" />
-    <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="false" />
-    <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" Private="false" />
-    <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" Private="$(PluginsInBundle)" />
     <!-- Dostawcy: Private=false nie kopiuje ich do katalogu głównego; target niżej układa je w providers\ -->
-    <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="false" />
-    <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="false" />
-    <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" Private="$(PluginsInBundle)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,16 +60,24 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CopyPluginDlls" AfterTargets="Build" DependsOnTargets="CollectPluginDlls">
+  <Target Name="CopyPluginDlls" AfterTargets="Build" Condition="'$(PluginsInBundle)' != 'true'" DependsOnTargets="CollectPluginDlls">
     <Copy SourceFiles="@(ProviderFile)" DestinationFolder="$(OutDir)providers" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(TabFile)" DestinationFolder="$(OutDir)tabs" SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="PublishPluginDlls" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="CollectPluginDlls">
+  <Target Name="PublishPluginDlls" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(PluginsInBundle)' != 'true'" DependsOnTargets="CollectPluginDlls">
     <ItemGroup>
       <ResolvedFileToPublish Include="@(ProviderFile)" RelativePath="providers\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="@(TabFile)" RelativePath="tabs\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
+  </Target>
+
+  <!-- Publikacja do jednego pliku: bez symboli obok exe -->
+  <Target Name="CleanSingleFilePublishDir" AfterTargets="Publish" Condition="'$(PluginsInBundle)' == 'true'">
+    <ItemGroup>
+      <LeftoverPdb Include="$(PublishDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(LeftoverPdb)" />
   </Target>
 
 </Project>
