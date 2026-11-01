@@ -102,7 +102,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Zakładki wstrzyknięte (IMainTab): MainWindow.xaml.cs tworzy je raz z DataTemplate wg typu zakładki -->
-                <TabControl x:Name="MainTabs" Grid.Row="0" SelectedIndex="{Binding ActiveTab}"/>
+                <TabControl x:Name="MainTabs" Grid.Row="0" SelectionChanged="MainTabs_SelectionChanged"/>
 
                 <views:ModelMetricsPanel Grid.Row="1" Margin="0,8,0,0"
                                          Visibility="{Binding IsOutputTab, Converter={StaticResource BoolToVis}}"/>

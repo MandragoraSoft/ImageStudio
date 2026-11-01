@@ -6,6 +6,16 @@ public sealed partial class MainViewModel
     // Przed pierwszym załadowaniem katalogu wszystkie są widoczne; potem znika zakładka, dla której dostawca nie ma żadnego modelu
     public IReadOnlyList<bool> TabVisibility { get; private set; } = [true, true, true, true, true];
 
+    // Kolejność wyświetlania zakładek wybrana przez użytkownika (przeciąganie nagłówków). ActiveTab i TabVisibility zostają
+    // w indeksach logicznych (kolejność wbudowana), więc przestawienie niczego w logice nie zmienia
+    public IReadOnlyList<string>? SavedTabOrder => _state.TabOrder;
+
+    public void SaveTabOrder(IReadOnlyList<string> order)
+    {
+        _state.TabOrder = order.ToList();
+        _stateStore.Save(_state);
+    }
+
     // Po załadowaniu katalogu: zakładka bez modeli (np. Wideo u dostawcy bez modeli wideo) jest ukrywana, a gdy była aktywna,
     // wybór przechodzi na pierwszą widoczną. Gdy katalog nie dał żadnych modeli (brak klucza, błąd), zostają wszystkie,
     // żeby użytkownik miał dokąd wrócić i poprawić ustawienia

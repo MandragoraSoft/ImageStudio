@@ -352,6 +352,7 @@
   "tab.chat": "Czat",
   "tab.edit": "Edycja",
   "tab.generate": "Generowanie",
+  "tab.reorder.tip": "Przeciągnij, aby zmienić kolejność zakładek",
   "tab.video": "Wideo",
   "tab.voice": "Głos",
   "tools.confirm": "Pytaj o zgodę przed każdym wywołaniem",

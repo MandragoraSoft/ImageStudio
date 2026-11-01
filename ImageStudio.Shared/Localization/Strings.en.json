@@ -352,6 +352,7 @@
   "tab.chat": "Chat",
   "tab.edit": "Edit",
   "tab.generate": "Generate",
+  "tab.reorder.tip": "Drag to reorder the tabs",
   "tab.video": "Video",
   "tab.voice": "Voice",
   "tools.confirm": "Ask for consent before every call",

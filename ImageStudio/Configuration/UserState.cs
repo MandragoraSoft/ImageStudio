@@ -41,6 +41,8 @@ public sealed class UserState
     public bool McpServerEnabled { get; set; }
     public int? McpServerPort { get; set; }
     public string? EnhancerInstruction { get; set; }
+    // Kolejność zakładek lewego panelu po przeciągnięciu (nazwy typów zakładek); null = domyślna
+    public List<string>? TabOrder { get; set; }
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
     public string? Quality { get; set; }
