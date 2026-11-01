@@ -14,12 +14,14 @@ public partial class PromptEditorWindow : Window
     private PromptEdit? _beforeRebuild;
     private bool _busy;
     private readonly Action<Preset>? _savePreset;
+    private readonly Func<Task<string>>? _describeImages;
 
     // initial.System == null: rodzaj bez promptu systemowego (np. wideo), sekcja jest ukryta;
     // brak instrukcji albo przebudowy ukrywa sekcję promptu technicznego
     public PromptEditorWindow(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
                               object? enhancerContext = null,
-                              IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null)
+                              IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null,
+                              Func<Task<string>>? describeImages = null)
     {
         InitializeComponent();
         _rebuild = rebuild;
@@ -27,6 +29,8 @@ public partial class PromptEditorWindow : Window
         EnhancerHost.Visibility = enhancerContext is null ? Visibility.Collapsed : Visibility.Visible;
         Title = title;
         _savePreset = savePreset;
+        _describeImages = describeImages;
+        DescribeButton.Visibility = describeImages is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBar.Visibility = presets is null ? Visibility.Collapsed : Visibility.Visible;
         PresetBox.ItemsSource = presets;
         PromptHeader.Text = "Koncept";
@@ -79,6 +83,39 @@ public partial class PromptEditorWindow : Window
         }
     }
 
+    // Opis obrazów trafia na koniec konceptu (AppendText zachowuje Ctrl+Z); nic nie jest nadpisywane
+    private async void Describe_Click(object sender, RoutedEventArgs e)
+    {
+        if (_describeImages is null || _busy) return;
+
+        SetBusy(true, "");
+        DescribeButton.IsEnabled = false;
+        DescribeStatus.Text = "Model opisuje obrazy...";
+        try
+        {
+            var text = await _describeImages();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                DescribeStatus.Text = "";
+                return;
+            }
+
+            PromptBox.IsReadOnly = false;
+            PromptBox.AppendText((PromptBox.Text.Length > 0 ? "\n\n" : "") + text);
+            PromptBox.CaretIndex = PromptBox.Text.Length;
+            DescribeStatus.Text = "Dodano opis obrazów.";
+        }
+        catch (Exception ex)
+        {
+            DescribeStatus.Text = $"Błąd opisu: {ex.Message}";
+        }
+        finally
+        {
+            SetBusy(false, "");
+            DescribeButton.IsEnabled = true;
+        }
+    }
+
     private void UndoRebuild_Click(object sender, RoutedEventArgs e)
     {
         if (_beforeRebuild is null) return;
@@ -93,7 +130,7 @@ public partial class PromptEditorWindow : Window
     {
         _busy = busy;
         // W trakcie przebudowy wynik nadpisze pola, więc blokujemy wszystko, co je zmienia
-        RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = !busy;
+        RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = DescribeButton.IsEnabled = !busy;
         UndoButton.IsEnabled = !busy && _beforeRebuild is not null;
         PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = busy;
         RebuildStatus.Text = status;

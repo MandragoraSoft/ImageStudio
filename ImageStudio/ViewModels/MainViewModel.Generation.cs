@@ -57,7 +57,7 @@ public sealed partial class MainViewModel
         {
             GenerateSystemPrompt = edit.System ?? "";
             GeneratePrompt = edit.Prompt;
-        });
+        }, () => DescribeImagesAsync([]));
 
     [RelayCommand]
     private void EditEditPrompt() =>
@@ -65,16 +65,17 @@ public sealed partial class MainViewModel
         {
             EditSystemPrompt = edit.System ?? "";
             EditPrompt = edit.Prompt;
-        });
+        }, () => DescribeImagesAsync(References));
 
     // Edytor z zestawami. Gdy w oknie nadpisano zestaw, a zatwierdzone pola są z nim zgodne, stan
     // "zmieniono od ostatniego zapisu" wraca do wartości sprzed otwarcia (zapis jest propagowany do okna głównego)
-    private void EditPromptWithPresets(string title, string kind, PromptEdit initial, Action<PromptEdit> apply)
+    private void EditPromptWithPresets(string title, string kind, PromptEdit initial, Action<PromptEdit> apply,
+                                       Func<Task<string>> describe)
     {
         var wasDirty = PresetDirty;
         Preset? saved = null;
         var edit = _dialogs.ShowPromptEditor(title, initial, RebuildPromptAsync, this, PresetsOfKind(kind),
-                                             preset => { PresetStore.Save(preset); saved = preset; });
+                                             preset => { PresetStore.Save(preset); saved = preset; }, describe);
         if (edit is null) return;
 
         apply(edit);
@@ -89,7 +90,37 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void EditVideoPrompt()
     {
-        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(null, VideoPrompt)) is { } edit) VideoPrompt = edit.Prompt;
+        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(null, VideoPrompt),
+                                      describeImages: () => DescribeImagesAsync(VideoAttachments)) is { } edit) VideoPrompt = edit.Prompt;
+    }
+
+    // Opis obrazów wybranym modelem tekstowym (musi przyjmować obrazy). Obrazy z zakładki (referencje, załączniki wideo),
+    // a gdy ich brak, z wyboru plików; pusty wynik = anulowano
+    private async Task<string> DescribeImagesAsync(IReadOnlyList<ReferenceItem> tabImages)
+    {
+        var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model w „Ustawieniach ulepszania AI”.");
+        if (_chatModels.TryGetValue(model, out var info) && info.AcceptsImage == false)
+            throw new InvalidOperationException($"Model {model} nie przyjmuje obrazów. Wybierz model z ikoną obrazu.");
+
+        var paths = tabImages.Count > 0 ? tabImages.Select(i => i.Path).ToList() : _dialogs.PickImageFiles()?.ToList();
+        if (paths is not { Count: > 0 }) return "";
+
+        var images = paths.Select(path =>
+        {
+            var (bytes, mime) = ImageFitter.Downscale(File.ReadAllBytes(path), _settings.MaxSide);
+            return new ChatImage(bytes, mime);
+        }).ToList();
+
+        var messages = new List<ChatMessage>
+        {
+            new("system", "You are a precise image analyst. Describe exactly what is visible: subjects and their count, pose and " +
+                          "expression, clothing, objects, setting, composition and camera angle, lighting, colours, style and any " +
+                          "visible text. If there are several images, describe each one in turn (\"Image 1:\", \"Image 2:\") and note " +
+                          "how they relate. Be factual, do not guess what is not visible. Reply in Polish, as plain text without markdown."),
+            new("user", images.Count == 1 ? "Describe this image in detail." : $"Describe these {images.Count} images in detail.", Images: images),
+        };
+        var reply = await _provider.ChatAsync(model, messages);
+        return reply.Content.Trim();
     }
 
     // Przebudowa z okna edytora: bieżące pola i prompt techniczny z okna, bez zmiany stanu aplikacji (zapis dopiero po Zastosuj)

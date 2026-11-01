@@ -1,5 +1,8 @@
 using System.Runtime.CompilerServices;
 
+// Testy dzielą jeden katalog danych (state.json, settings.json, zestawy), więc nie biegną równolegle (cały zestaw trwa ok. 3 s)
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace ImageStudio.Tests;
 
 // Testy nie mogą czytać ani zapisywać prawdziwych danych użytkownika (state.json, gallery.json, zestawy)

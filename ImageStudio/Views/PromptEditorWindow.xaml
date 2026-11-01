@@ -47,6 +47,10 @@
 
         <DockPanel Grid.Row="2">
             <TextBlock x:Name="PromptCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+            <Button x:Name="DescribeButton" DockPanel.Dock="Right" Content="Opisz obraz (AI)" Padding="10,2" Margin="8,0,12,0"
+                    Click="Describe_Click" Visibility="Collapsed"
+                    ToolTip="Wybrany model tekstowy opisze obrazy zakładki (a gdy ich brak, wskazane pliki) i dopisze opis do konceptu"/>
+            <TextBlock x:Name="DescribeStatus" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
             <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"/>
         </DockPanel>
         <TextBox x:Name="PromptBox" Grid.Row="3" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"

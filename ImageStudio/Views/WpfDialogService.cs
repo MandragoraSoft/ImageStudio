@@ -78,9 +78,10 @@ public sealed class WpfDialogService : IDialogService
 
     public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
                                        object? enhancerContext = null,
-                                       IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null)
+                                       IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null,
+                                       Func<Task<string>>? describeImages = null)
     {
-        var window = new PromptEditorWindow(title, initial, rebuild, enhancerContext, presets, savePreset) { Owner = OwnerWindow() };
+        var window = new PromptEditorWindow(title, initial, rebuild, enhancerContext, presets, savePreset, describeImages) { Owner = OwnerWindow() };
         return window.ShowDialog() == true ? window.Result : null;
     }
 

@@ -34,10 +34,12 @@ public interface IDialogService
     // Edytor promptu w oknie modalnym; null = anulowano. initial.System == null ukrywa sekcję konfiguracji,
     // initial.Instruction == null albo rebuild == null ukrywa sekcję promptu technicznego i przebudowy AI;
     // enhancerContext (DataContext panelu modelu i parametrów przetwarzania tekstu) null = bez panelu;
-    // presets (lista do wyboru) wraz z savePreset (zapis nadpisanego zestawu) włączają wczytywanie i nadpisywanie zestawów
+    // describeImages (opcjonalny) włącza przycisk "Opisz obraz (AI)": zwraca opis obrazów do dopisania do konceptu
+    // (pusty tekst = anulowano); presets (lista do wyboru) wraz z savePreset (zapis nadpisanego zestawu) włączają wczytywanie i nadpisywanie zestawów
     PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
                                  object? enhancerContext = null,
-                                 IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null);
+                                 IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null,
+                                 Func<Task<string>>? describeImages = null);
 
     void CopyText(string text);
 
