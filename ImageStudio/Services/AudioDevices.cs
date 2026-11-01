@@ -1,9 +1,48 @@
 using System.IO;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace ImageStudio.Services;
 
-public sealed record AudioDevice(int Index, string Name);
+public sealed record AudioDevice(int Index, string Name)
+{
+    // Zapisane urządzenie po nazwie; obcięta nazwa winmm z dawnych ustawień (31 znaków) pasuje do pełnej po początku
+    public bool Matches(string? saved) =>
+        !string.IsNullOrEmpty(saved) && (Name == saved || Name.StartsWith(saved, StringComparison.OrdinalIgnoreCase));
+}
+
+// winmm obcina nazwy urządzeń do 31 znaków ("SteelSeries Sonar - Gaming (Ste"). Pełne nazwy podaje Core Audio
+// (FriendlyName zaczyna się od obciętej nazwy winmm), więc dopasowujemy po początku; bez dopasowania zostaje nazwa winmm
+internal static class AudioNames
+{
+    public static IReadOnlyList<string> Friendly(DataFlow flow)
+    {
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            return enumerator.EnumerateAudioEndPoints(flow, DeviceState.Active).Select(d => d.FriendlyName).ToList();
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            return [];  // bez Core Audio zostają obcięte nazwy winmm
+        }
+    }
+
+    // Każda pełna nazwa trafia do jednego urządzenia (dwa identyczne mikrofony dostają dwie kolejne nazwy)
+    public static IReadOnlyList<string> Resolve(IReadOnlyList<string> winmmNames, IReadOnlyList<string> friendly)
+    {
+        var pool = friendly.ToList();
+        var result = new List<string>();
+        foreach (var name in winmmNames)
+        {
+            var match = pool.FirstOrDefault(f => f.StartsWith(name, StringComparison.OrdinalIgnoreCase));
+            if (match is not null) pool.Remove(match);
+            result.Add(match ?? name);
+        }
+
+        return result;
+    }
+}
 
 // Nagrywanie z mikrofonu do pliku WAV (16 kHz, mono, 16 bitów: format, który przyjmują modele rozpoznawania mowy).
 // Za interfejsem, żeby ViewModel nie zależał od NAudio i dało się go testować bez sprzętu
@@ -44,9 +83,12 @@ public sealed class NAudioRecorder : IAudioRecorder
 
     public event Action<double>? LevelChanged;
 
-    public IReadOnlyList<AudioDevice> Devices() =>
-        [new(NAudioPlayer.DefaultDevice, "Domyślne urządzenie systemu"),
-         .. Enumerable.Range(0, WaveIn.DeviceCount).Select(i => new AudioDevice(i, WaveIn.GetCapabilities(i).ProductName))];
+    public IReadOnlyList<AudioDevice> Devices()
+    {
+        var names = AudioNames.Resolve(Enumerable.Range(0, WaveIn.DeviceCount).Select(i => WaveIn.GetCapabilities(i).ProductName).ToList(),
+                                       AudioNames.Friendly(DataFlow.Capture));
+        return [new(NAudioPlayer.DefaultDevice, "Domyślne urządzenie systemu"), .. names.Select((n, i) => new AudioDevice(i, n))];
+    }
 
     public void Start(int deviceIndex, string path)
     {
@@ -108,9 +150,12 @@ public sealed class NAudioPlayer : IAudioPlayer
 
     public int OutputDevice { get; set; } = DefaultDevice;
 
-    public IReadOnlyList<AudioDevice> OutputDevices() =>
-        [new(DefaultDevice, "Domyślne urządzenie systemu"),
-         .. Enumerable.Range(0, WaveOut.DeviceCount).Select(i => new AudioDevice(i, WaveOut.GetCapabilities(i).ProductName))];
+    public IReadOnlyList<AudioDevice> OutputDevices()
+    {
+        var names = AudioNames.Resolve(Enumerable.Range(0, WaveOut.DeviceCount).Select(i => WaveOut.GetCapabilities(i).ProductName).ToList(),
+                                       AudioNames.Friendly(DataFlow.Render));
+        return [new(DefaultDevice, "Domyślne urządzenie systemu"), .. names.Select((n, i) => new AudioDevice(i, n))];
+    }
 
     public void Play(string path, Action? ended = null, Action<string>? failed = null)
     {

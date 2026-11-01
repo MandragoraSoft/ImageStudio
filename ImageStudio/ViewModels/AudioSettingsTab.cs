@@ -24,8 +24,8 @@ public sealed partial class AudioSettingsTab : ObservableObject, ISettingsTab
     {
         Inputs = inputs;
         Outputs = outputs;
-        _selectedInput = inputs.FirstOrDefault(d => d.Name == current.Microphone) ?? inputs.FirstOrDefault();
-        _selectedOutput = outputs.FirstOrDefault(d => d.Name == current.Speaker) ?? outputs.FirstOrDefault();
+        _selectedInput = inputs.FirstOrDefault(d => d.Matches(current.Microphone)) ?? inputs.FirstOrDefault();
+        _selectedOutput = outputs.FirstOrDefault(d => d.Matches(current.Speaker)) ?? outputs.FirstOrDefault();
     }
 
     public SettingsResult Apply(SettingsResult result) =>

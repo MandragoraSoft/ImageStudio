@@ -180,8 +180,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     // Wybór z okna ustawień (po nazwie; nieznana nazwa nic nie zmienia)
     public void ApplyDevices(string? microphone, string? speaker)
     {
-        if (Microphones.FirstOrDefault(d => d.Name == microphone) is { } mic) SelectedMicrophone = mic;
-        if (Speakers.FirstOrDefault(d => d.Name == speaker) is { } output) SelectedSpeaker = output;
+        if (Microphones.FirstOrDefault(d => d.Matches(microphone)) is { } mic) SelectedMicrophone = mic;
+        if (Speakers.FirstOrDefault(d => d.Matches(speaker)) is { } output) SelectedSpeaker = output;
     }
 
     private void RefreshSpeakers()
@@ -196,7 +196,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             Report($"Nie udało się odczytać listy wyjść dźwięku: {ex.Message}", true);
         }
 
-        SelectedSpeaker = Speakers.FirstOrDefault(d => d.Name == _savedSpeaker) ?? Speakers.FirstOrDefault();
+        SelectedSpeaker = Speakers.FirstOrDefault(d => d.Matches(_savedSpeaker)) ?? Speakers.FirstOrDefault();
     }
 
     // --- Wyniki ---
@@ -343,7 +343,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             Report($"Nie udało się odczytać listy mikrofonów: {ex.Message}", true);
         }
 
-        SelectedMicrophone = Microphones.FirstOrDefault(m => m.Name == _savedMicrophone) ?? Microphones.FirstOrDefault();
+        SelectedMicrophone = Microphones.FirstOrDefault(m => m.Matches(_savedMicrophone)) ?? Microphones.FirstOrDefault();
     }
 
     [RelayCommand]
