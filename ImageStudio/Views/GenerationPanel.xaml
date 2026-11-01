@@ -14,7 +14,6 @@
                         Command="{Binding OpenPresetsCommand}" ToolTip="Wczytaj lub zarządzaj zapisanymi zestawami"/>
             </UniformGrid>
 
-            
 
             <views:ModelPicker Header="Model" HasFilters="True" Margin="0,4,0,0"
                                ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"/>
@@ -45,7 +44,7 @@
                 <views:SizePanel Margin="0,4,0,0"/>
             </Expander>
 
-            <Button Content="Generuj" Height="34" Command="{Binding GenerateCommand}"/>
+            <Button Content="Generuj" Height="34" Command="{Binding GenerateCommand}" ToolTip="Ctrl+Enter"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

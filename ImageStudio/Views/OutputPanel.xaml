@@ -12,9 +12,9 @@
             <Button DockPanel.Dock="Right" Content="Wyczyść" Width="80" Margin="8,0,0,0"
                     Command="{Binding ClearResultCommand}" ToolTip="Czyści ekran wyniku (galeria zostaje)"/>
             <Button DockPanel.Dock="Right" Content="Zapisz jako..." Width="110" Margin="8,0,0,0"
-                    Command="{Binding SaveImageAsCommand}"/>
+                    Command="{Binding SaveImageAsCommand}" ToolTip="Zapisz wynik w wybranym miejscu (Ctrl+S)"/>
             <Button DockPanel.Dock="Right" Content="Kopiuj" Width="90" Margin="8,0,0,0"
-                    Command="{Binding CopyImageCommand}"/>
+                    Command="{Binding CopyImageCommand}" ToolTip="Kopiuj obraz do schowka"/>
             <Button DockPanel.Dock="Right" Content="100%" Width="60" Margin="8,0,0,0"
                     Command="{Binding ResetZoomCommand}" ToolTip="Rzeczywisty rozmiar"/>
             <Button DockPanel.Dock="Right" Content="Dopasuj" Width="80" Margin="8,0,0,0"

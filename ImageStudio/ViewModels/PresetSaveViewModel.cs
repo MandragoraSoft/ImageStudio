@@ -9,6 +9,7 @@ public sealed partial class PresetSaveViewModel : ObservableObject
     private readonly Func<Task<PresetDraft>>? _suggest;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
     private string _name;
 
     [ObservableProperty]
@@ -19,7 +20,11 @@ public sealed partial class PresetSaveViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SuggestCommand))]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
     private bool _isSuggesting;
+
+    // Przycisk "Zapisz": nazwa nie może być pusta, a w trakcie propozycji AI pola jeszcze się zmienią
+    public bool CanSave => !string.IsNullOrWhiteSpace(Name) && !IsSuggesting;
 
     // Prompt zestawu (tylko podgląd) i widoczność przycisku "Zaproponuj (AI)"
     public string Prompt { get; }

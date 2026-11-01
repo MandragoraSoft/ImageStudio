@@ -18,7 +18,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
                      ToolTip="Szukaj po nazwie lub opisie modelu"/>
             <CheckBox Grid.Column="1" Content="Tylko preferowane" IsChecked="{Binding OnlyPreferred}"
                       VerticalAlignment="Center" Margin="12,0,0,0"/>

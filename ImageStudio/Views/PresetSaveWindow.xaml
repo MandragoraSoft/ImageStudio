@@ -27,8 +27,8 @@
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
-                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-            <Button Content="Zapisz" IsDefault="True" Width="90" Click="Save_Click"/>
+                    Style="{StaticResource SecondaryButton}"/>
+            <Button Content="Zapisz" IsDefault="True" Width="90" Click="Save_Click" IsEnabled="{Binding CanSave}"/>
         </StackPanel>
     </StackPanel>
 </Window>

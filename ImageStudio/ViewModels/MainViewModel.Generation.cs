@@ -173,6 +173,14 @@ public sealed partial class MainViewModel
         }, Compose(EditSystemPrompt, EditPrompt), SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PerResult);
     }
 
+    // Ctrl+Enter w głównym oknie: akcja aktywnej zakładki. Wideo celowo pomijamy (każde wywołanie to płatne zadanie)
+    [RelayCommand]
+    private void RunActiveTab()
+    {
+        var command = ActiveTab switch { 0 => GenerateCommand, 1 => EditCommand, _ => null };
+        if (command?.CanExecute(null) == true) command.Execute(null);
+    }
+
     // Seed i negative prompt tylko gdy podane; jakość "auto" = nie wysyłamy
     private ImageOptions CurrentImageOptions()
     {

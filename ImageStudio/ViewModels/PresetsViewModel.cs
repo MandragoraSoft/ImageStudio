@@ -65,8 +65,12 @@ public sealed partial class PresetsViewModel : ObservableObject
         CloseRequested?.Invoke();
     }
 
+    // Zapis aktywny tylko po zmianie nazwy lub opisu zaznaczonego zestawu
+    private bool DetailsChanged => SelectedPreset is { } p
+                                   && (EditName.Trim() != p.Name || EditDescription.Trim() != (p.Description ?? ""));
+
     // Nazwa i opis są w pliku; nazwa pliku się nie zmienia
-    [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
+    [RelayCommand(CanExecute = nameof(DetailsChanged))]
     private void SaveDetails()
     {
         if (SelectedPreset is null) return;

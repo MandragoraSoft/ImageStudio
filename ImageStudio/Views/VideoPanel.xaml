@@ -20,7 +20,7 @@
                             <DataTemplate>
                                 <DockPanel ToolTip="{Binding Source}">
                                     <Button DockPanel.Dock="Right" Content="×" Width="26" Padding="0" Margin="6,0,0,0"
-                                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                            Style="{StaticResource SecondaryButton}"
                                             Command="{Binding DataContext.RemoveVideoAttachmentCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                             CommandParameter="{Binding}"/>
                                     <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>

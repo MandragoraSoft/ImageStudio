@@ -4,9 +4,11 @@
         xmlns:views="clr-namespace:ImageStudio.Views"
         Style="{StaticResource WindowBase}"
         Title="ImageStudio" Height="800" Width="1220" MinHeight="560" MinWidth="860">
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-    </Window.Resources>
+    <!-- Skróty: Ctrl+Enter = akcja aktywnej zakładki (Generuj / Edytuj), Ctrl+S = zapis wyniku -->
+    <Window.InputBindings>
+        <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding RunActiveTabCommand}"/>
+        <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveImageAsCommand}"/>
+    </Window.InputBindings>
 
     <Grid>
         <Grid.RowDefinitions>

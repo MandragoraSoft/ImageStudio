@@ -92,8 +92,10 @@ public partial class PromptEditorWindow : Window
     private void SetBusy(bool busy, string status)
     {
         _busy = busy;
-        RebuildButton.IsEnabled = !busy;
-        PromptBox.IsReadOnly = SystemBox.IsReadOnly = busy;
+        // W trakcie przebudowy wynik nadpisze pola, więc blokujemy wszystko, co je zmienia
+        RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = !busy;
+        UndoButton.IsEnabled = !busy && _beforeRebuild is not null;
+        PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = busy;
         RebuildStatus.Text = status;
     }
 

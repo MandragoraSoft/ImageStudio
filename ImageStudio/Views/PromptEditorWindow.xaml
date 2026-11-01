@@ -65,9 +65,9 @@
                 <Button x:Name="RebuildButton" Content="Przebuduj koncept AI" Padding="12,4" Margin="0,0,8,0" Click="Rebuild_Click"
                         ToolTip="Model ulepszający przepisze koncept (i rozdzieli konfigurację) według powyższych poleceń"/>
                 <Button x:Name="UndoButton" Content="Cofnij przebudowę" Padding="12,4" Margin="0,0,8,0" Click="UndoRebuild_Click" IsEnabled="False"
-                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        Style="{StaticResource SecondaryButton}"/>
                 <Button Content="Instrukcja domyślna" Padding="12,4" Click="DefaultInstruction_Click"
-                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        Style="{StaticResource SecondaryButton}"/>
             </StackPanel>
             <Expander x:Name="EnhancerHost" Header="Model i parametry przetwarzania tekstu" IsExpanded="True" Margin="0,8,0,0">
                 <views:EnhancerPanel Margin="0,4,0,0"/>
@@ -79,10 +79,10 @@
                    Text="Ctrl+Enter zatwierdza, Esc anuluje. Ctrl+Z cofa zmiany w polu."/>
 
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Wyczyść wszystko" Padding="12,0" Margin="0,0,8,0" Click="Clear_Click"
-                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <Button x:Name="ClearButton" Content="Wyczyść wszystko" Padding="12,0" Margin="0,0,8,0" Click="Clear_Click"
+                    Style="{StaticResource SecondaryButton}"/>
             <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
-                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    Style="{StaticResource SecondaryButton}"/>
             <Button Content="Zastosuj" IsDefault="True" Width="90" Click="Apply_Click"/>
         </StackPanel>
     </Grid>

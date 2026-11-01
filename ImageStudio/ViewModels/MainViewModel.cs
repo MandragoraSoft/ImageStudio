@@ -56,7 +56,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EditCommand), nameof(AddReferencesCommand),
                                 nameof(CopyImageCommand), nameof(SaveImageAsCommand), nameof(OpenSettingsCommand),
-                                nameof(AddReferenceFromUrlCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand))]
+                                nameof(AddReferenceFromUrlCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand),
+                                nameof(GenerateVideoCommand), nameof(AddVideoAttachmentsCommand), nameof(PasteReferenceCommand),
+                                nameof(PasteVideoAttachmentCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -258,6 +260,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        // Zajętość na czas ładowania: pasek postępu i zablokowane akcje (także po zmianie dostawcy w Ustawieniach)
+        IsBusy = true;
         Status = "Pobieranie listy modeli i cen...";
         PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
         try
@@ -287,6 +291,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         await LoadEnhancersAsync();
+        IsBusy = false;
         _ready = true;
         SaveState();
 

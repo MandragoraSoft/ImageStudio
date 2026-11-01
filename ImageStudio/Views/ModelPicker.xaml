@@ -13,7 +13,8 @@
     </UserControl.Resources>
     <StackPanel>
         <TextBlock Text="{Binding Header, ElementName=Picker}" Style="{StaticResource SectionHeader}"/>
-        <Expander x:Name="Accordion" HorizontalContentAlignment="Stretch" FontWeight="Normal" Margin="0,0,0,6">
+        <Expander x:Name="Accordion" HorizontalContentAlignment="Stretch" FontWeight="Normal" Margin="0,0,0,6"
+                  Expanded="Accordion_Expanded">
             <Expander.Header>
                 <ContentControl Content="{Binding SelectedItem, ElementName=Picker}" HorizontalContentAlignment="Stretch"/>
             </Expander.Header>
@@ -25,7 +26,7 @@
                 <ListBox x:Name="List" MaxHeight="260" HorizontalContentAlignment="Stretch"
                          ItemsSource="{Binding ItemsSource, ElementName=Picker}"
                          SelectedItem="{Binding SelectedItem, ElementName=Picker}"
-                         PreviewMouseLeftButtonUp="List_PreviewMouseLeftButtonUp">
+                         PreviewMouseLeftButtonUp="List_PreviewMouseLeftButtonUp" PreviewKeyDown="List_PreviewKeyDown">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Padding" Value="8,4"/>

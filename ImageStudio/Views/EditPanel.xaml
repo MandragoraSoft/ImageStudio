@@ -25,7 +25,7 @@
                             <DataTemplate>
                                 <DockPanel ToolTip="{Binding Source}">
                                     <Button DockPanel.Dock="Right" Content="×" Width="26" Padding="0" Margin="6,0,0,0"
-                                            Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                            Style="{StaticResource SecondaryButton}"
                                             Command="{Binding DataContext.RemoveReferenceCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                             CommandParameter="{Binding}"/>
                                     <!-- Długie linki są skracane z "..." na końcu; pełny adres w podpowiedzi -->
@@ -53,7 +53,6 @@
                         Command="{Binding OpenPresetsCommand}" ToolTip="Wczytaj lub zarządzaj zapisanymi zestawami"/>
             </UniformGrid>
 
-            
 
             <views:ModelPicker Header="Model edycji" HasFilters="True" Margin="0,4,0,0"
                                ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
@@ -66,7 +65,7 @@
                 </StackPanel>
             </Expander>
 
-            <Button Content="Edytuj" Height="34" Margin="0,6,0,0" Command="{Binding EditCommand}"/>
+            <Button Content="Edytuj" Height="34" Margin="0,6,0,0" Command="{Binding EditCommand}" ToolTip="Ctrl+Enter"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

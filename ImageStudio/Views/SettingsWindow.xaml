@@ -5,6 +5,7 @@
         xmlns:views="clr-namespace:ImageStudio.Views"
         Style="{StaticResource WindowBase}"
         Title="Ustawienia" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <!-- Komponent konfiguracji wybierany po typie ViewModelu providera -->
     <Window.Resources>
@@ -19,6 +20,8 @@
         </DataTemplate>
     </Window.Resources>
 
+    <!-- Rozwinięty selektor modelu wydłuża okno: przy niskim ekranie treść przewija się zamiast wychodzić poza ekran -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="16">
         <TextBlock Text="Dostawca AI" Style="{StaticResource SectionHeader}"/>
         <ComboBox ItemsSource="{Binding Providers}" SelectedValuePath="Id" SelectedValue="{Binding SelectedProvider}">
@@ -61,8 +64,9 @@
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
-                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    Style="{StaticResource SecondaryButton}"/>
             <Button Content="Zapisz" IsDefault="True" Width="90" Click="Save_Click"/>
         </StackPanel>
     </StackPanel>
+    </ScrollViewer>
 </Window>

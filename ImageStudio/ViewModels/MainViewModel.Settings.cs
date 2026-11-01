@@ -51,8 +51,18 @@ public sealed partial class MainViewModel
 
         AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
                          result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
-        ThemeService.Apply(result.Theme);
+        var previous = _settings;
         _settings = AppSettings.Load();
+        if (_settings.Theme != previous.Theme) ThemeService.Apply(result.Theme);
+
+        // Zmiana samego motywu lub preferencji nie wymaga nowego providera ani ponownego pobierania list modeli
+        if (_settings with { Theme = "" } == previous with { Theme = "" })
+        {
+            PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
+            Status = "Zapisano ustawienia.";
+            return;
+        }
+
         // Nowe ustawienia (także inny provider) = nowa instancja providera
         await SwitchProviderAsync(ProviderRegistry.Create(result.ProviderId, _settings));
     }

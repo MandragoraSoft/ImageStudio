@@ -75,7 +75,10 @@ internal sealed class FakeDialogs : IDialogService
 
     public string? ChooseSaveFile(string suggestedFileName) => throw new NotSupportedException();
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
-    public SettingsResult? ShowSettings(SettingsResult current) => throw new NotSupportedException();
+    // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
+    public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
+    public SettingsResult? ShowSettings(SettingsResult current) =>
+        SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) => throw new NotSupportedException();
     public PromptEdit? PromptEditResult { get; set; }
     public ImageStudio.Configuration.Preset? OverwritePreset { get; set; }

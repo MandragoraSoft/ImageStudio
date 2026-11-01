@@ -32,7 +32,12 @@
         <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock Text="Nazwa" Style="{StaticResource SectionHeader}"/>
-                <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"/>
+                <!-- Enter w nazwie zapisuje nazwę (a nie wczytuje zestawu przyciskiem domyślnym), gdy jest co zapisać -->
+                <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding SaveDetailsCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
                 <TextBlock Text="Opis" Style="{StaticResource SectionHeader}"/>
                 <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalScrollBarVisibility="Auto"/>
@@ -87,6 +92,6 @@
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0" Style="{StaticResource MutedTextBlock}"/>
         </StackPanel>
         <Button Grid.Row="1" Grid.Column="2" Content="Zamknij" Width="110" IsCancel="True" HorizontalAlignment="Right"
-                Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                Style="{StaticResource SecondaryButton}"/>
     </Grid>
 </Window>

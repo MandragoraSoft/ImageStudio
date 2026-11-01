@@ -34,4 +34,18 @@ public partial class ModelPicker : UserControl
         if (e.OriginalSource is DependencyObject d && ItemsControl.ContainerFromElement(List, d) is ListBoxItem)
             Accordion.IsExpanded = false;
     }
+
+    // Klawiatura: Enter lub Esc zwija akordeon (bez uruchamiania przycisku domyślnego / zamykania okna)
+    private void List_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Enter or Key.Escape)) return;
+        Accordion.IsExpanded = false;
+        e.Handled = true;
+    }
+
+    // Po rozwinięciu lista pokazuje wybrany model (przy długiej liście byłby poza widokiem)
+    private void Accordion_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (List.SelectedItem is { } item) List.ScrollIntoView(item);
+    }
 }
