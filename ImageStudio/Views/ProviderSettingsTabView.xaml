@@ -15,6 +15,12 @@
         <DataTemplate DataType="{x:Type vm:OpenAiSettingsViewModel}">
             <views:OpenAiSettingsView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ChatGptSettingsViewModel}">
+            <views:ChatGptSettingsView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:KeyOnlySettingsViewModel}">
+            <views:KeyOnlySettingsView/>
+        </DataTemplate>
     </UserControl.Resources>
 
     <!-- Rozwinięty selektor modelu wydłuża zawartość: przewija się w obrębie zakładki -->

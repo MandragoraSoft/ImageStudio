@@ -14,6 +14,9 @@ public sealed record ModelOption(
     IReadOnlyList<string>? OutputModalities = null,
     bool Reasoning = false)
 {
+    // Pozycja "wszyscy" w filtrze dostawcy modeli
+    public const string AllOwners = "Wszyscy";
+
     // Ikony możliwości w szablonie (App.xaml, ModelIconsTemplate)
     public bool AcceptsFile => InputModalities.Contains("file");
     public bool AcceptsAudio => InputModalities.Contains("audio");

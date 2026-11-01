@@ -21,11 +21,19 @@ public sealed partial class ProviderSettingsTab : ObservableObject, ISettingsTab
     public UberLlmSettingsViewModel UberLlm { get; }
     public OpenRouterSettingsViewModel OpenRouter { get; }
     public OpenAiSettingsViewModel OpenAi { get; }
+    public ChatGptSettingsViewModel ChatGpt { get; }
+    public KeyOnlySettingsViewModel Mistral { get; }
+    public KeyOnlySettingsViewModel Kilo { get; }
+    public KeyOnlySettingsViewModel OpenCodeGo { get; }
 
     public ProviderSettingsViewModel ActiveProvider => SelectedProvider switch
     {
         OpenRouterProvider.Identifier => OpenRouter,
         OpenAiProvider.Identifier => OpenAi,
+        ChatGptProvider.Identifier => ChatGpt,
+        MistralProvider.Identifier => Mistral,
+        KiloProvider.Identifier => Kilo,
+        OpenCodeGoProvider.Identifier => OpenCodeGo,
         _ => UberLlm,
     };
 
@@ -66,21 +74,34 @@ public sealed partial class ProviderSettingsTab : ObservableObject, ISettingsTab
         OpenRouterKey = OpenRouter.ApiKey.Trim(),
         OpenAiBaseUrl = OpenAi.BaseUrl.Trim(),
         OpenAiKey = OpenAi.ApiKey.Trim(),
+        ChatGptSession = ChatGpt.SessionJson,
+        MistralKey = Mistral.ApiKey.Trim(),
+        KiloKey = Kilo.ApiKey.Trim(),
+        OpenCodeGoKey = OpenCodeGo.ApiKey.Trim(),
         PreferredOnly = new Dictionary<string, bool>
         {
             [UberLlm.ProviderId] = UberLlm.PreferredOnly,
             [OpenRouter.ProviderId] = OpenRouter.PreferredOnly,
             [OpenAi.ProviderId] = OpenAi.PreferredOnly,
+            [ChatGpt.ProviderId] = ChatGpt.PreferredOnly,
+            [Mistral.ProviderId] = Mistral.PreferredOnly,
+            [Kilo.ProviderId] = Kilo.PreferredOnly,
+            [OpenCodeGo.ProviderId] = OpenCodeGo.PreferredOnly,
         },
         DefaultTextModels = new Dictionary<string, string?>
         {
             [UberLlm.ProviderId] = UberLlm.PreferredTextModelOrNull,
             [OpenRouter.ProviderId] = OpenRouter.PreferredTextModelOrNull,
             [OpenAi.ProviderId] = OpenAi.PreferredTextModelOrNull,
+            [ChatGpt.ProviderId] = ChatGpt.PreferredTextModelOrNull,
+            [Mistral.ProviderId] = Mistral.PreferredTextModelOrNull,
+            [Kilo.ProviderId] = Kilo.PreferredTextModelOrNull,
+            [OpenCodeGo.ProviderId] = OpenCodeGo.PreferredTextModelOrNull,
         },
     };
 
-    public ProviderSettingsTab(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null)
+    public ProviderSettingsTab(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null,
+                               Func<ChatGptSession?, CancellationToken, Task<ChatGptSession>>? signInToChatGpt = null)
     {
         _current = current;
         _loadTextModels = loadTextModels;
@@ -91,7 +112,14 @@ public sealed partial class ProviderSettingsTab : ObservableObject, ISettingsTab
             { ProviderDefaultTextModel = OpenRouterProvider.DefaultTextModelId };
         OpenAi = new OpenAiSettingsViewModel(current.OpenAiBaseUrl, current.OpenAiKey)
             { ProviderDefaultTextModel = OpenAiProvider.DefaultTextModelId };
-        foreach (var provider in new ProviderSettingsViewModel[] { UberLlm, OpenRouter, OpenAi })
+        ChatGpt = new ChatGptSettingsViewModel(current.ChatGptSession, signInToChatGpt);
+        Mistral = new KeyOnlySettingsViewModel(MistralProvider.Identifier, "MISTRAL_API_KEY", current.MistralKey, "provider.mistral.note")
+            { ProviderDefaultTextModel = MistralProvider.DefaultTextModelId };
+        Kilo = new KeyOnlySettingsViewModel(KiloProvider.Identifier, "KILO_API_KEY", current.KiloKey, "provider.kilo.note")
+            { ProviderDefaultTextModel = KiloProvider.DefaultTextModelId };
+        OpenCodeGo = new KeyOnlySettingsViewModel(OpenCodeGoProvider.Identifier, "OPENCODE_API_KEY", current.OpenCodeGoKey, "provider.opencodego.note")
+            { ProviderDefaultTextModel = OpenCodeGoProvider.DefaultTextModelId };
+        foreach (var provider in new ProviderSettingsViewModel[] { UberLlm, OpenRouter, OpenAi, ChatGpt, Mistral, Kilo, OpenCodeGo })
         {
             provider.PreferredOnly = current.PreferredOnly?.GetValueOrDefault(provider.ProviderId) ?? false;
             provider.SetTextModels(provider.ProviderId == current.ProviderId ? current.ActiveTextModels ?? [] : [],

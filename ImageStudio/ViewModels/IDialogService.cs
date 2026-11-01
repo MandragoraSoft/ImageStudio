@@ -15,7 +15,9 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    IReadOnlyList<string>? ActiveTextModels = null,
                                    bool UseStreaming = true,
                                    string? Microphone = null, string? Speaker = null,
-                                   string Language = "system");
+                                   string Language = "system",
+                                   string MistralKey = "", string KiloKey = "", string OpenCodeGoKey = "",
+                                   string ChatGptSession = "");
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);

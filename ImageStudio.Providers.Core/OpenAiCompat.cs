@@ -21,7 +21,7 @@ public static class OpenAiCompat
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
+            throw ApiErrors.Failure(response.StatusCode, text);
 
         using var doc = JsonDocument.Parse(text);
         var message = doc.RootElement.GetProperty("choices")[0].GetProperty("message");
@@ -67,6 +67,10 @@ public static class OpenAiCompat
         return input is null && output is null && cached is null ? null : new TokenUsage(input, output, cached);
     }
 
+    private static Task<HttpResponseMessage> SendStreamAsync(HttpClient http, string path, object body, CancellationToken ct) =>
+        http.SendAsync(new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) },
+                       HttpCompletionOption.ResponseHeadersRead, ct);
+
     // Ciało żądania czatu: model, historia, narzędzia i (gdy podano) sterowanie rozumowaniem
     private static Dictionary<string, object?> BuildChatBody(string model, IReadOnlyList<ChatMessage> messages,
                                                               IReadOnlyList<ToolDefinition>? tools, ChatOptions? options)
@@ -99,10 +103,27 @@ public static class OpenAiCompat
         body["stream"] = true;
         body["stream_options"] = new { include_usage = true };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        var response = await SendStreamAsync(http, path, body, ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
+        {
+            // Nie każde API zna stream_options (zużycie tokenów): ponawiamy bez nich
+            var error = await response.Content.ReadAsStringAsync(ct);
+            var status = response.StatusCode;
+            response.Dispose();
+            if (!error.Contains("stream_options", StringComparison.OrdinalIgnoreCase)) throw ApiErrors.Failure(status, error);
+
+            body.Remove("stream_options");
+            response = await SendStreamAsync(http, path, body, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var retryError = await response.Content.ReadAsStringAsync(ct);
+                var retryStatus = response.StatusCode;
+                response.Dispose();
+                throw ApiErrors.Failure(retryStatus, retryError);
+            }
+        }
+
+        using var _ = response;
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
@@ -120,7 +141,7 @@ public static class OpenAiCompat
 
             using var doc = JsonDocument.Parse(data);
             var root = doc.RootElement;
-            if (root.TryGetProperty("error", out var error)) throw new InvalidOperationException(error.ToString());
+            if (root.TryGetProperty("error", out var error)) throw new InvalidOperationException(ApiErrors.Message(error.GetRawText()));
             if (ReadUsage(root) is { } u) usage = u;
             if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array
                 || choices.GetArrayLength() == 0) continue;
@@ -319,7 +340,7 @@ public static class OpenAiCompat
     {
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
-        return response.IsSuccessStatusCode ? (true, text) : (false, $"HTTP {(int)response.StatusCode}: {text}");
+        return response.IsSuccessStatusCode ? (true, text) : (false, ApiErrors.Failure(response.StatusCode, text).Message);
     }
 
     public static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)

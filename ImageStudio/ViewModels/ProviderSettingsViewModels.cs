@@ -1,6 +1,7 @@
 using ImageStudio.Localization;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
@@ -10,11 +11,11 @@ public abstract partial class ProviderSettingsViewModel : ObservableObject
 {
     public abstract string ProviderId { get; }
 
-    // Zmienna środowiskowa z kluczem dostawcy (ma pierwszeństwo nad zapisanym sekretem)
+    // Zmienna środowiskowa z kluczem dostawcy (ma pierwszeństwo nad zapisanym sekretem); pusta, gdy dostawca jej nie ma
     public abstract string EnvVar { get; }
 
     // Ostrzeżenie w oknie ustawień; null, gdy zmienna nie jest ustawiona
-    public string? EnvNotice => Environment.GetEnvironmentVariable(EnvVar) is { Length: > 0 }
+    public string? EnvNotice => EnvVar.Length > 0 && Environment.GetEnvironmentVariable(EnvVar) is { Length: > 0 }
         ? Loc.T("provider.envOverride", EnvVar)
         : null;
 
@@ -77,6 +78,92 @@ public sealed partial class OpenRouterSettingsViewModel : ProviderSettingsViewMo
 
     [ObservableProperty]
     private string _apiKey;
+}
+
+// ChatGPT: logowanie kontem ChatGPT zamiast klucza API (przycisk w widoku otwiera przeglądarkę); sesja trafia do zapisu z oknem
+public sealed partial class ChatGptSettingsViewModel : ProviderSettingsViewModel
+{
+    private readonly Func<ChatGptSession?, CancellationToken, Task<ChatGptSession>>? _signIn;
+    private CancellationTokenSource? _cancel;
+
+    public ChatGptSettingsViewModel(string sessionJson, Func<ChatGptSession?, CancellationToken, Task<ChatGptSession>>? signIn)
+    {
+        _session = ChatGptSession.Parse(sessionJson);
+        _signIn = signIn;
+    }
+
+    public override string ProviderId => ChatGptProvider.Identifier;
+    public override string EnvVar => "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status), nameof(SessionJson), nameof(IsSignedIn))]
+    private ChatGptSession _session;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSignIn), nameof(IsNotBusy))]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    private string _error = "";
+
+    public string SessionJson => Session.ToJson();
+    public bool IsSignedIn => Session.IsSignedIn;
+    public bool IsNotBusy => !IsBusy;
+    public bool CanSignIn => !IsBusy && _signIn is not null;
+    public string Status => Session.IsSignedIn ? Loc.T("provider.chatgpt.signedIn", Session.Email ?? "—") : Loc.T("provider.chatgpt.signedOut");
+
+    [RelayCommand(CanExecute = nameof(CanSignIn))]
+    private async Task SignInAsync()
+    {
+        Error = "";
+        IsBusy = true;
+        _cancel = new CancellationTokenSource();
+        try
+        {
+            Session = await _signIn!(Session, _cancel.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // anulowane przez użytkownika
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            _cancel.Dispose();
+            _cancel = null;
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void Cancel() => _cancel?.Cancel();
+
+    // Wylogowanie zostawia rejestrację (client_id i identyfikator instalacji), kasuje tokeny
+    [RelayCommand]
+    private void SignOut()
+    {
+        Error = "";
+        Session = Session.SignedOut();
+    }
+
+    partial void OnIsBusyChanged(bool value) => SignInCommand.NotifyCanExecuteChanged();
+}
+
+// Dostawca skonfigurowany samym kluczem API (stały adres): jeden ViewModel i jeden widok dla Mistrala, Kilo i OpenCode Go
+public sealed partial class KeyOnlySettingsViewModel(string providerId, string envVar, string apiKey, string noteKey)
+    : ProviderSettingsViewModel
+{
+    public override string ProviderId => providerId;
+    public override string EnvVar => envVar;
+
+    // Opis pod polem klucza (klucz tłumaczenia rozwiązywany przy tworzeniu okna)
+    public string Note => Loc.T(noteKey);
+
+    [ObservableProperty]
+    private string _apiKey = apiKey;
 }
 
 public sealed partial class OpenAiSettingsViewModel : ProviderSettingsViewModel

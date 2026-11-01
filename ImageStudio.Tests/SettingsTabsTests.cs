@@ -87,6 +87,13 @@ public sealed class SettingsTabsTests
             vm.SelectedTab = provider;
             Flush(window.Dispatcher);
             Assert.NotNull(Find<ProviderSettingsTabView>(window));
+            // wybór dostawcy podmienia panel konfiguracji (ChatGPT: logowanie zamiast adresów i klucza UberLLM)
+            provider.SelectedProvider = "chatgpt";
+            Flush(window.Dispatcher);
+            Assert.Equal("chatgpt", provider.SelectedProvider);
+            Assert.IsType<ChatGptSettingsViewModel>(provider.ActiveProvider);
+            Assert.NotNull(Find<ChatGptSettingsView>(window));
+            Assert.Null(Find<UberLlmSettingsView>(window));
             window.Close();
 
             // zakładka bez DataTemplate w oknie: wyjątek przy otwarciu

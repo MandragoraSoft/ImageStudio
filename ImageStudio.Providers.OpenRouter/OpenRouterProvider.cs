@@ -182,7 +182,7 @@ public sealed class OpenRouterProvider : IAiProvider
                 continue;
             }
 
-            throw new InvalidOperationException($"HTTP {(int)create.StatusCode}: {createText}");
+            throw ApiErrors.Failure(create.StatusCode, createText);
         }
 
         using var job = JsonDocument.Parse(createText);
@@ -201,7 +201,7 @@ public sealed class OpenRouterProvider : IAiProvider
             using var poll = await _http.GetAsync(pollUrl, ct);
             var pollText = await poll.Content.ReadAsStringAsync(ct);
             if (!poll.IsSuccessStatusCode)
-                throw new InvalidOperationException($"HTTP {(int)poll.StatusCode}: {pollText}");
+                throw ApiErrors.Failure(poll.StatusCode, pollText);
 
             using var state = JsonDocument.Parse(pollText);
             var status = state.RootElement.GetProperty("status").GetString() ?? "";
@@ -253,7 +253,7 @@ public sealed class OpenRouterProvider : IAiProvider
         using var response = await _http.PostAsJsonAsync(ChatPath, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
+            throw ApiErrors.Failure(response.StatusCode, text);
 
         using var doc = JsonDocument.Parse(text);
         var root = doc.RootElement;
@@ -304,7 +304,7 @@ public sealed class OpenRouterProvider : IAiProvider
         using var response = await _http.GetAsync("/api/v1/videos/models", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()
@@ -353,7 +353,7 @@ public sealed class OpenRouterProvider : IAiProvider
         using var response = await _http.GetAsync(ModelsPath, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()

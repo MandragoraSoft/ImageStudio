@@ -28,7 +28,7 @@ public sealed partial class MainViewModel
     private void RefreshOwners()
     {
         var owners = Models.Concat(EditModels).Concat(VideoModels).Concat(ChatModelOptions).Concat(Voice.SpeechModels).Concat(Voice.TranscriptionModels)
-            .Select(m => m.OwnedBy).OfType<string>().Distinct().OrderBy(o => o, StringComparer.OrdinalIgnoreCase).ToList();
+            .Select(m => m.OwnedBy).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(o => o, StringComparer.OrdinalIgnoreCase).ToList();
         Providers.Clear();
         Providers.Add(AllProviders);
         foreach (var owner in owners) Providers.Add(owner);

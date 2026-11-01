@@ -40,10 +40,15 @@
     <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.ChatGpt\ImageStudio.Providers.ChatGpt.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.Mistral\ImageStudio.Providers.Mistral.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.Kilo\ImageStudio.Providers.Kilo.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" Private="$(PluginsInBundle)" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Markdig" />
     <PackageReference Include="NAudio" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />

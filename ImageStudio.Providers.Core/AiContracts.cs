@@ -139,6 +139,9 @@ public sealed class ChatMessage : System.ComponentModel.INotifyPropertyChanged
     // Rozumowanie jest tylko do podglądu: nie wraca do API w historii rozmowy
     public bool HasReasoning => !string.IsNullOrWhiteSpace(Reasoning);
     public bool IsUser => Role == "user";
+
+    // Odpowiedzi modelu są pokazywane jako Markdown (kod, listy, pogrubienia); tekst użytkownika i narzędzi zostaje surowy
+    public bool IsAssistant => Role == "assistant";
     public bool HasImages => Images is { Count: > 0 };
     public bool HasToolCalls => ToolCalls is { Count: > 0 };
 

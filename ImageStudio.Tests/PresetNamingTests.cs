@@ -54,7 +54,8 @@ public sealed class ProviderDefaultsTests
     [Fact]
     public void Registry_exposes_provider_default_text_models()
     {
-        Assert.All(ProviderRegistry.Available, p => Assert.False(string.IsNullOrWhiteSpace(p.DefaultTextModel)));
+        // ChatGPT nie ma modelu domyślnego: katalog zależy od konta, więc zostaje pierwszy z listy
+        Assert.All(ProviderRegistry.Available.Where(p => p.Id != "chatgpt"), p => Assert.False(string.IsNullOrWhiteSpace(p.DefaultTextModel)));
     }
 
     [Fact]

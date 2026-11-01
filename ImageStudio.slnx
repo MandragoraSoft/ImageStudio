@@ -5,8 +5,12 @@
   </Configurations>
   <Project Path="ImageStudio.Tests/ImageStudio.Tests.csproj" />
   <Folder Name="/Providers/">
+    <Project Path="ImageStudio.Providers.ChatGpt/ImageStudio.Providers.ChatGpt.csproj" />
     <Project Path="ImageStudio.Providers.Core/ImageStudio.Providers.Core.csproj" />
+    <Project Path="ImageStudio.Providers.Kilo/ImageStudio.Providers.Kilo.csproj" />
+    <Project Path="ImageStudio.Providers.Mistral/ImageStudio.Providers.Mistral.csproj" />
     <Project Path="ImageStudio.Providers.OpenAi/ImageStudio.Providers.OpenAi.csproj" />
+    <Project Path="ImageStudio.Providers.OpenCodeGo/ImageStudio.Providers.OpenCodeGo.csproj" />
     <Project Path="ImageStudio.Providers.OpenRouter/ImageStudio.Providers.OpenRouter.csproj" />
     <Project Path="ImageStudio.Providers.UberLlm/ImageStudio.Providers.UberLlm.csproj" />
   </Folder>

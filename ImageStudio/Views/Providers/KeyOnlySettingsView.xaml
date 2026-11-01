@@ -1,0 +1,11 @@
+<UserControl x:Class="ImageStudio.Views.KeyOnlySettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
+             xmlns:views="clr-namespace:ImageStudio.Views">
+    <StackPanel>
+        <TextBlock Text="{loc:T provider.apiKey}" Style="{StaticResource SectionHeader}"/>
+        <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="{Binding Note}"
+                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
+    </StackPanel>
+</UserControl>

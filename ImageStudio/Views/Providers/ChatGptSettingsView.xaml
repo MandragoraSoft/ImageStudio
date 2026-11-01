@@ -1,0 +1,22 @@
+<UserControl x:Class="ImageStudio.Views.ChatGptSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
+    <StackPanel>
+        <TextBlock Text="{Binding Status}" Margin="0,4,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <Button Content="{loc:T provider.chatgpt.signIn}" Padding="12,4" Margin="0,0,8,0"
+                    Command="{Binding SignInCommand}"/>
+            <Button Content="{loc:T provider.chatgpt.cancel}" Padding="12,4" Margin="0,0,8,0"
+                    Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"
+                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+            <Button Content="{loc:T provider.chatgpt.signOut}" Padding="12,4"
+                    Style="{StaticResource SecondaryButton}" Command="{Binding SignOutCommand}"
+                    IsEnabled="{Binding IsSignedIn}"/>
+        </StackPanel>
+        <TextBlock Text="{loc:T provider.chatgpt.waiting}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"
+                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="OrangeRed" Margin="0,6,0,0"/>
+        <TextBlock Text="{loc:T provider.chatgpt.note}"
+                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
+    </StackPanel>
+</UserControl>

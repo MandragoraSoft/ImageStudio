@@ -82,6 +82,7 @@
                                   Visibility="{Binding HasFilters, ElementName=Picker, Converter={StaticResource BoolToVis}}"/>
                 </DockPanel>
                 <views:ModelFilterBar x:Name="FilterBar" Margin="0,0,0,4"
+                                      ModelsSource="{Binding ItemsSource, ElementName=Picker}" ActiveProvider="{Binding SelectedProvider}"
                                       Visibility="{Binding IsChecked, ElementName=FiltersToggle, Converter={StaticResource BoolToVis}}"/>
                 <ListBox x:Name="List" MaxHeight="260" HorizontalContentAlignment="Stretch"
                          ItemsSource="{Binding ItemsSource, ElementName=Picker}"

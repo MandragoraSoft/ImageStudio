@@ -16,6 +16,10 @@
     <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" />
+    <ProjectReference Include="..\ImageStudio.Providers.ChatGpt\ImageStudio.Providers.ChatGpt.csproj" />
+    <ProjectReference Include="..\ImageStudio.Providers.Mistral\ImageStudio.Providers.Mistral.csproj" />
+    <ProjectReference Include="..\ImageStudio.Providers.Kilo\ImageStudio.Providers.Kilo.csproj" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" />
     <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" />

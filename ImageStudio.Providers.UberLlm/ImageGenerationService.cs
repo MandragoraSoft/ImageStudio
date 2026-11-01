@@ -46,7 +46,7 @@ public sealed class ImageGenerationService : IDisposable
         using var response = await _http.GetAsync("/v1/models?type=image", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         var generation = new List<ImageModelInfo>();
@@ -90,7 +90,7 @@ public sealed class ImageGenerationService : IDisposable
         using var response = await _http.GetAsync("/v1/models?type=chat", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()
@@ -170,7 +170,7 @@ public sealed class ImageGenerationService : IDisposable
         using var response = await _http.GetAsync("/v1/models?type=video", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()
@@ -247,7 +247,7 @@ public sealed class ImageGenerationService : IDisposable
                 continue;
             }
 
-            throw new InvalidOperationException($"HTTP {(int)create.StatusCode}: {createText}");
+            throw ApiErrors.Failure(create.StatusCode, createText);
         }
 
         using var job = JsonDocument.Parse(createText);
@@ -263,7 +263,7 @@ public sealed class ImageGenerationService : IDisposable
             using var poll = await _http.GetAsync(pollUrl, ct);
             var pollText = await poll.Content.ReadAsStringAsync(ct);
             if (!poll.IsSuccessStatusCode)
-                throw new InvalidOperationException($"HTTP {(int)poll.StatusCode}: {pollText}");
+                throw ApiErrors.Failure(poll.StatusCode, pollText);
 
             using var state = JsonDocument.Parse(pollText);
             var status = state.RootElement.GetProperty("status").GetString() ?? "";
@@ -296,7 +296,7 @@ public sealed class ImageGenerationService : IDisposable
         using var response = await _http.GetAsync($"/v1/models?type={type}", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()
@@ -352,7 +352,7 @@ public sealed class ImageGenerationService : IDisposable
     {
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         // Koszt z API (usage.cost_usd) jest w odpowiedzi generowania i edycji

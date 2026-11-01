@@ -36,7 +36,7 @@ public static class OpenAiAudio
                 continue;
             }
 
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {error}");
+            throw ApiErrors.Failure(response.StatusCode, error);
         }
     }
 
@@ -48,13 +48,15 @@ public static class OpenAiAudio
     }
 
     public static async Task<TranscriptResult> TranscribeAsync(HttpClient http, string model, string filePath,
-                                                               string? language, string? prompt, CancellationToken ct)
+                                                               string? language, string? prompt, CancellationToken ct,
+                                                               bool openAiFields = true)
     {
+        // openAiFields = false: tylko model, plik i język (Mistral odrzuca pola spoza swojej specyfikacji)
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(model), "model");
-        content.Add(new StringContent("json"), "response_format");
+        if (openAiFields) content.Add(new StringContent("json"), "response_format");
         if (!string.IsNullOrWhiteSpace(language)) content.Add(new StringContent(language.Trim()), "language");
-        if (!string.IsNullOrWhiteSpace(prompt)) content.Add(new StringContent(prompt.Trim()), "prompt");
+        if (openAiFields && !string.IsNullOrWhiteSpace(prompt)) content.Add(new StringContent(prompt.Trim()), "prompt");
 
         await using var stream = File.OpenRead(filePath);
         var file = new StreamContent(stream);
@@ -64,7 +66,7 @@ public static class OpenAiAudio
         using var response = await http.PostAsync(TranscriptionPath, content, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
+            throw ApiErrors.Failure(response.StatusCode, text);
 
         using var doc = JsonDocument.Parse(text);
         var transcript = doc.RootElement.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";

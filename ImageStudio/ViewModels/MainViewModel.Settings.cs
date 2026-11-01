@@ -44,11 +44,13 @@ public sealed partial class MainViewModel
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
                                          EnhancerModels.ToList(), _settings.UseStreaming,
-                                         Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name, _settings.Language);
+                                         Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name, _settings.Language,
+                                         _secrets.Load("mistral") ?? "", _secrets.Load("kilo") ?? "", _secrets.Load("opencodego") ?? "",
+                                         _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "");
         Voice.RefreshDevices();
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
-                                                     new ProviderSettingsTab(current, LoadTextModelsAsync)]);
+                                                     new ProviderSettingsTab(current, LoadTextModelsAsync, SignInToChatGptAsync)]);
         if (result is null) return;
 
         Voice.ApplyDevices(result.Microphone, result.Speaker);
@@ -60,7 +62,8 @@ public sealed partial class MainViewModel
         _prefs.Save();
 
         _settingsStore.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
-                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming, result.Language);
+                         result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming, result.Language,
+                         result.MistralKey, result.KiloKey, result.OpenCodeGoKey, result.ChatGptSession);
         var previous = _settings;
         _settings = _settingsStore.Load();
         if (_settings.Theme != previous.Theme) _themes.Apply(result.Theme);
@@ -87,10 +90,17 @@ public sealed partial class MainViewModel
 
         var settings = new AppSettings(draft.BaseUrl, draft.MarketUrl, draft.MaxSide, Key("UBERLLM_API_KEY", draft.ApiKey), draft.Theme,
                                        draft.ProviderId, Key("OPENROUTER_API_KEY", draft.OpenRouterKey), draft.OpenAiBaseUrl,
-                                       Key("OPENAI_API_KEY", draft.OpenAiKey));
+                                       Key("OPENAI_API_KEY", draft.OpenAiKey),
+                                       MistralKey: Key("MISTRAL_API_KEY", draft.MistralKey), KiloKey: Key("KILO_API_KEY", draft.KiloKey),
+                                       OpenCodeGoKey: Key("OPENCODE_API_KEY", draft.OpenCodeGoKey),
+                                       ChatGptSession: draft.ChatGptSession);
         using var provider = _providers.Create(draft.ProviderId, settings);
         return (await provider.GetChatModelsAsync()).Select(m => m.Id).ToList();
     }
+
+    // Logowanie "Sign in with ChatGPT" z okna ustawień: strona logowania w przeglądarce systemowej, powrót na 127.0.0.1
+    private Task<ChatGptSession> SignInToChatGptAsync(ChatGptSession? previous, CancellationToken ct) =>
+        new ChatGptAuth().SignInAsync(previous, "ImageStudio", _dialogs.OpenFile, Loc.T("provider.chatgpt.done"), ct);
 
     // Jedyne miejsce wymiany providera: zwalnia starego, odświeża bindowane właściwości i listy modeli.
     // Filtry i wybory z poprzedniego providera są zerowane, bo inaczej ukryłyby wszystkie nowe modele.

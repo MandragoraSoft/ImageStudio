@@ -162,7 +162,7 @@ public sealed class ActivityTests
     [Fact]
     public void Production_provider_factory_wraps_every_provider_in_the_activity_decorator()
     {
-        var factory = new ProviderFactory(new ActivityTracker());
+        var factory = new ProviderFactory(new ActivityTracker(), new MemorySecretStore());
         var settings = new AppSettings("http://x", "http://x", 1536, "k", "system");
 
         using var provider = factory.Create("uberllm", settings);

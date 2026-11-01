@@ -9,8 +9,8 @@ public interface IProviderFactory
 }
 
 // Każdy utworzony dostawca jest opakowany dekoratorem aktywności (spinner w stopce)
-public sealed class ProviderFactory(IActivityTracker activity) : IProviderFactory
+public sealed class ProviderFactory(IActivityTracker activity, ISecretStore secrets) : IProviderFactory
 {
     public IAiProvider Create(string providerId, AppSettings settings) =>
-        new ActivityAiProvider(ProviderRegistry.Create(providerId, settings), activity);
+        new ActivityAiProvider(ProviderRegistry.Create(providerId, settings, secrets), activity);
 }

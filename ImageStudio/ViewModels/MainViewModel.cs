@@ -15,7 +15,7 @@ namespace ImageStudio.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
-    public const string AllProviders = "Wszyscy";
+    public const string AllProviders = ModelOption.AllOwners;
     public const string DefaultInstruction =
         "You improve image generation prompts. Make the concept vivid and detailed, " +
         "keep the same language, subject and intent.";
@@ -98,8 +98,24 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = "";
 
-    [ObservableProperty]
     private string _selectedProvider = AllProviders;
+
+    // Wybrany dostawca modeli w filtrze. Lista w filtrze zależy od zakładki i odświeża się po przeładowaniu katalogu,
+    // a ComboBox przy wymianie pozycji zgłasza null: to nie jest decyzja użytkownika, więc wybór zostaje (jak w SelectedEnhancerModelOption)
+    public string SelectedProvider
+    {
+        get => _selectedProvider;
+        set
+        {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SetProperty(ref _selectedProvider, value)) RefreshFilters();
+        }
+    }
 
     [ObservableProperty]
     private bool _inputImageOnly;
@@ -187,6 +203,7 @@ public sealed partial class MainViewModel : ObservableObject
         VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
         VideoModelsView.Filter = FilterModel;
         Loc.LanguageChanged += RefreshLanguageTexts;
+
         References.CollectionChanged += (_, _) => EditCommand.NotifyCanExecuteChanged();
         VideoAttachments.CollectionChanged += (_, _) =>
         {
@@ -297,7 +314,6 @@ public sealed partial class MainViewModel : ObservableObject
     private bool HasSource => SourceImage is not null;
 
     partial void OnSearchTextChanged(string value) => RefreshFilters();
-    partial void OnSelectedProviderChanged(string value) => RefreshFilters();
     partial void OnInputImageOnlyChanged(bool value) => RefreshFilters();
     partial void OnHideNsfwChanged(bool value) => RefreshFilters();
 
@@ -327,7 +343,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (item is not ModelOption m) return false;
         if (HideNsfw && m.Nsfw) return false;
         if (imageFilter && InputImageOnly && !m.AcceptsImage) return false;
-        if (SelectedProvider != AllProviders && m.OwnedBy != SelectedProvider) return false;
+        if (SelectedProvider != AllProviders && !string.Equals(m.OwnedBy, SelectedProvider, StringComparison.OrdinalIgnoreCase)) return false;
         // Pusta lista preferowanych nie ukrywa wszystkiego: filtr działa dopiero po dodaniu pierwszego modelu
         if (PreferredOnly && _prefs.For(_provider.Id) is { Preferred.Count: > 0 } prefs && !prefs.Preferred.Contains(m.Id))
             return false;

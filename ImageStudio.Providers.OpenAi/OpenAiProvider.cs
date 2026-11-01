@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Globalization;
 using System.Text.Json;
 
 namespace ImageStudio.Services;
@@ -13,6 +14,12 @@ public sealed class OpenAiProvider : IAiProvider
 {
     public const string Identifier = "openai";
     public const string DefaultBaseUrl = "https://api.openai.com";
+
+    // Jedna nazwa właściciela we wszystkich katalogach (obrazy, tekst, dźwięk), żeby filtr "Dostawca" nie miał dwóch wpisów
+    private const string Owner = "openai";
+
+    // OpenAI nie podaje cen w API; ceny tekstu bierzemy z publicznego katalogu OpenRouter (modele openai/<id>, bez klucza)
+    private const string PricingCatalogUrl = "https://openrouter.ai/api/v1/models";
 
     private static readonly string[] ChatParameters =
     [
@@ -56,7 +63,7 @@ public sealed class OpenAiProvider : IAiProvider
     {
         var ids = await GetModelIdsAsync(ct);
         return ids.Where(IsChatModel)
-                  .Select(id => new ChatModelInfo(id, ChatParameters, OwnedBy: "openai"))
+                  .Select(id => new ChatModelInfo(id, ChatParameters, OwnedBy: Owner))
                   .ToList();
     }
 
@@ -65,7 +72,7 @@ public sealed class OpenAiProvider : IAiProvider
 
     public async Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) =>
         (await GetModelIdsAsync(ct)).Where(id => id.Contains("tts", StringComparison.OrdinalIgnoreCase))
-                                    .Select(id => new AudioModelInfo(id, "OpenAI")).ToList();
+                                    .Select(id => new AudioModelInfo(id, Owner)).ToList();
 
     public Task<IReadOnlyList<string>> GetSpeechVoicesAsync(string model, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<string>>(SpeechVoices);
@@ -77,14 +84,61 @@ public sealed class OpenAiProvider : IAiProvider
     public async Task<IReadOnlyList<AudioModelInfo>> GetTranscriptionModelsAsync(CancellationToken ct = default) =>
         (await GetModelIdsAsync(ct)).Where(id => id.Contains("whisper", StringComparison.OrdinalIgnoreCase)
                                                  || id.Contains("transcribe", StringComparison.OrdinalIgnoreCase))
-                                    .Select(id => new AudioModelInfo(id, "OpenAI")).ToList();
+                                    .Select(id => new AudioModelInfo(id, Owner)).ToList();
 
     public Task<TranscriptResult> TranscribeAsync(string model, string filePath, string? language, string? prompt,
                                                   CancellationToken ct = default) =>
         OpenAiAudio.TranscribeAsync(_http, model, filePath, language, prompt, ct);
 
-    public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyDictionary<string, ModelPricing>>(new Dictionary<string, ModelPricing>());
+    // Brak ceny nie jest błędem (modele obrazów i dźwięku nie mają jej w katalogu), więc awaria katalogu OpenRouter
+    // zostawia listę bez cen zamiast psuć odświeżanie modeli
+    public async Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var ids = await GetModelIdsAsync(ct);
+            using var response = await _files.GetAsync(PricingCatalogUrl, ct);
+            return response.IsSuccessStatusCode
+                ? ParseCatalogPricing(await response.Content.ReadAsStringAsync(ct), ids)
+                : new Dictionary<string, ModelPricing>();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return new Dictionary<string, ModelPricing>();
+        }
+    }
+
+    // Ceny za 1M tokenów z katalogu OpenRouter (pricing.prompt/completion/input_cache_read w USD za token) dla podanych id OpenAI.
+    // Wersje z datą (gpt-4o-mini-2024-07-18) dostają cenę modelu bez daty, warianty z ":" (batch, free) są pomijane
+    public static IReadOnlyDictionary<string, ModelPricing> ParseCatalogPricing(string catalogJson, IEnumerable<string> ids)
+    {
+        using var doc = JsonDocument.Parse(catalogJson);
+        var catalog = new Dictionary<string, ModelPricing>(StringComparer.OrdinalIgnoreCase);
+        foreach (var model in doc.RootElement.GetProperty("data").EnumerateArray())
+        {
+            var id = model.TryGetProperty("id", out var i) ? i.GetString() : null;
+            if (id is null || !id.StartsWith("openai/", StringComparison.OrdinalIgnoreCase) || id.Contains(':')) continue;
+            if (!model.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Object) continue;
+
+            static decimal? PerMillion(JsonElement p, string name) =>
+                p.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+                && decimal.TryParse(v.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var usd) && usd >= 0
+                    ? usd * 1_000_000m
+                    : null;
+
+            if (PerMillion(pricing, "prompt") is not { } input) continue;
+            catalog[id["openai/".Length..]] = new ModelPricing(input, null, null, ModelPricing.TokenUnit, null, null,
+                                                               PerMillion(pricing, "completion"), PerMillion(pricing, "input_cache_read"));
+        }
+
+        var result = new Dictionary<string, ModelPricing>();
+        foreach (var id in ids)
+        {
+            var dated = System.Text.RegularExpressions.Regex.Replace(id, @"-\d{4}-\d{2}-\d{2}$", "");
+            if (catalog.TryGetValue(id, out var price) || catalog.TryGetValue(dated, out price)) result[id] = price;
+        }
+        return result;
+    }
 
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                 CancellationToken ct = default)
@@ -167,7 +221,7 @@ public sealed class OpenAiProvider : IAiProvider
     {
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
+            throw ApiErrors.Failure(response.StatusCode, text);
 
         using var doc = JsonDocument.Parse(text);
         var item = doc.RootElement.GetProperty("data")[0];
@@ -186,7 +240,7 @@ public sealed class OpenAiProvider : IAiProvider
         using var response = await _http.GetAsync("v1/models", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {body}");
+            throw ApiErrors.Failure(response.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         return doc.RootElement.GetProperty("data").EnumerateArray()
@@ -215,7 +269,7 @@ public sealed class OpenAiProvider : IAiProvider
     }
 
     private static ImageModelInfo ToInfo(string id) =>
-        new(id, "OpenAI", false, id.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase)
+        new(id, Owner, false, id.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase)
                                  ? ["text", "image"]
                                  : ["text"]);
 

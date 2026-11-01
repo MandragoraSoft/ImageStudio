@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -31,5 +32,47 @@ public static partial class ApiErrors
 
         var match = RejectedParameterPattern().Match(text);
         return match.Success ? match.Groups["p"].Value : null;
+    }
+
+    // Błąd HTTP jako wyjątek z czytelnym komunikatem: "HTTP 401: Incorrect API key provided" zamiast surowego JSON-a
+    public static InvalidOperationException Failure(HttpStatusCode status, string responseBody) =>
+        new($"HTTP {(int)status}: {Message(responseBody, status)}");
+
+    // Tekst błędu z odpowiedzi API. Formaty: {"error":{"message":..}} (OpenAI, OpenRouter, Kilo), {"error":".."},
+    // {"message":".."}, {"detail":".."} albo lista {"detail":[{"msg":..}]} (Mistral), {"type":"error","error":{"message":..}} (OpenCode).
+    // Gdy to nie JSON albo nic z tego nie pasuje, zwraca skrócony surowy tekst, a przy pustej odpowiedzi nazwę statusu
+    public static string Message(string responseBody, HttpStatusCode status = 0)
+    {
+        var fallback = string.IsNullOrWhiteSpace(responseBody)
+            ? status == 0 ? "" : status.ToString()
+            : responseBody.Trim() is { Length: > 300 } trimmed ? trimmed[..300] + "…" : responseBody.Trim();
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            return Extract(doc.RootElement) ?? fallback;
+        }
+        catch (JsonException)
+        {
+            return fallback;
+        }
+    }
+
+    private static string? Extract(JsonElement node)
+    {
+        switch (node.ValueKind)
+        {
+            case JsonValueKind.String:
+                return node.GetString() is { Length: > 0 } text ? text : null;
+            case JsonValueKind.Array:
+                var parts = node.EnumerateArray().Select(Extract).OfType<string>().ToList();
+                return parts.Count > 0 ? string.Join("; ", parts) : null;
+            case JsonValueKind.Object:
+                foreach (var name in new[] { "message", "msg", "error", "detail", "error_description" })
+                    if (node.TryGetProperty(name, out var value) && Extract(value) is { } found)
+                        return found;
+                return null;
+            default:
+                return null;
+        }
     }
 }

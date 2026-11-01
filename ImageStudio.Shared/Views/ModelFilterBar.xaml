@@ -14,7 +14,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{loc:T filter.provider}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
-                <ComboBox Grid.Column="1" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}"/>
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Providers, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding ActiveProvider, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

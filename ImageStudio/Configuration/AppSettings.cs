@@ -9,7 +9,9 @@ namespace ImageStudio.Configuration;
 public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, string ApiKey, string Theme,
                                  string ProviderId = "uberllm", string OpenRouterKey = "",
                                  string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "",
-                                 bool UseStreaming = true, string Language = "system")
+                                 bool UseStreaming = true, string Language = "system",
+                                 string MistralKey = "", string KiloKey = "", string OpenCodeGoKey = "",
+                                 string ChatGptSession = "")
 {
     private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
@@ -32,7 +34,11 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             OpenAiBaseUrl: config["OpenAi:BaseUrl"] ?? "https://api.openai.com",
             OpenAiKey: Secret("OPENAI_API_KEY", "openai"),
             UseStreaming: !string.Equals(config["Ui:UseStreaming"], "false", StringComparison.OrdinalIgnoreCase),
-            Language: config["Ui:Language"] is "pl" or "en" ? config["Ui:Language"]! : "system");
+            Language: config["Ui:Language"] is "pl" or "en" ? config["Ui:Language"]! : "system",
+            MistralKey: Secret("MISTRAL_API_KEY", "mistral"),
+            KiloKey: Secret("KILO_API_KEY", "kilo"),
+            OpenCodeGoKey: Secret("OPENCODE_API_KEY", "opencodego"),
+            ChatGptSession: SecretStore.Load("chatgpt") ?? "");
     }
 
     // Gradacja sekretu: niepusta zmienna środowiskowa > zaszyfrowany SecretStore (DPAPI) > pusty
@@ -43,7 +49,9 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
     public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,
                             string providerId = "uberllm", string openRouterKey = "",
                             string openAiBaseUrl = "https://api.openai.com", string openAiKey = "",
-                            bool useStreaming = true, string language = "system")
+                            bool useStreaming = true, string language = "system",
+                            string mistralKey = "", string kiloKey = "", string openCodeGoKey = "",
+                            string chatGptSession = "")
     {
         Directory.CreateDirectory(AppPaths.UserDataDir);
         var json = JsonSerializer.Serialize(
@@ -59,5 +67,9 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
         SecretStore.Save(apiKey);
         SecretStore.Save(openRouterKey, "openrouter");
         SecretStore.Save(openAiKey, "openai");
+        SecretStore.Save(mistralKey, "mistral");
+        SecretStore.Save(kiloKey, "kilo");
+        SecretStore.Save(openCodeGoKey, "opencodego");
+        SecretStore.Save(chatGptSession, "chatgpt");
     }
 }
