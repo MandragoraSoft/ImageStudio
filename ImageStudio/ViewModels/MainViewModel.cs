@@ -258,17 +258,42 @@ public sealed partial class MainViewModel : ObservableObject
                || m.Id.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
     }
 
+    // Start, zmiana dostawcy i ręczne odświeżenie (ReloadModelsCommand): katalog dostawcy ładuje IAiProvider.ReloadAsync,
+    // a wybory użytkownika (modele, filtry) zostają, o ile model nadal istnieje
     public async Task InitializeAsync()
     {
         // Zajętość na czas ładowania: pasek postępu i zablokowane akcje (także po zmianie dostawcy w Ustawieniach)
         IsBusy = true;
         Status = "Pobieranie listy modeli i cen...";
         PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
+        var keepVideo = SelectedVideoModel?.Id;
         try
         {
-            var models = await _provider.GetImageModelsAsync();
-            var pricing = await LoadPricingAsync();
+            ApplyCatalog(await _provider.ReloadAsync(), keepVideo);
+        }
+        catch (Exception ex)
+        {
+            Status = $"Nie udało się pobrać modeli: {ex.Message}";
+            Log.LogError("{Message}", Status);
+        }
 
+        IsBusy = false;
+        _ready = true;
+        SaveState();
+
+        // Łączenie z serwerami MCP może trwać (npx), więc nie blokuje startu; błędy trafiają do statusu serwera
+        _ = Tools.InitializeAsync();
+    }
+
+    // Ręczne odświeżenie list modeli i cen z aktywnego dostawcy (przycisk w selektorze modeli)
+    [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
+    private Task ReloadModelsAsync() => InitializeAsync();
+
+    private void ApplyCatalog(ProviderCatalog catalog, string? keepVideo)
+    {
+        var pricing = catalog.Pricing;
+        if (catalog.Image is { } models)
+        {
             Replace(Models, models.Generation, pricing);
             Replace(EditModels, models.Edit, pricing);
             FillProviders(models.Generation.Concat(models.Edit));
@@ -278,25 +303,26 @@ public sealed partial class MainViewModel : ObservableObject
             SelectedEditModel = EditModels.FirstOrDefault(m => m.Id == _state.EditModel)
                                 ?? EditModels.FirstOrDefault(m => m.Id == DefaultEdit)
                                 ?? EditModels.FirstOrDefault();
-
-            Replace(VideoModels, await _provider.GetVideoModelsAsync(), pricing);
-            SelectedVideoModel ??= VideoModels.FirstOrDefault(m => m.Pricing is not null) ?? VideoModels.FirstOrDefault();
-
-            Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
         }
-        catch (Exception ex)
+
+        if (catalog.Video is { } video)
         {
-            Status = $"Nie udało się pobrać modeli: {ex.Message}";
-            Log.LogError("{Message}", Status);
+            Replace(VideoModels, video, pricing);
+            SelectedVideoModel = VideoModels.FirstOrDefault(m => m.Id == keepVideo)
+                                 ?? VideoModels.FirstOrDefault(m => m.Pricing is not null)
+                                 ?? VideoModels.FirstOrDefault();
         }
 
-        await LoadEnhancersAsync();
-        IsBusy = false;
-        _ready = true;
-        SaveState();
+        // Brak modeli tekstowych nie blokuje generowania, tylko wyłącza ulepszanie promptu
+        if (catalog.Chat is { } chat) ApplyChatModels(chat);
 
-        // Łączenie z serwerami MCP może trwać (npx), więc nie blokuje startu; błędy trafiają do statusu serwera
-        _ = Tools.InitializeAsync();
+        Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
+        if (catalog.Warnings.Count > 0)
+        {
+            var warnings = string.Join("; ", catalog.Warnings);
+            Status += $" · Uwagi: {warnings}";
+            Log.LogWarning("Przeładowanie katalogu: {Warnings}", warnings);
+        }
     }
 
     // Zapis stanu i zamknięcie połączeń MCP przy wyjściu (kończy procesy serwerów)
@@ -306,28 +332,18 @@ public sealed partial class MainViewModel : ObservableObject
         Task.Run(() => Tools.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(3));
     }
 
-    // Brak modeli czatu nie blokuje generowania, tylko wyłącza ulepszanie promptu
-    private async Task LoadEnhancersAsync()
+    private void ApplyChatModels(IReadOnlyList<ChatModelInfo> chat)
     {
-        try
-        {
-            var chat = await _provider.GetChatModelsAsync();
-            _chatModels.Clear();
-            foreach (var model in chat) _chatModels[model.Id] = model;
-            ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
+        _chatModels.Clear();
+        foreach (var model in chat) _chatModels[model.Id] = model;
+        ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
 
-            SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
-                                    : chat.Any(m => m.Id == EffectiveDefaultTextModel) ? EffectiveDefaultTextModel
-                                    : chat.FirstOrDefault()?.Id;
-            Chat.SelectedModel = _state.ChatModel is { } chatModel && EnhancerModels.Contains(chatModel)
-                ? chatModel
-                : SelectedEnhancerModel;
-        }
-        catch (Exception ex)
-        {
-            Status = $"Bez modeli do ulepszania promptu: {ex.Message}";
-            Log.LogError("{Message}", Status);
-        }
+        SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
+                                : chat.Any(m => m.Id == EffectiveDefaultTextModel) ? EffectiveDefaultTextModel
+                                : chat.FirstOrDefault()?.Id;
+        Chat.SelectedModel = _state.ChatModel is { } chatModel && EnhancerModels.Contains(chatModel)
+            ? chatModel
+            : SelectedEnhancerModel;
     }
 
     // Parametry widoczne tylko dla modelu, który je deklaruje; wartości z zapamiętanego stanu
@@ -378,21 +394,6 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var p in EnhancerParameters)
             _state.EnhancerParams[p.Key] = new ParamState { Enabled = p.Enabled, Value = p.Value };
         _state.Save();
-    }
-
-    // Brak cen nie blokuje listy modeli, tylko zostawia etykiety bez ceny
-    private async Task<IReadOnlyDictionary<string, ModelPricing>> LoadPricingAsync()
-    {
-        try
-        {
-            return await _provider.GetPricingAsync();
-        }
-        catch (Exception ex)
-        {
-            Status = $"Bez cen z rynku: {ex.Message}";
-            Log.LogError("{Message}", Status);
-            return new Dictionary<string, ModelPricing>();
-        }
     }
 
     // Status i log błędów z czatu (czat nie zna paska stanu ani loggera)

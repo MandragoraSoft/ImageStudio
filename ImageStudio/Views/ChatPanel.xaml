@@ -5,7 +5,8 @@
     <!-- Opcje czatu (DataContext = ChatViewModel); sama rozmowa jest po prawej w ChatConversation -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <views:ModelPicker Header="Model czatu" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"/>
+            <views:ModelPicker Header="Model czatu"
+                               ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"/>
 
             <TextBlock Text="Instrukcja systemowa (opcjonalna)" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding SystemPrompt, UpdateSourceTrigger=PropertyChanged}"

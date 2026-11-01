@@ -40,7 +40,7 @@ public sealed partial class MainViewModel
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
                                          EnhancerModels.ToList());
-        var result = _dialogs.ShowSettings(current);
+        var result = _dialogs.ShowSettings(current, LoadTextModelsAsync);
         if (result is null) return;
 
         foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())
@@ -65,6 +65,20 @@ public sealed partial class MainViewModel
 
         // Nowe ustawienia (także inny provider) = nowa instancja providera
         await SwitchProviderAsync(ProviderRegistry.Create(result.ProviderId, _settings));
+    }
+
+    // Modele tekstowe dostawcy wybranego w oknie ustawień, pobrane z jeszcze niezapisanymi adresami i kluczami.
+    // Zmienna środowiskowa z kluczem ma pierwszeństwo, tak jak przy zwykłym wczytaniu ustawień
+    private static async Task<IReadOnlyList<string>> LoadTextModelsAsync(SettingsResult draft)
+    {
+        static string Key(string envVar, string typed) =>
+            Environment.GetEnvironmentVariable(envVar) is { Length: > 0 } env ? env : typed;
+
+        var settings = new AppSettings(draft.BaseUrl, draft.MarketUrl, draft.MaxSide, Key("UBERLLM_API_KEY", draft.ApiKey), draft.Theme,
+                                       draft.ProviderId, Key("OPENROUTER_API_KEY", draft.OpenRouterKey), draft.OpenAiBaseUrl,
+                                       Key("OPENAI_API_KEY", draft.OpenAiKey));
+        using var provider = ProviderRegistry.Create(draft.ProviderId, settings);
+        return (await provider.GetChatModelsAsync()).Select(m => m.Id).ToList();
     }
 
     // Jedyne miejsce wymiany providera: zwalnia starego, odświeża bindowane właściwości i listy modeli.

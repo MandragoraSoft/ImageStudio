@@ -35,6 +35,7 @@ public abstract partial class ProviderSettingsViewModel : ObservableObject
 
     public void SetTextModels(IEnumerable<string> known, string? preferred)
     {
+        TextModels.Clear();
         foreach (var model in known.Append(ProviderDefaultTextModel).Append(preferred).OfType<string>().Distinct())
             TextModels.Add(model);
         DefaultTextModel = preferred ?? ProviderDefaultTextModel;

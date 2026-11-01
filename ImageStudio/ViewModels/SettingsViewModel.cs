@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
@@ -40,8 +41,52 @@ public sealed partial class SettingsViewModel : ObservableObject
         _ => UberLlm,
     };
 
-    public SettingsViewModel(SettingsResult current)
+    // Pobiera modele tekstowe dostawcy z ustawieniami wpisanymi w oknie (jeszcze niezapisanymi); null = brak odświeżania
+    private readonly Func<SettingsResult, Task<IReadOnlyList<string>>>? _loadTextModels;
+
+    [ObservableProperty]
+    private string _textModelsStatus = "";
+
+    private bool CanReloadTextModels => _loadTextModels is not null;
+
+    // Odświeża listę modeli tekstowych aktywnego dostawcy, np. po wpisaniu klucza
+    [RelayCommand(CanExecute = nameof(CanReloadTextModels))]
+    private async Task ReloadTextModelsAsync()
     {
+        var provider = ActiveProvider;
+        TextModelsStatus = "Pobieranie modeli...";
+        try
+        {
+            var models = await _loadTextModels!(ToResult());
+            provider.SetTextModels(models, provider.PreferredTextModelOrNull);
+            TextModelsStatus = $"Pobrano modeli: {models.Count}";
+        }
+        catch (Exception ex)
+        {
+            TextModelsStatus = $"Nie udało się pobrać modeli: {ex.Message}";
+        }
+    }
+
+    // Bieżący stan okna jako wynik (wartości przycięte); używany przy zapisie i przy odświeżaniu modeli
+    public SettingsResult ToResult() => new(
+        UberLlm.BaseUrl.Trim(), UberLlm.MarketUrl.Trim(), MaxSide, UberLlm.ApiKey.Trim(), SelectedTheme, SelectedProvider,
+        OpenRouter.ApiKey.Trim(), OpenAi.BaseUrl.Trim(), OpenAi.ApiKey.Trim(),
+        new Dictionary<string, bool>
+        {
+            [UberLlm.ProviderId] = UberLlm.PreferredOnly,
+            [OpenRouter.ProviderId] = OpenRouter.PreferredOnly,
+            [OpenAi.ProviderId] = OpenAi.PreferredOnly,
+        },
+        new Dictionary<string, string?>
+        {
+            [UberLlm.ProviderId] = UberLlm.PreferredTextModelOrNull,
+            [OpenRouter.ProviderId] = OpenRouter.PreferredTextModelOrNull,
+            [OpenAi.ProviderId] = OpenAi.PreferredTextModelOrNull,
+        });
+
+    public SettingsViewModel(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null)
+    {
+        _loadTextModels = loadTextModels;
         _maxSide = current.MaxSide;
         _selectedTheme = current.Theme;
         _selectedProvider = current.ProviderId;

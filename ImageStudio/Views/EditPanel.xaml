@@ -54,7 +54,7 @@
             </UniformGrid>
 
 
-            <views:ModelPicker Header="Model edycji" HasFilters="True" Margin="0,4,0,0"
+            <views:ModelPicker Header="Model edycji" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" Margin="0,4,0,0"
                                ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
 
             <Expander Header="Proporcje i rozmiar wyjścia" IsExpanded="True" Margin="0,0,0,6">

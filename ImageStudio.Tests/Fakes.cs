@@ -34,9 +34,21 @@ internal sealed class FakeProvider : IAiProvider
         return Task.FromResult(OnReply?.Invoke(messages) ?? new ChatReply(OnChat(model, messages), []));
     }
 
-    public Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<IReadOnlyList<ImageModelInfo>> GetVideoModelsAsync(CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) => throw new NotSupportedException();
+    // Katalog dla testów przeładowania; null = dana część "nie jest obsługiwana" (jak dotąd)
+    public ImageModels? ImageCatalog { get; set; }
+    public IReadOnlyList<ImageModelInfo>? VideoCatalog { get; set; }
+    public IReadOnlyList<ChatModelInfo>? ChatCatalog { get; set; }
+    public int ImageCalls { get; private set; }
+
+    public Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default)
+    {
+        ImageCalls++;
+        return ImageCatalog is { } catalog ? Task.FromResult(catalog) : throw new NotSupportedException();
+    }
+    public Task<IReadOnlyList<ImageModelInfo>> GetVideoModelsAsync(CancellationToken ct = default) =>
+        VideoCatalog is { } catalog ? Task.FromResult(catalog) : throw new NotSupportedException();
+    public Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) =>
+        ChatCatalog is { } catalog ? Task.FromResult(catalog) : throw new NotSupportedException();
     public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) => throw new NotSupportedException();
 
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
@@ -83,7 +95,7 @@ internal sealed class FakeDialogs : IDialogService
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
-    public SettingsResult? ShowSettings(SettingsResult current) =>
+    public SettingsResult? ShowSettings(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null) =>
         SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) => throw new NotSupportedException();
     public PromptEdit? PromptEditResult { get; set; }

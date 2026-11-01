@@ -38,33 +38,16 @@ public sealed class WpfDialogService : IDialogService
     public BitmapSource? GetClipboardImage() => Clipboard.ContainsImage() ? Clipboard.GetImage() : null;
 
     // Modalne okno ustawień, właścicielem jest główne okno
-    public SettingsResult? ShowSettings(SettingsResult current)
+    public SettingsResult? ShowSettings(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null)
     {
-        var viewModel = new SettingsViewModel(current);
+        var viewModel = new SettingsViewModel(current, loadTextModels);
         var window = new SettingsWindow
         {
             DataContext = viewModel,
             Owner = Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Application.Current.MainWindow
         };
 
-        return window.ShowDialog() == true
-            ? new SettingsResult(viewModel.UberLlm.BaseUrl.Trim(), viewModel.UberLlm.MarketUrl.Trim(), viewModel.MaxSide,
-                                 viewModel.UberLlm.ApiKey.Trim(), viewModel.SelectedTheme, viewModel.SelectedProvider,
-                                 viewModel.OpenRouter.ApiKey.Trim(), viewModel.OpenAi.BaseUrl.Trim(),
-                                 viewModel.OpenAi.ApiKey.Trim(),
-                                 new Dictionary<string, bool>
-                                 {
-                                     [viewModel.UberLlm.ProviderId] = viewModel.UberLlm.PreferredOnly,
-                                     [viewModel.OpenRouter.ProviderId] = viewModel.OpenRouter.PreferredOnly,
-                                     [viewModel.OpenAi.ProviderId] = viewModel.OpenAi.PreferredOnly,
-                                 },
-                                 new Dictionary<string, string?>
-                                 {
-                                     [viewModel.UberLlm.ProviderId] = viewModel.UberLlm.PreferredTextModelOrNull,
-                                     [viewModel.OpenRouter.ProviderId] = viewModel.OpenRouter.PreferredTextModelOrNull,
-                                     [viewModel.OpenAi.ProviderId] = viewModel.OpenAi.PreferredTextModelOrNull,
-                                 })
-            : null;
+        return window.ShowDialog() == true ? viewModel.ToResult() : null;
     }
 
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null)

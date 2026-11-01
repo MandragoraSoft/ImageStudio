@@ -19,8 +19,13 @@
                 <ContentControl Content="{Binding SelectedItem, ElementName=Picker}" HorizontalContentAlignment="Stretch"/>
             </Expander.Header>
             <StackPanel Margin="0,4,0,0">
-                <ToggleButton x:Name="FiltersToggle" Content="Filtry modeli" Padding="10,2" HorizontalAlignment="Left" Margin="0,0,0,4"
-                              Visibility="{Binding HasFilters, ElementName=Picker, Converter={StaticResource BoolToVis}}"/>
+                <DockPanel Margin="0,0,0,4">
+                    <Button x:Name="ReloadButton" DockPanel.Dock="Right" Content="&#x27F3; Odśwież" Padding="10,2" Visibility="Collapsed"
+                            Command="{Binding ReloadCommand, ElementName=Picker}"
+                            ToolTip="Pobiera ponownie listy modeli i ceny od dostawcy"/>
+                    <ToggleButton x:Name="FiltersToggle" Content="Filtry modeli" Padding="10,2" HorizontalAlignment="Left"
+                                  Visibility="{Binding HasFilters, ElementName=Picker, Converter={StaticResource BoolToVis}}"/>
+                </DockPanel>
                 <views:ModelFilterBar Margin="0,0,0,4"
                                       Visibility="{Binding IsChecked, ElementName=FiltersToggle, Converter={StaticResource BoolToVis}}"/>
                 <ListBox x:Name="List" MaxHeight="260" HorizontalContentAlignment="Stretch"

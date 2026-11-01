@@ -16,12 +16,19 @@ public partial class ModelPicker : UserControl
         DependencyProperty.Register(nameof(Header), typeof(string), typeof(ModelPicker));
     public static readonly DependencyProperty HasFiltersProperty =
         DependencyProperty.Register(nameof(HasFilters), typeof(bool), typeof(ModelPicker));
+    public static readonly DependencyProperty ReloadCommandProperty =
+        DependencyProperty.Register(nameof(ReloadCommand), typeof(ICommand), typeof(ModelPicker),
+            new PropertyMetadata(null, (d, e) => ((ModelPicker)d).ReloadButton.Visibility =
+                e.NewValue is null ? Visibility.Collapsed : Visibility.Visible));
 
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public object? SelectedItem { get => GetValue(SelectedItemProperty); set => SetValue(SelectedItemProperty, value); }
     public string? Header { get => (string?)GetValue(HeaderProperty); set => SetValue(HeaderProperty, value); }
     // Pokazuje przycisk panelu filtrów (filtry działają na DataContext rodzica, czyli MainViewModel)
     public bool HasFilters { get => (bool)GetValue(HasFiltersProperty); set => SetValue(HasFiltersProperty, value); }
+
+    // Odświeża listy modeli z dostawcy (IAiProvider.ReloadAsync); bez komendy przycisk jest ukryty
+    public ICommand? ReloadCommand { get => (ICommand?)GetValue(ReloadCommandProperty); set => SetValue(ReloadCommandProperty, value); }
 
     public ModelPicker()
     {

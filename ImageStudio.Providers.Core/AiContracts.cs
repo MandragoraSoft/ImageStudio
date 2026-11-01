@@ -73,3 +73,8 @@ public sealed record ModelPricing(
     // Cena jednego wyniku do szacunku kosztu; null, gdy cena jest za tokeny
     public decimal? PerResult => Unit == TokenUnit ? null : PriceNow;
 }
+
+// Katalog dostawcy pobrany jednym wywołaniem ReloadAsync. Część katalogu, której nie udało się pobrać, jest null
+// (aplikacja zostawia wtedy poprzednią listę), a przyczyna trafia do Warnings. Pricing bywa pusty (modele bez cen)
+public sealed record ProviderCatalog(ImageModels? Image, IReadOnlyList<ImageModelInfo>? Video, IReadOnlyList<ChatModelInfo>? Chat,
+                                     IReadOnlyDictionary<string, ModelPricing> Pricing, IReadOnlyList<string> Warnings);

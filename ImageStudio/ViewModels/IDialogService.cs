@@ -28,7 +28,8 @@ public interface IDialogService
     string? ChooseSaveFile(string suggestedFileName);
     void CopyImage(BitmapSource image);
     BitmapSource? GetClipboardImage();
-    SettingsResult? ShowSettings(SettingsResult current);
+// loadTextModels (opcjonalny) odświeża listę modeli tekstowych dostawcy według ustawień wpisanych w oknie
+    SettingsResult? ShowSettings(SettingsResult current, Func<SettingsResult, Task<IReadOnlyList<string>>>? loadTextModels = null);
     // prompt: podgląd w oknie; suggest (opcjonalny) proponuje nazwę i opis przez AI
     PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null);
 
