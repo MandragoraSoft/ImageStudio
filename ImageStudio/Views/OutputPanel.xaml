@@ -114,7 +114,43 @@
                                 </StackPanel.ContextMenu>
                                 <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                                         BorderThickness="1" CornerRadius="6" Height="96" Padding="4">
-                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                    <Grid>
+                                        <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                        <!-- Wideo bez miniatury (np. brak kodeka): ikona zamiast pustego pola -->
+                                        <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="30" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding IsVideo}" Value="True"/>
+                                                                <Condition Binding="{Binding Thumbnail}" Value="{x:Null}"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <!-- Znaczek odtwarzania w rogu miniatury wideo -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="10" Width="20" Height="20"
+                                                Background="#99000000">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="9" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
                                 </Border>
                                 <TextBlock Text="{Binding CostLabel}" FontFamily="Consolas" Margin="0,4,0,0"/>
                                 <TextBlock Text="{Binding KindLabel}" Style="{StaticResource MutedTextBlock}"/>

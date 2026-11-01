@@ -146,6 +146,7 @@ public sealed partial class MainViewModel
                 Kind = "video",
                 Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? $" · {attachments.Count} zał." : ""),
                 FilePath = path,
+                Thumbnail = GalleryStore.Thumbnail(path),
                 CostUsd = result.CostUsd ?? estimate,
                 CostEstimated = result.CostUsd is null && estimate is not null,
             });
