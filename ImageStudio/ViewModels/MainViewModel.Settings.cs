@@ -34,9 +34,9 @@ public sealed partial class MainViewModel
     {
         // Do okna idą tylko sekrety z SecretStore: wartość ze zmiennej środowiskowej nie może trafić do pliku
         var current = new SettingsResult(_settings.BaseUrl, _settings.MarketUrl, _settings.MaxSide,
-                                         SecretStore.Load() ?? "", _settings.Theme, _settings.ProviderId,
-                                         SecretStore.Load("openrouter") ?? "",
-                                         _settings.OpenAiBaseUrl, SecretStore.Load("openai") ?? "",
+                                         _secrets.Load() ?? "", _settings.Theme, _settings.ProviderId,
+                                         _secrets.Load("openrouter") ?? "",
+                                         _settings.OpenAiBaseUrl, _secrets.Load("openai") ?? "",
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
                                          ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
                                          EnhancerModels.ToList());
@@ -49,11 +49,11 @@ public sealed partial class MainViewModel
             _prefs.For(id).DefaultTextModel = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
         _prefs.Save();
 
-        AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
+        _settingsStore.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
                          result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
         var previous = _settings;
-        _settings = AppSettings.Load();
-        if (_settings.Theme != previous.Theme) ThemeService.Apply(result.Theme);
+        _settings = _settingsStore.Load();
+        if (_settings.Theme != previous.Theme) _themes.Apply(result.Theme);
 
         // Zmiana samego motywu lub preferencji nie wymaga nowego providera ani ponownego pobierania list modeli
         if (_settings with { Theme = "" } == previous with { Theme = "" })
@@ -64,12 +64,12 @@ public sealed partial class MainViewModel
         }
 
         // Nowe ustawienia (także inny provider) = nowa instancja providera
-        await SwitchProviderAsync(ProviderRegistry.Create(result.ProviderId, _settings));
+        await SwitchProviderAsync(_providers.Create(result.ProviderId, _settings));
     }
 
     // Modele tekstowe dostawcy wybranego w oknie ustawień, pobrane z jeszcze niezapisanymi adresami i kluczami.
     // Zmienna środowiskowa z kluczem ma pierwszeństwo, tak jak przy zwykłym wczytaniu ustawień
-    private static async Task<IReadOnlyList<string>> LoadTextModelsAsync(SettingsResult draft)
+    private async Task<IReadOnlyList<string>> LoadTextModelsAsync(SettingsResult draft)
     {
         static string Key(string envVar, string typed) =>
             Environment.GetEnvironmentVariable(envVar) is { Length: > 0 } env ? env : typed;
@@ -77,7 +77,7 @@ public sealed partial class MainViewModel
         var settings = new AppSettings(draft.BaseUrl, draft.MarketUrl, draft.MaxSide, Key("UBERLLM_API_KEY", draft.ApiKey), draft.Theme,
                                        draft.ProviderId, Key("OPENROUTER_API_KEY", draft.OpenRouterKey), draft.OpenAiBaseUrl,
                                        Key("OPENAI_API_KEY", draft.OpenAiKey));
-        using var provider = ProviderRegistry.Create(draft.ProviderId, settings);
+        using var provider = _providers.Create(draft.ProviderId, settings);
         return (await provider.GetChatModelsAsync()).Select(m => m.Id).ToList();
     }
 
@@ -118,7 +118,7 @@ public sealed partial class MainViewModel
                                            SelectedEnhancerModel is null ? null : SuggestPresetDraftAsync);
         if (draft is null) return;
 
-        PresetStore.Create(CapturePreset(draft));
+        _presetStore.Create(CapturePreset(draft));
         PresetDirty = false;
         Status = $"Zapisano zestaw: {draft.Name}";
     }

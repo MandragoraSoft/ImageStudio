@@ -2,16 +2,18 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Windows;
+using ImageStudio.Composition;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ImageStudio;
 
 public partial class App : Application
 {
-    private MainViewModel? _viewModel;
+    private IServiceProvider? _services;
 
     // Biblioteki dostawców i zakładek leżą w podfolderach providers\ i tabs\ (patrz ImageStudio.csproj);
     // domyślny kontekst ich nie widzi sam
@@ -29,10 +31,11 @@ public partial class App : Application
         };
     }
 
-    // Zapis wyborów modeli i parametrów przy zamykaniu
+    // Zapis wyborów modeli i parametrów przy zamykaniu. Kontener nie jest zwalniany jawnie: proces się kończy,
+    // a McpToolHost zamyka MainViewModel.Shutdown (kontener zgłasza błąd przy synchronicznym Dispose usług IAsyncDisposable)
     protected override void OnExit(ExitEventArgs e)
     {
-        _viewModel?.Shutdown();
+        _services?.GetService<MainViewModel>()?.Shutdown();
         base.OnExit(e);
     }
 
@@ -40,13 +43,15 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var settings = AppSettings.Load();
-        ThemeService.Apply(settings.Theme);
-        var provider = ProviderRegistry.Create(settings.ProviderId, settings);
-        var downloads = new ImageDownloadService();
-        var viewModel = new MainViewModel(provider, new WpfDialogService(), downloads, settings);
-        _viewModel = viewModel;
-        var window = new MainWindow { DataContext = viewModel };
+        var services = new ServiceCollection().AddImageStudioCore().AddImageStudioInfrastructure()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+        _services = services;
+
+        WindowMemory.Store = services.GetRequiredService<IWindowStateStore>();
+        services.GetRequiredService<IThemeService>().Apply(services.GetRequiredService<AppSettings>().Theme);
+
+        var window = services.GetRequiredService<MainWindow>();
+        var viewModel = services.GetRequiredService<MainViewModel>();
         window.Loaded += async (_, _) => await viewModel.InitializeAsync();
         window.Show();
     }

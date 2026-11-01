@@ -8,10 +8,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
-using ImageStudio.Tabs.Chat;
-using ImageStudio.Tabs.Edit;
-using ImageStudio.Tabs.Generate;
-using ImageStudio.Tabs.Video;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -35,10 +31,19 @@ public sealed partial class MainViewModel : ObservableObject
 
     private IAiProvider _provider;
     private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
+    private readonly IProviderFactory _providers;
+    private readonly IThemeService _themes;
     private readonly IDialogService _dialogs;
     private readonly ImageDownloadService _downloads;
+    private readonly ISettingsStore _settingsStore;
+    private readonly IUserStateStore _stateStore;
+    private readonly IGalleryStore _galleryStore;
+    private readonly IPresetStore _presetStore;
+    private readonly ISecretStore _secrets;
+    private readonly McpToolHost _toolHost;
+    private readonly McpOptions _mcp;
     private readonly UserState _state;
-    private readonly ModelPreferences _prefs = ModelPreferences.Load();
+    private readonly ModelPreferences _prefs;
     private readonly Dictionary<string, ChatModelInfo> _chatModels = [];
     private AppSettings _settings;
 
@@ -105,20 +110,29 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _preferredOnly;
 
-    // Zakładki lewego panelu: wbudowane (Generowanie, Edycja, Wideo, Czat) plus wstrzyknięte w konstruktorze
-    public IReadOnlyList<IMainTab> Tabs { get; }
-
-    public MainViewModel(IAiProvider provider, IDialogService dialogs,
-                         ImageDownloadService downloads, AppSettings settings,
-                         IEnumerable<IMainTab>? extraTabs = null)
+    // Wszystkie zależności przychodzą z kontenera DI (patrz Composition/ServiceCollectionExtensions)
+    public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
+                         ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
+                         IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
+                         ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes)
     {
         _provider = provider;
+        _providers = providers;
         _dialogs = dialogs;
         _downloads = downloads;
         _settings = settings;
+        _settingsStore = settingsStore;
+        _stateStore = stateStore;
+        _galleryStore = galleryStore;
+        _presetStore = presetStore;
+        _secrets = secrets;
+        _prefs = prefs;
+        _toolHost = toolHost;
+        _mcp = mcp;
+        _themes = themes;
 
         // Ostatnio wpisane prompty i wybory wracają po uruchomieniu
-        _state = UserState.Load();
+        _state = _stateStore.Load();
         GeneratePrompt = _state.GeneratePrompt ?? "";
         GenerateSystemPrompt = _state.GenerateSystemPrompt ?? "";
         EditPrompt = _state.EditPrompt ?? "";
@@ -129,17 +143,14 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedQuality = _state.Quality ?? "auto";
         var appTools = new AppControlTools(this, _dialogs.ConfirmToolCall);
         var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
-                                            _state.McpServerPort ?? AppServerViewModel.DefaultPort);
-        Tools = new ToolsViewModel(new McpToolHost(), _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
-                                   null, appTools, _state.AppControlEnabled, server);
+                                            _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
+        Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
+                                   _mcp.ConfigPath, appTools, _state.AppControlEnabled, server);
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
                                  Tools, _dialogs.ConfirmToolCall,
                                  new ChatImageSupport(_dialogs,
                                                       id => _chatModels.TryGetValue(id, out var info) ? info.AcceptsImage : null,
                                                       () => _settings.MaxSide));
-
-        Tabs = new IMainTab[] { new GenerateTab(this), new EditTab(this), new VideoTab(this), new ChatTab(Chat) }
-            .Concat(extraTabs ?? []).OrderBy(t => t.Order).ToList();
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
@@ -152,7 +163,7 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(VideoHint));
         };
 
-        foreach (var entry in GalleryStore.Load()) Gallery.Add(entry);
+        foreach (var entry in _galleryStore.Load()) Gallery.Add(entry);
     }
 
     // Listy z /v1/models wraz z cenami; widoki stosują filtry
@@ -404,7 +415,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.Quality = SelectedQuality;
         foreach (var p in EnhancerParameters)
             _state.EnhancerParams[p.Key] = new ParamState { Enabled = p.Enabled, Value = p.Value };
-        _state.Save();
+        _stateStore.Save(_state);
     }
 
     // Status i log błędów z czatu (czat nie zna paska stanu ani loggera)

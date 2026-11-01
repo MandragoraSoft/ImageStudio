@@ -21,8 +21,10 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     private bool _silent;
 
     // token: dostarcza (i przy pierwszym użyciu tworzy) sekret serwera; w aplikacji to SecretStore
-    public AppServerViewModel(McpAppServer server, IDialogService dialogs, bool enabled, int port, Func<string>? token = null)
+    public AppServerViewModel(McpAppServer server, IDialogService dialogs, bool enabled, int port, Func<string>? token = null,
+                              ISecretStore? secrets = null)
     {
+        _secrets = secrets ?? new FileSecretStore();
         _server = server;
         _dialogs = dialogs;
         _token = token ?? StoredToken;
@@ -102,13 +104,15 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
 
     public ValueTask DisposeAsync() => _server.DisposeAsync();
 
+    private readonly ISecretStore _secrets;
+
     // Token przechowywany szyfrowanie (DPAPI) obok kluczy API; tworzony losowo przy pierwszym użyciu
-    private static string StoredToken()
+    private string StoredToken()
     {
-        if (SecretStore.Load("mcp-server") is { Length: > 0 } existing) return existing;
+        if (_secrets.Load("mcp-server") is { Length: > 0 } existing) return existing;
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        SecretStore.Save(token, "mcp-server");
+        _secrets.Save(token, "mcp-server");
         return token;
     }
 }

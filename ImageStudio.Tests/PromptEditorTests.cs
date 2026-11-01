@@ -9,7 +9,7 @@ public sealed class PromptEditorTests
     private static (MainViewModel Vm, FakeDialogs Dialogs) Create()
     {
         var dialogs = new FakeDialogs();
-        var vm = new MainViewModel(new FakeProvider(), dialogs, new ImageDownloadService(), AppSettings.Load());
+        var vm = TestApp.CreateVm(dialogs: dialogs);
         return (vm, dialogs);
     }
 
@@ -70,10 +70,8 @@ public sealed class PromptEditorTests
                 return new PromptParts("styl: foto", concept + ", złote światło");
             };
             var dialogs = new FakeDialogs();
-            var vm = new MainViewModel(provider, dialogs, new ImageDownloadService(), AppSettings.Load())
-            {
-                GeneratePrompt = "kot",
-            };
+            var vm = TestApp.CreateVm(provider, dialogs);
+            vm.GeneratePrompt = "kot";
             vm.EnhancerModels.Add("m");
             vm.SelectedEnhancerModel = "m";
 

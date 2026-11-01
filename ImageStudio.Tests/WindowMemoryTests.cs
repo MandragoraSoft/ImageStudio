@@ -35,13 +35,13 @@ public sealed class WindowMemoryTests
     {
         WpfHost.Run(() =>
         {
+            WindowMemory.Store = new MemoryWindowStateStore();
             var first = NewSettings();
             first.Show();
             first.Width = 710;
             first.Height = 530;
             first.Close();
 
-            WindowStateStore.Reload();  // jak po ponownym uruchomieniu aplikacji
             var second = NewSettings();
             second.Show();
             Flush(second.Dispatcher);
@@ -57,7 +57,8 @@ public sealed class WindowMemoryTests
     {
         WpfHost.Run(() =>
         {
-            WindowStateStore.SetWindow(typeof(PresetSaveWindow).FullName!, new WindowRecord(0, 0, 123, 456, false));
+            WindowMemory.Store = new MemoryWindowStateStore();
+            WindowMemory.Store.SetWindow(typeof(PresetSaveWindow).FullName!, new WindowRecord(0, 0, 123, 456, false));
 
             var window = new PresetSaveWindow { DataContext = new PresetSaveViewModel("x"), ShowInTaskbar = false };
             window.Show();
@@ -73,7 +74,8 @@ public sealed class WindowMemoryTests
     {
         WpfHost.Run(() =>
         {
-            WindowStateStore.SetColumn("Test.Column", 412);
+            WindowMemory.Store = new MemoryWindowStateStore();
+            WindowMemory.Store.SetColumn("Test.Column", 412);
             var grid = new Grid();
             var column = new ColumnDefinition { Width = new GridLength(390) };
             grid.ColumnDefinitions.Add(column);

@@ -15,8 +15,7 @@ public sealed class UserDataCollection
 [Collection(UserDataCollection.Name)]
 public sealed class UiFlowTests
 {
-    private static MainViewModel Create(FakeDialogs dialogs) =>
-        new(new FakeProvider(), dialogs, new ImageDownloadService(), AppSettings.Load());
+    private static MainViewModel Create(FakeDialogs dialogs) => TestApp.CreateVm(dialogs: dialogs);
 
     [Fact]
     public void Busy_change_refreshes_video_and_paste_commands()
@@ -106,8 +105,9 @@ public sealed class UiFlowTests
     {
         Sta.Run(() =>
         {
-            PresetStore.Create(new Preset { Name = "szczegoly", Kind = "generate", Prompt = "p" });
-            var vm = new PresetsViewModel(new FakeDialogs());
+            using var app = TestApp.Create();
+            app.Presets.Create(new Preset { Name = "szczegoly", Kind = "generate", Prompt = "p" });
+            var vm = app.NewPresetsViewModel();
             vm.SelectedPreset = vm.Presets.First(p => p.Name == "szczegoly");
             Assert.False(vm.SaveDetailsCommand.CanExecute(null));
 

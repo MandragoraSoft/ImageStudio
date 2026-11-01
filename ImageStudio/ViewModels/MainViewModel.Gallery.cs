@@ -54,7 +54,7 @@ public sealed partial class MainViewModel
     {
         Gallery.Insert(0, entry);
         while (Gallery.Count > GalleryStore.MaxEntries) Gallery.RemoveAt(Gallery.Count - 1);
-        GalleryStore.Save(Gallery);
+        _galleryStore.Save(Gallery);
         OnPropertyChanged(nameof(GalleryTotalLabel));
     }
 
@@ -64,7 +64,7 @@ public sealed partial class MainViewModel
     {
         Gallery.Clear();
         SelectedGalleryEntry = null;
-        GalleryStore.Save(Gallery);
+        _galleryStore.Save(Gallery);
         OnPropertyChanged(nameof(GalleryTotalLabel));
         Status = "Wyczyszczono galerię (pliki obrazów zostały w folderze zapisów).";
     }

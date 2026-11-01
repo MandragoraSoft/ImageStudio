@@ -12,6 +12,10 @@ namespace ImageStudio.Views;
 //  - WindowMemory.ColumnKey na ColumnDefinition: szerokość kolumny (np. lewego panelu) po przeciągnięciu GridSplittera.
 public static class WindowMemory
 {
+    // Magazyn rozmiarów; zachowanie jest tworzone przez XAML (bez konstruktora z DI), więc composition root podmienia tę
+    // właściwość przy starcie (testy: magazyn w pamięci)
+    public static IWindowStateStore Store { get; set; } = new FileWindowStateStore();
+
     private const double MinVisibleTitle = 40;
 
     public static readonly DependencyProperty RememberProperty =
@@ -44,7 +48,7 @@ public static class WindowMemory
 
     private static void Restore(Window window)
     {
-        if (WindowStateStore.GetWindow(KeyOf(window)) is not { } record) return;
+        if (Store.GetWindow(KeyOf(window)) is not { } record) return;
 
         var work = SystemParameters.WorkArea;
         if (Resizable(window))
@@ -74,9 +78,10 @@ public static class WindowMemory
         var bounds = window.WindowState == WindowState.Normal
             ? new Rect(window.Left, window.Top, window.Width, window.Height)
             : window.RestoreBounds;
-        if (bounds.IsEmpty || double.IsNaN(bounds.Width)) return;
+        if (bounds.IsEmpty || !double.IsFinite(bounds.Left) || !double.IsFinite(bounds.Top)
+            || !double.IsFinite(bounds.Width) || !double.IsFinite(bounds.Height)) return;
 
-        WindowStateStore.SetWindow(KeyOf(window),
+        Store.SetWindow(KeyOf(window),
             new WindowRecord(bounds.Left, bounds.Top, bounds.Width, bounds.Height, window.WindowState == WindowState.Maximized));
     }
 
@@ -84,7 +89,7 @@ public static class WindowMemory
     {
         if (d is not ColumnDefinition column || e.NewValue is not string key) return;
 
-        if (WindowStateStore.GetColumn(key) is { } saved)
+        if (Store.GetColumn(key) is { } saved)
             column.Width = new GridLength(Math.Clamp(saved, Math.Max(column.MinWidth, 150), SystemParameters.WorkArea.Width - 300));
 
         // GridSplitter zmienia Width kolumny; zapis z opóźnieniem, żeby nie pisać pliku przy każdym pikselu przeciągania
@@ -92,7 +97,7 @@ public static class WindowMemory
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            if (column.ActualWidth > 0) WindowStateStore.SetColumn(key, column.ActualWidth);
+            if (column.ActualWidth > 0) Store.SetColumn(key, column.ActualWidth);
         };
         DependencyPropertyDescriptor.FromProperty(ColumnDefinition.WidthProperty, typeof(ColumnDefinition))
             .AddValueChanged(column, (_, _) =>

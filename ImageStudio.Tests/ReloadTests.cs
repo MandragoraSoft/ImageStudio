@@ -38,7 +38,7 @@ public sealed class ReloadTests
                 VideoCatalog = [Info("v1"), Info("v2")],
                 ChatCatalog = [new ChatModelInfo("chat", [])],
             };
-            var vm = new MainViewModel(provider, new FakeDialogs(), new ImageDownloadService(), AppSettings.Load());
+            var vm = TestApp.CreateVm(provider: provider);
             vm.InitializeAsync().GetAwaiter().GetResult();
             vm.SelectedModel = vm.Models.Single(m => m.Id == "b");
             vm.SelectedVideoModel = vm.VideoModels.Single(m => m.Id == "v2");
@@ -63,7 +63,7 @@ public sealed class ReloadTests
         Sta.Run(() =>
         {
             var provider = new FakeProvider { ImageCatalog = new ImageModels([Info("a")], [Info("e")]) };
-            var vm = new MainViewModel(provider, new FakeDialogs(), new ImageDownloadService(), AppSettings.Load());
+            var vm = TestApp.CreateVm(provider: provider);
             vm.InitializeAsync().GetAwaiter().GetResult();
 
             provider.ImageCatalog = null;  // następne pobranie modeli obrazów kończy się błędem

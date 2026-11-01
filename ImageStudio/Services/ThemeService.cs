@@ -7,6 +7,17 @@ using Microsoft.Win32;
 namespace ImageStudio.Services;
 
 // Motyw: zmienia kolory istniejących pędzli w App.xaml, więc całe UI przechodzi naraz
+// Motyw za interfejsem: ViewModel nie woła statycznej klasy WPF (testy podstawiają atrapę)
+public interface IThemeService
+{
+    void Apply(string theme);
+}
+
+public sealed class WpfThemeService : IThemeService
+{
+    public void Apply(string theme) => ThemeService.Apply(theme);
+}
+
 public static class ThemeService
 {
     public const string System = "system";

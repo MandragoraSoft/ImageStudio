@@ -34,10 +34,14 @@ public sealed partial class PresetsViewModel : ObservableObject
     public event Action? CloseRequested;
 
     private readonly IDialogService _dialogs;
+    private readonly IPresetStore _presets;
+    private readonly LegacyPromptImporter _importer;
 
-    public PresetsViewModel(IDialogService dialogs)
+    public PresetsViewModel(IDialogService dialogs, IPresetStore presets, LegacyPromptImporter importer)
     {
         _dialogs = dialogs;
+        _presets = presets;
+        _importer = importer;
         Reload(null);
     }
 
@@ -54,7 +58,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     private void Reload(string? selectFilePath)
     {
         Presets.Clear();
-        foreach (var preset in PresetStore.LoadAll()) Presets.Add(preset);
+        foreach (var preset in _presets.LoadAll()) Presets.Add(preset);
         SelectedPreset = Presets.FirstOrDefault(p => p.FilePath == selectFilePath) ?? Presets.FirstOrDefault();
     }
 
@@ -84,7 +88,7 @@ public sealed partial class PresetsViewModel : ObservableObject
 
         SelectedPreset.Name = name;
         SelectedPreset.Description = EditDescription.Trim();
-        PresetStore.Save(SelectedPreset);
+        _presets.Save(SelectedPreset);
         Reload(SelectedPreset.FilePath);
         Status = "Zapisano nazwę i opis.";
     }
@@ -93,7 +97,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     [RelayCommand]
     private void ImportLegacy()
     {
-        var result = LegacyPromptImporter.Import();
+        var result = _importer.Import();
         if (!result.FileFound)
         {
             Status = "Nie znaleziono starej historii (prompts.json).";
@@ -111,7 +115,7 @@ public sealed partial class PresetsViewModel : ObservableObject
 
         if (!_dialogs.Confirm($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu")) return;
 
-        PresetStore.Delete(SelectedPreset);
+        _presets.Delete(SelectedPreset);
         Reload(null);
         Status = "Usunięto zestaw.";
     }

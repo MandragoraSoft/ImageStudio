@@ -53,7 +53,7 @@ public sealed partial class MainViewModel
     private IReadOnlyList<PromptRevision>? _generateHistory;
     private IReadOnlyList<PromptRevision>? _editHistory;
 
-    private static List<Preset> PresetsOfKind(string kind) => PresetStore.LoadAll().Where(p => p.Kind == kind).ToList();
+    private List<Preset> PresetsOfKind(string kind) => _presetStore.LoadAll().Where(p => p.Kind == kind).ToList();
 
     [RelayCommand]
     private void EditGeneratePrompt() =>
@@ -81,7 +81,7 @@ public sealed partial class MainViewModel
         var wasDirty = PresetDirty;
         Preset? saved = null;
         var edit = _dialogs.ShowPromptEditor(title, initial, RebuildPromptAsync, this, PresetsOfKind(kind),
-                                             preset => { PresetStore.Save(preset); saved = preset; }, describe);
+                                             preset => { _presetStore.Save(preset); saved = preset; }, describe);
         if (edit is null) return;
 
         apply(edit);

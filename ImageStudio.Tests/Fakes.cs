@@ -98,7 +98,9 @@ internal sealed class FakeDialogs : IDialogService
     public IReadOnlyList<ISettingsTab>? LastSettingsTabs { get; private set; }
     public SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs) =>
         (LastSettingsTabs = tabs) is not null && SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
-    public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) => throw new NotSupportedException();
+    public Func<string, string, PresetDraft?>? SavePresetAnswer { get; set; }
+    public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) =>
+        SavePresetAnswer is { } answer ? answer(defaultName, prompt) : throw new NotSupportedException();
     public PromptEdit? PromptEditResult { get; set; }
     public Func<Task<string>>? LastDescribe { get; private set; }
     public ImageStudio.Configuration.Preset? OverwritePreset { get; set; }

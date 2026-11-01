@@ -5,13 +5,13 @@ namespace ImageStudio.Tests;
 
 public sealed class PresetsViewModelTests
 {
-    private static (PresetsViewModel Vm, FakeDialogs Dialogs) Create(string name)
+    private static (TestApp App, PresetsViewModel Vm) Create(string name)
     {
-        PresetStore.Create(new Preset { Name = name, Kind = "generate", Prompt = "p" });
-        var dialogs = new FakeDialogs();
-        var vm = new PresetsViewModel(dialogs);
+        var app = TestApp.Create();
+        app.Presets.Create(new Preset { Name = name, Kind = "generate", Prompt = "p" });
+        var vm = app.NewPresetsViewModel();
         vm.SelectedPreset = vm.Presets.First(p => p.Name == name);
-        return (vm, dialogs);
+        return (app, vm);
     }
 
     [Fact]
@@ -19,9 +19,13 @@ public sealed class PresetsViewModelTests
     {
         Sta.Run(() =>
         {
-            var (vm, _) = Create("do-usuniecia");
+            var (app, vm) = Create("do-usuniecia");
+            using var _ = app;
+
             vm.DeletePresetCommand.Execute(null);
+
             Assert.DoesNotContain(vm.Presets, p => p.Name == "do-usuniecia");
+            Assert.DoesNotContain(app.Presets.Presets, p => p.Name == "do-usuniecia");
         });
     }
 
@@ -30,10 +34,14 @@ public sealed class PresetsViewModelTests
     {
         Sta.Run(() =>
         {
-            var (vm, dialogs) = Create("zostaje");
-            dialogs.ConfirmAnswer = false;
+            var (app, vm) = Create("zostaje");
+            using var _ = app;
+            app.Dialogs.ConfirmAnswer = false;
+
             vm.DeletePresetCommand.Execute(null);
+
             Assert.Contains(vm.Presets, p => p.Name == "zostaje");
+            Assert.Contains(app.Presets.Presets, p => p.Name == "zostaje");
         });
     }
 }
@@ -45,13 +53,13 @@ public sealed class PromptEditorPresetStateTests
     {
         Sta.Run(() =>
         {
-            var dialogs = new FakeDialogs();
-            var vm = new MainViewModel(new FakeProvider(), dialogs, new ImageStudio.Services.ImageDownloadService(), AppSettings.Load());
+            using var app = TestApp.Create();
+            var vm = app.Vm;
             vm.InitializeAsync().GetAwaiter().GetResult();
             vm.PresetDirty = false;
-            var preset = PresetStore.Create(new Preset { Name = "p", Kind = "generate" });
-            dialogs.PromptEditResult = new PromptEdit("sys", "koncept");
-            dialogs.OverwritePreset = preset;
+            var preset = app.Presets.Create(new Preset { Name = "p", Kind = "generate" });
+            app.Dialogs.PromptEditResult = new PromptEdit("sys", "koncept");
+            app.Dialogs.OverwritePreset = preset;
 
             vm.EditGeneratePromptCommand.Execute(null);
 
@@ -65,11 +73,11 @@ public sealed class PromptEditorPresetStateTests
     {
         Sta.Run(() =>
         {
-            var dialogs = new FakeDialogs();
-            var vm = new MainViewModel(new FakeProvider(), dialogs, new ImageStudio.Services.ImageDownloadService(), AppSettings.Load());
+            using var app = TestApp.Create();
+            var vm = app.Vm;
             vm.InitializeAsync().GetAwaiter().GetResult();
             vm.PresetDirty = false;
-            dialogs.PromptEditResult = new PromptEdit("sys", "inny");
+            app.Dialogs.PromptEditResult = new PromptEdit("sys", "inny");
 
             vm.EditGeneratePromptCommand.Execute(null);
 

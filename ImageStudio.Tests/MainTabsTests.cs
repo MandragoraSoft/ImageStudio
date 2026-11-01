@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using ImageStudio.Services;
+using Microsoft.Extensions.DependencyInjection;
 using ImageStudio.ViewModels;
 using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
@@ -19,9 +19,6 @@ public sealed class MainTabsTests
         public object Content => new object();
     }
 
-    private static MainViewModel Vm(params IMainTab[] extra) =>
-        new(new FakeProvider(), new FakeDialogs(), new ImageDownloadService(), ImageStudio.Configuration.AppSettings.Load(), extra);
-
     private static IEnumerable<T> FindAll<T>(DependencyObject root) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
@@ -37,11 +34,12 @@ public sealed class MainTabsTests
     {
         Sta.Run(() =>
         {
-            var vm = Vm(new UnknownTab());
+            using var app = TestApp.Create(services => services.AddSingleton<IMainTab>(new UnknownTab()));
+            var vm = app.Vm;
 
-            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Nieznana"], vm.Tabs.Select(t => t.Title));
-            Assert.Same(vm, ((GenerateTab)vm.Tabs[0]).Content);
-            Assert.Same(vm.Chat, ((ChatTab)vm.Tabs[3]).Content);
+            Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Nieznana"], app.Tabs.Select(t => t.Title));
+            Assert.Same(vm, ((GenerateTab)app.Tabs[0]).Content);
+            Assert.Same(vm.Chat, ((ChatTab)app.Tabs[3]).Content);
         });
     }
 
@@ -50,8 +48,10 @@ public sealed class MainTabsTests
     {
         WpfHost.Run(() =>
         {
-            var vm = Vm();
-            var window = new ImageStudio.MainWindow { DataContext = vm, ShowInTaskbar = false };
+            using var app = TestApp.Create();
+            var vm = app.Vm;
+            var window = app.Get<ImageStudio.MainWindow>();
+            window.ShowInTaskbar = false;
             window.Show();
             window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
@@ -82,12 +82,11 @@ public sealed class MainTabsTests
     {
         WpfHost.Run(() =>
         {
-            var vm = Vm(new UnknownTab());
-            var window = new ImageStudio.MainWindow { ShowInTaskbar = false };
+            using var app = TestApp.Create(services => services.AddSingleton<IMainTab>(new UnknownTab()));
 
-            var error = Assert.Throws<InvalidOperationException>(() => window.DataContext = vm);
+            var error = Assert.ThrowsAny<Exception>(() => app.Get<ImageStudio.MainWindow>());
 
-            Assert.Contains("nie ma widoku", error.Message);
+            Assert.Contains("nie ma widoku", (error.InnerException ?? error).Message + error.Message);
         });
     }
 }

@@ -22,10 +22,8 @@ public sealed class DescribeImagesTests : IDisposable
     {
         var dialogs = new FakeDialogs();
         var provider = new FakeProvider { OnChat = (_, _) => "  Kot siedzi na parapecie.  " };
-        var vm = new MainViewModel(provider, dialogs, new ImageDownloadService(), AppSettings.Load())
-        {
-            SelectedEnhancerModel = "vision-model",
-        };
+        var vm = TestApp.CreateVm(provider, dialogs);
+        vm.SelectedEnhancerModel = "vision-model";
         return (vm, dialogs, provider);
     }
 

@@ -103,7 +103,7 @@ public sealed class PromptEnhanceTests
                 Enhance = (_, _, concept) => new PromptParts("styl", concept + "+", "dopisano"),
             };
             var dialogs = new FakeDialogs();
-            var vm = new MainViewModel(provider, dialogs, new ImageDownloadService(), AppSettings.Load());
+            var vm = TestApp.CreateVm(provider: provider, dialogs: dialogs);
             vm.EnhancerModels.Add("m");
             vm.SelectedEnhancerModel = "m";
             vm.EditGeneratePromptCommand.Execute(null);

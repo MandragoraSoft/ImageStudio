@@ -8,7 +8,7 @@ using Microsoft.Win32;
 
 namespace ImageStudio.Views;
 
-public sealed class WpfDialogService : IDialogService
+public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter importer) : IDialogService
 {
     public string[]? PickImageFiles()
     {
@@ -84,7 +84,7 @@ public sealed class WpfDialogService : IDialogService
 
     public Preset? ShowPresets()
     {
-        var viewModel = new PresetsViewModel(this);
+        var viewModel = new PresetsViewModel(this, presets, importer);
         var window = new PresetsWindow { DataContext = viewModel, Owner = OwnerWindow() };
         viewModel.CloseRequested += window.Close;
         window.ShowDialog();
