@@ -8,8 +8,9 @@ public static class PasswordBoxBehavior
 {
     public static readonly DependencyProperty BoundPasswordProperty =
         DependencyProperty.RegisterAttached("BoundPassword", typeof(string), typeof(PasswordBoxBehavior),
-            // Domyślnie null: powiązanie pustego "" też jest zmianą i podpina PasswordChanged
-            new FrameworkPropertyMetadata(null, OnBoundPasswordChanged));
+            // Domyślnie null: powiązanie pustego "" też jest zmianą i podpina PasswordChanged.
+            // BindsTwoWayByDefault: bez tego binding bez jawnego Mode jest jednokierunkowy i wpisany klucz nie trafia do ViewModelu
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnBoundPasswordChanged));
 
     private static readonly DependencyProperty IsAttachedProperty =
         DependencyProperty.RegisterAttached("IsAttached", typeof(bool), typeof(PasswordBoxBehavior),

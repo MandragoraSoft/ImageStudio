@@ -72,4 +72,26 @@ public sealed class RegressionTests : IDisposable
             Assert.Equal("zapisany-klucz", box.Password);
         });
     }
+
+    [Fact]
+    public void PasswordBox_binding_writes_typed_key_back_to_the_view_model()
+    {
+        // przypadek z okna Ustawień: binding bez jawnego Mode, a klucz po wpisaniu znikał przy zapisie
+        Sta.Run(() =>
+        {
+            var vm = new ImageStudio.ViewModels.OpenRouterSettingsViewModel("");
+            var box = new PasswordBox();
+            System.Windows.Data.BindingOperations.SetBinding(box, PasswordBoxBehavior.BoundPasswordProperty,
+                new System.Windows.Data.Binding("ApiKey")
+                {
+                    Source = vm,
+                    UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged,
+                });
+
+            box.Password = "sk-or-sekret";
+            box.Password = "sk-or-sekret2";
+
+            Assert.Equal("sk-or-sekret2", vm.ApiKey);
+        });
+    }
 }
