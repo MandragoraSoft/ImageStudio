@@ -28,9 +28,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
+    <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
     <!-- Zakładki lewego panelu: osobne projekty, ich DLL-e trafiają do podfolderu tabs\ (jak dostawcy do providers\) -->
+    <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Video\ImageStudio.Tabs.Video.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tabs.Chat\ImageStudio.Tabs.Chat.csproj" Private="$(PluginsInBundle)" />
     <!-- Dostawcy: Private=false nie kopiuje ich do katalogu głównego; target niżej układa je w providers\ -->
     <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" Private="$(PluginsInBundle)" />
   </ItemGroup>
 
