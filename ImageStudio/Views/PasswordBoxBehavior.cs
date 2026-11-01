@@ -8,7 +8,8 @@ public static class PasswordBoxBehavior
 {
     public static readonly DependencyProperty BoundPasswordProperty =
         DependencyProperty.RegisterAttached("BoundPassword", typeof(string), typeof(PasswordBoxBehavior),
-            new FrameworkPropertyMetadata(string.Empty, OnBoundPasswordChanged));
+            // Domyślnie null: powiązanie pustego "" też jest zmianą i podpina PasswordChanged
+            new FrameworkPropertyMetadata(null, OnBoundPasswordChanged));
 
     private static readonly DependencyProperty IsAttachedProperty =
         DependencyProperty.RegisterAttached("IsAttached", typeof(bool), typeof(PasswordBoxBehavior),
@@ -34,7 +35,8 @@ public static class PasswordBoxBehavior
 
         // Zmiana z ViewModelu: aktualizujemy pole, chyba że to echo z PasswordChanged
         if ((bool)d.GetValue(IsUpdatingProperty)) return;
-        if (box.Password != (string)e.NewValue) box.Password = (string)e.NewValue;
+        var value = (string?)e.NewValue ?? "";
+        if (box.Password != value) box.Password = value;
     }
 
     private static void OnPasswordChanged(object sender, RoutedEventArgs e)

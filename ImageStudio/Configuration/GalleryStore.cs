@@ -74,13 +74,21 @@ public static class GalleryStore
     {
         if (!File.Exists(path)) return null;
 
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.DecodePixelWidth = 120;
-        image.UriSource = new Uri(path);
-        image.EndInit();
-        image.Freeze();
-        return image;
+        // Wideo (.mp4) i uszkodzone pliki nie są obrazami; WIC rzuca NotSupportedException, miniatura wtedy zostaje pusta
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 120;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

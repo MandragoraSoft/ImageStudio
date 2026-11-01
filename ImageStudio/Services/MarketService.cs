@@ -9,7 +9,14 @@ public sealed record ModelPricing(
     decimal? DiscountPct,
     string? Unit,
     decimal? MarketOffers,
-    decimal? Requests24h);
+    decimal? Requests24h)
+{
+    // OpenRouter podaje cenę tokenów obrazu (za 1M tok), nie cenę za obraz
+    public const string TokenUnit = "1M tok";
+
+    // Cena jednego wyniku do szacunku kosztu; null, gdy cena jest za tokeny
+    public decimal? PerResult => Unit == TokenUnit ? null : PriceNow;
+}
 
 // Publiczny rynek cen: bez klucza API, bo to inny host niż api.uberllm.dev
 public sealed class MarketService : IDisposable

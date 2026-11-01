@@ -8,7 +8,8 @@ using System.Text.Json.Serialization;
 namespace ImageStudio.Services;
 
 // Atrybuty modelu z /v1/models, używane do filtrowania w UI
-public sealed record ImageModelInfo(string Id, string? OwnedBy, bool Nsfw, IReadOnlyList<string> InputModalities);
+public sealed record ImageModelInfo(string Id, string? OwnedBy, bool Nsfw, IReadOnlyList<string> InputModalities,
+                                    string? Description = null, IReadOnlyList<string>? OutputModalities = null);
 
 public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IReadOnlyList<ImageModelInfo> Edit);
 
@@ -86,7 +87,8 @@ public sealed class ImageGenerationService : IDisposable
                 Nsfw: model.TryGetProperty("nsfw", out var nsfw) && nsfw.ValueKind == JsonValueKind.True,
                 InputModalities: model.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array
                     ? inputs.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
-                    : []);
+                    : [],
+                Description: Describe(model));
 
             if (endpoints.Contains(GenerationPath)) generation.Add(info);
             if (endpoints.Contains(EditPath)) edit.Add(info);
@@ -94,6 +96,10 @@ public sealed class ImageGenerationService : IDisposable
 
         return new ImageModels(generation, edit);
     }
+
+    // Opis modelu z /v1/models, jeśli API go zwraca; brak = UI pokaże opis z atrybutów
+    private static string? Describe(JsonElement model) =>
+        model.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
 
     // Dostępne modele czatu (do ulepszania promptu) wraz z ich parametrami
     public async Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default)
@@ -228,7 +234,8 @@ public sealed class ImageGenerationService : IDisposable
                 Nsfw: m.TryGetProperty("nsfw", out var nsfw) && nsfw.ValueKind == JsonValueKind.True,
                 InputModalities: m.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array
                     ? inputs.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
-                    : []))
+                    : [],
+                Description: Describe(m)))
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

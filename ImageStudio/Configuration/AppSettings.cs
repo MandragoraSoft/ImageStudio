@@ -20,19 +20,21 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             .AddJsonFile(UserSettingsPath, optional: true)
             .Build();
 
-        var apiKey = Environment.GetEnvironmentVariable("UBERLLM_API_KEY") ?? SecretStore.Load() ?? "";
-
         return new AppSettings(
             BaseUrl: config["Uberllm:BaseUrl"]!,
             MarketUrl: config["Uberllm:MarketUrl"]!,
             MaxSide: int.Parse(config["Uberllm:MaxSide"]!),
-            ApiKey: apiKey,
+            ApiKey: Secret("UBERLLM_API_KEY", "uberllm"),
             Theme: config["Ui:Theme"] ?? "system",
             ProviderId: config["Ai:Provider"] ?? "uberllm",
-            OpenRouterKey: Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? SecretStore.Load("openrouter") ?? "",
+            OpenRouterKey: Secret("OPENROUTER_API_KEY", "openrouter"),
             OpenAiBaseUrl: config["OpenAi:BaseUrl"] ?? "https://api.openai.com",
-            OpenAiKey: Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? SecretStore.Load("openai") ?? "");
+            OpenAiKey: Secret("OPENAI_API_KEY", "openai"));
     }
+
+    // Gradacja sekretu: niepusta zmienna środowiskowa > zaszyfrowany SecretStore (DPAPI) > pusty
+    public static string Secret(string envVar, string name) =>
+        Environment.GetEnvironmentVariable(envVar) is { Length: > 0 } env ? env : SecretStore.Load(name) ?? "";
 
     // Adresy, limit wymiarów, motyw i provider trafiają do settings.json użytkownika, klucz do sekretów
     public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,

@@ -16,8 +16,16 @@ public static class SecretStore
         var path = FilePath(name);
         if (!File.Exists(path)) return null;
 
-        var plain = ProtectedData.Unprotect(File.ReadAllBytes(path), null, DataProtectionScope.CurrentUser);
-        return Encoding.UTF8.GetString(plain);
+        try
+        {
+            var plain = ProtectedData.Unprotect(File.ReadAllBytes(path), null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plain);
+        }
+        catch (CryptographicException)
+        {
+            // Plik z innego konta Windows lub uszkodzony: traktujemy jak brak klucza
+            return null;
+        }
     }
 
     public static void Save(string value, string name = "uberllm")

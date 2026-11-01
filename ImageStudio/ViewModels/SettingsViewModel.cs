@@ -48,5 +48,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         UberLlm = new UberLlmSettingsViewModel(current.BaseUrl, current.MarketUrl, current.ApiKey);
         OpenRouter = new OpenRouterSettingsViewModel(current.OpenRouterKey);
         OpenAi = new OpenAiSettingsViewModel(current.OpenAiBaseUrl, current.OpenAiKey);
+        foreach (var provider in new ProviderSettingsViewModel[] { UberLlm, OpenRouter, OpenAi })
+            provider.PreferredOnly = current.PreferredOnly?.GetValueOrDefault(provider.ProviderId) ?? false;
     }
 }

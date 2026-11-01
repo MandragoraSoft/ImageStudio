@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
 
@@ -27,10 +28,13 @@ public sealed partial class MainViewModel : ObservableObject
         ("1:1", 1.0), ("4:3", 4.0 / 3), ("3:2", 1.5), ("16:9", 16.0 / 9), ("9:16", 9.0 / 16),
     ];
 
+    private static readonly ILogger Log = AppLog.For<MainViewModel>();
+
     private IAiProvider _provider;
     private readonly IDialogService _dialogs;
     private readonly ImageDownloadService _downloads;
     private readonly UserState _state;
+    private readonly ModelPreferences _prefs = ModelPreferences.Load();
     private readonly Dictionary<string, ChatModelInfo> _chatModels = [];
     private AppSettings _settings;
 
@@ -127,7 +131,7 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EditCommand), nameof(AddReferencesCommand),
                                 nameof(CopyImageCommand), nameof(SaveImageAsCommand), nameof(OpenSettingsCommand),
                                 nameof(AddReferenceFromUrlCommand), nameof(EnhanceGeneratePromptCommand),
-                                nameof(EnhanceEditPromptCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand))]
+                                nameof(EnhanceEditPromptCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -165,6 +169,10 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _hideNsfw;
+
+    // Lista modeli: wszystkie albo tylko preferowane aktywnego dostawcy (zapis w models.json)
+    [ObservableProperty]
+    private bool _preferredOnly;
 
     public MainViewModel(IAiProvider provider, IDialogService dialogs,
                          ImageDownloadService downloads, AppSettings settings)
@@ -284,6 +292,13 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnInputImageOnlyChanged(bool value) => RefreshFilters();
     partial void OnHideNsfwChanged(bool value) => RefreshFilters();
 
+    partial void OnPreferredOnlyChanged(bool value)
+    {
+        _prefs.For(_provider.Id).PreferredOnly = value;
+        _prefs.Save();
+        RefreshFilters();
+    }
+
     private void RefreshFilters()
     {
         ModelsView.Refresh();
@@ -296,6 +311,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (HideNsfw && m.Nsfw) return false;
         if (InputImageOnly && !m.AcceptsImage) return false;
         if (SelectedProvider != AllProviders && m.OwnedBy != SelectedProvider) return false;
+        // Pusta lista preferowanych nie ukrywa wszystkiego: filtr działa dopiero po dodaniu pierwszego modelu
+        if (PreferredOnly && _prefs.For(_provider.Id) is { Preferred.Count: > 0 } prefs && !prefs.Preferred.Contains(m.Id))
+            return false;
         return string.IsNullOrWhiteSpace(SearchText)
                || m.Id.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
     }
@@ -303,6 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         Status = "Pobieranie listy modeli i cen...";
+        PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
         try
         {
             var models = await _provider.GetImageModelsAsync();
@@ -326,6 +345,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się pobrać modeli: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
 
         await LoadEnhancersAsync();
@@ -350,6 +370,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Bez modeli do ulepszania promptu: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
     }
 
@@ -405,8 +426,22 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Bez cen z rynku: {ex.Message}";
+            Log.LogError("{Message}", Status);
             return new Dictionary<string, ModelPricing>();
         }
+    }
+
+    // --- Przeglądarka modeli ---
+
+    [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
+    private void OpenModelBrowser()
+    {
+        var models = Models.Select(m => (m, "generowanie"))
+            .Concat(EditModels.Select(m => (m, "edycja")))
+            .Concat(VideoModels.Select(m => (m, "wideo")));
+        var viewModel = new ModelBrowserViewModel(_provider.DisplayName, models, _prefs.For(_provider.Id), _prefs);
+        _dialogs.ShowModelBrowser(viewModel);
+        RefreshFilters();
     }
 
     // --- Ustawienia ---
@@ -414,17 +449,23 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
     private async Task OpenSettingsAsync()
     {
+        // Do okna idą tylko sekrety z SecretStore: wartość ze zmiennej środowiskowej nie może trafić do pliku
         var current = new SettingsResult(_settings.BaseUrl, _settings.MarketUrl, _settings.MaxSide,
-                                         _settings.ApiKey, _settings.Theme, _settings.ProviderId, _settings.OpenRouterKey,
-                                         _settings.OpenAiBaseUrl, _settings.OpenAiKey);
+                                         SecretStore.Load() ?? "", _settings.Theme, _settings.ProviderId,
+                                         SecretStore.Load("openrouter") ?? "",
+                                         _settings.OpenAiBaseUrl, SecretStore.Load("openai") ?? "",
+                                         ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly));
         var result = _dialogs.ShowSettings(current);
         if (result is null) return;
+
+        foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())
+            _prefs.For(id).PreferredOnly = preferredOnly;
+        _prefs.Save();
 
         AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
                          result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
         ThemeService.Apply(result.Theme);
-        _settings = new AppSettings(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
-                                    result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
+        _settings = AppSettings.Load();
         // Nowe ustawienia (także inny provider) = nowa instancja providera; stara zostaje zwolniona
         _provider.Dispose();
         _provider = ProviderRegistry.Create(result.ProviderId, _settings);
@@ -638,6 +679,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się wczytać obrazu: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
     }
 
@@ -660,6 +702,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się pobrać obrazu: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
         finally
         {
@@ -703,6 +746,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się wkleić obrazu: {ex.Message}";
+            Log.LogError("{Message}", Status);
             return null;
         }
     }
@@ -786,6 +830,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Błąd ulepszania promptu: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
         finally
         {
@@ -813,7 +858,7 @@ public sealed partial class MainViewModel : ObservableObject
         SaveState();
         var prompt = Compose(GenerateSystemPrompt, GeneratePrompt);
         return RunAsync(() => _provider.GenerateImageAsync(SelectedModel!.Id, prompt, Size, CurrentImageOptions()),
-                        prompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PriceNow);
+                        prompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PerResult);
     }
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
@@ -826,7 +871,7 @@ public sealed partial class MainViewModel : ObservableObject
                                                   References.Select(r => r.Path).ToList());
             // Endpoint edycji nie respektuje rozmiaru, więc wynik dopasowujemy do wybranych proporcji lokalnie
             return edited with { Bytes = ImageFitter.FitTo(edited.Bytes, Width, Height) };
-        }, Compose(EditSystemPrompt, EditPrompt), SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PriceNow);
+        }, Compose(EditSystemPrompt, EditPrompt), SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PerResult);
     }
 
     // Seed i negative prompt tylko gdy podane; jakość "auto" = nie wysyłamy
@@ -849,6 +894,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się skopiować: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
     }
 
@@ -917,6 +963,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Błąd: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
         finally
         {
@@ -975,6 +1022,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Nie udało się wczytać załącznika: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
     }
 
@@ -1063,6 +1111,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Błąd wideo: {ex.Message}";
+            Log.LogError("{Message}", Status);
         }
         finally
         {
@@ -1131,7 +1180,8 @@ public sealed partial class MainViewModel : ObservableObject
         target.Clear();
         foreach (var info in infos.OrderBy(i => i.Id, StringComparer.OrdinalIgnoreCase))
             target.Add(new ModelOption(info.Id, info.OwnedBy, info.Nsfw, info.InputModalities,
-                                       pricing.GetValueOrDefault(info.Id)));
+                                       pricing.GetValueOrDefault(info.Id), info.Description,
+                                       info.OutputModalities));
     }
 
     private void FillProviders(IEnumerable<ImageModelInfo> infos)

@@ -255,6 +255,30 @@
         </Style>
 
         <!-- Pozycja modelu: nazwa, ikony zgodne z filtrami (obraz wejściowy, NSFW), cena wyrównana do prawej -->
+        <!-- Ikony możliwości modelu: wejścia (obraz, plik, audio, wideo), wyjście tekstowe, NSFW -->
+        <DataTemplate x:Key="ModelIconsTemplate" DataType="{x:Type vm:ModelOption}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE91B;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje obraz wejściowy"
+                           Visibility="{Binding AcceptsImage, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje pliki (np. PDF)"
+                           Visibility="{Binding AcceptsFile, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE720;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje audio"
+                           Visibility="{Binding AcceptsAudio, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje wideo"
+                           Visibility="{Binding AcceptsVideo, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D2;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextMutedBrush}" ToolTip="Zwraca też tekst"
+                           Visibility="{Binding ReturnsText, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7BA;" Margin="4,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource WarningBrush}" ToolTip="NSFW"
+                           Visibility="{Binding Nsfw, Converter={StaticResource BoolToVis}}"/>
+            </StackPanel>
+        </DataTemplate>
+
         <DataTemplate x:Key="ModelItemTemplate" DataType="{x:Type vm:ModelOption}">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -263,14 +287,8 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding Id}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE91B;" Margin="4,0,0,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource AccentBrush}" ToolTip="Przyjmuje obraz wejściowy"
-                               Visibility="{Binding AcceptsImage, Converter={StaticResource BoolToVis}}"/>
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7BA;" Margin="4,0,0,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource WarningBrush}" ToolTip="NSFW"
-                               Visibility="{Binding Nsfw, Converter={StaticResource BoolToVis}}"/>
-                </StackPanel>
+                <ContentControl Grid.Column="1" Margin="8,0,0,0" Content="{Binding}"
+                                ContentTemplate="{StaticResource ModelIconsTemplate}"/>
                 <TextBlock Grid.Column="2" Text="{Binding PriceText}" HorizontalAlignment="Right" VerticalAlignment="Center"
                            Margin="12,0,0,0" FontFamily="Consolas" Style="{StaticResource MutedTextBlock}"/>
             </Grid>

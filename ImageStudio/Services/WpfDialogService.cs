@@ -51,7 +51,13 @@ public sealed class WpfDialogService : IDialogService
             ? new SettingsResult(viewModel.UberLlm.BaseUrl.Trim(), viewModel.UberLlm.MarketUrl.Trim(), viewModel.MaxSide,
                                  viewModel.UberLlm.ApiKey.Trim(), viewModel.SelectedTheme, viewModel.SelectedProvider,
                                  viewModel.OpenRouter.ApiKey.Trim(), viewModel.OpenAi.BaseUrl.Trim(),
-                                 viewModel.OpenAi.ApiKey.Trim())
+                                 viewModel.OpenAi.ApiKey.Trim(),
+                                 new Dictionary<string, bool>
+                                 {
+                                     [viewModel.UberLlm.ProviderId] = viewModel.UberLlm.PreferredOnly,
+                                     [viewModel.OpenRouter.ProviderId] = viewModel.OpenRouter.PreferredOnly,
+                                     [viewModel.OpenAi.ProviderId] = viewModel.OpenAi.PreferredOnly,
+                                 })
             : null;
     }
 
@@ -63,6 +69,9 @@ public sealed class WpfDialogService : IDialogService
             ? new PresetDraft(viewModel.Name.Trim(), viewModel.Description.Trim())
             : null;
     }
+
+    public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
+        new ModelBrowserWindow { DataContext = viewModel, Owner = OwnerWindow() }.ShowDialog();
 
     public Preset? ShowPresets()
     {

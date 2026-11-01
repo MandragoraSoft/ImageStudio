@@ -5,7 +5,7 @@
     <StackPanel>
         <TextBlock Text="Klucz API (openrouter.ai)" Style="{StaticResource SectionHeader}"/>
         <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
-        <TextBlock Text="OpenRouter nie generuje wideo. Modele tekstowe i obrazowe są dostępne."
+        <TextBlock Text="Modele tekstowe, obrazowe i wideo są dostępne. Ceny obrazów to cena tokenów (za 1M), wideo: za sekundę, gdy katalog ją podaje."
                    TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
     </StackPanel>
 </UserControl>

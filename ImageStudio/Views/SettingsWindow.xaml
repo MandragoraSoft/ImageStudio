@@ -31,6 +31,12 @@
 
         <!-- Konfiguracja aktywnego providera -->
         <ContentControl Content="{Binding ActiveProvider}" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding ActiveProvider.EnvNotice}" TextWrapping="Wrap" Foreground="OrangeRed"/>
+
+        <TextBlock Text="Lista modeli tego dostawcy" Style="{StaticResource SectionHeader}"/>
+        <CheckBox Content="Pokazuj tylko preferowane (odznaczone = wszystkie)"
+                  IsChecked="{Binding ActiveProvider.PreferredOnly}"
+                  ToolTip="Preferowane wybierasz w oknie „Przeglądaj modele” obok filtrów. Pusta lista preferowanych pokazuje wszystkie modele."/>
 
         <TextBlock Text="Maksymalny długi bok obrazu źródłowego (px)" Style="{StaticResource SectionHeader}"/>
         <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>

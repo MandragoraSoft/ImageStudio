@@ -21,6 +21,17 @@
                 <CheckBox Content="Przyjmuje obraz" IsChecked="{Binding InputImageOnly}" Margin="0,0,16,0"/>
                 <CheckBox Content="Ukryj NSFW" IsChecked="{Binding HideNsfw}"/>
             </StackPanel>
+
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="★ Tylko preferowane" IsChecked="{Binding PreferredOnly}" VerticalAlignment="Center"
+                          ToolTip="Zapamiętywane osobno dla każdego dostawcy"/>
+                <Button Grid.Column="1" Content="Przeglądaj modele…" Padding="10,2"
+                        Command="{Binding OpenModelBrowserCommand}"/>
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

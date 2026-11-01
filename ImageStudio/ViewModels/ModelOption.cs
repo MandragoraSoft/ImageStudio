@@ -8,8 +8,16 @@ public sealed record ModelOption(
     string? OwnedBy,
     bool Nsfw,
     IReadOnlyList<string> InputModalities,
-    ModelPricing? Pricing)
+    ModelPricing? Pricing,
+    string? Description = null,
+    IReadOnlyList<string>? OutputModalities = null)
 {
+    // Ikony możliwości w szablonie (App.xaml, ModelIconsTemplate)
+    public bool AcceptsFile => InputModalities.Contains("file");
+    public bool AcceptsAudio => InputModalities.Contains("audio");
+    public bool AcceptsVideo => InputModalities.Contains("video");
+    public bool ReturnsText => OutputModalities?.Contains("text") == true;
+
     // Atrybut zgodny z filtrem "Przyjmuje obraz" i ikoną w szablonie
     public bool AcceptsImage => InputModalities.Contains("image");
 
