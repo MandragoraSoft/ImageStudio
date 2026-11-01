@@ -136,6 +136,9 @@ public sealed class OpenRouterProvider : IAiProvider
     // Wideo: POST /videos tworzy zadanie, potem odpytywanie polling_url i pobranie MP4 z /videos/{id}/content.
     // Obrazy: pierwszy (i drugi) jako klatka początkowa (końcowa), jeśli model je przyjmuje; reszta jako referencje.
     // Nieobsługiwane wartości (czas, proporcje) kończą się HTTP 400 z listą dozwolonych.
+    // Parametry żądania wideo odrzucone przez dany model w tej sesji (id modelu -> nazwy parametrów)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string[]> _rejectedVideoParameters = new();
+
     public async Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                       IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                                       Action<string>? progress = null, CancellationToken ct = default)
@@ -162,10 +165,25 @@ public sealed class OpenRouterProvider : IAiProvider
                 .ToList();
         if (images.Count > used) body["input_references"] = images.Skip(used).ToList();
 
-        using var create = await _http.PostAsJsonAsync("/api/v1/videos", body, ct);
-        var createText = await create.Content.ReadAsStringAsync(ct);
-        if (!create.IsSuccessStatusCode)
+        foreach (var skipped in _rejectedVideoParameters.GetValueOrDefault(model) ?? []) body.Remove(skipped);
+
+        string createText;
+        while (true)
+        {
+            using var create = await _http.PostAsJsonAsync("/api/v1/videos", body, ct);
+            createText = await create.Content.ReadAsStringAsync(ct);
+            if (create.IsSuccessStatusCode) break;
+
+            // Model może nie przyjmować części parametrów (np. aspect_ratio): ponawiamy bez odrzuconego i zapamiętujemy
+            if (ApiErrors.RejectedParameter(createText) is { } rejected && rejected is not ("model" or "prompt") && body.Remove(rejected))
+            {
+                _rejectedVideoParameters.AddOrUpdate(model, _ => [rejected], (_, known) => [.. known, rejected]);
+                progress?.Invoke($"model nie przyjmuje parametru {rejected}: pomijam");
+                continue;
+            }
+
             throw new InvalidOperationException($"HTTP {(int)create.StatusCode}: {createText}");
+        }
 
         using var job = JsonDocument.Parse(createText);
         var id = job.RootElement.GetProperty("id").GetString()!;

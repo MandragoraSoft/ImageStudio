@@ -191,26 +191,64 @@ public sealed class ImageGenerationService : IDisposable
 
     // Wideo: tworzy zadanie, odpytuje o status co 5 s i pobiera mp4 po zakończeniu.
     // Załączniki (obrazy wejściowe) idą jako data: URI: pojedynczy w polu "image", wiele w "input_images".
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, JsonElement> _videoSchemas = new();
+
+    // Pole parameters z opisu modelu (JSON Schema żądania); null, gdy nie da się go pobrać (wtedy zadziała ponawianie bez odrzuconych pól)
+    private async Task<JsonElement?> GetVideoSchemaAsync(string model, CancellationToken ct)
+    {
+        if (_videoSchemas.TryGetValue(model, out var cached)) return cached;
+
+        try
+        {
+            using var response = await _http.GetAsync($"/v1/models/{model}", ct);
+            if (!response.IsSuccessStatusCode) return null;
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            if (!doc.RootElement.TryGetProperty("parameters", out var parameters) || parameters.ValueKind != JsonValueKind.Object) return null;
+
+            return _videoSchemas[model] = parameters.Clone();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    // Parametry żądania wideo odrzucone przez dany model w tej sesji (id modelu -> nazwy parametrów)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string[]> _rejectedVideoParameters = new();
+
     public async Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                       IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                                       Action<string>? progress = null, CancellationToken ct = default)
     {
-        var body = new Dictionary<string, object>
+        // Schemat żądania tego modelu (dozwolone pola, czasy i proporcje) z GET /v1/models/<id>; bez niego idą nazwy z dokumentacji
+        var notes = new List<string>();
+        var body = VideoRequest.Build(await GetVideoSchemaAsync(model, ct), model, prompt, duration, aspectRatio, attachments, notes);
+        foreach (var note in notes) progress?.Invoke(note);
+
+        // Parametry odrzucone wcześniej przez ten model (np. aspect_ratio dla modeli image-to-video) pomijamy od razu
+        foreach (var skipped in _rejectedVideoParameters.GetValueOrDefault(model) ?? []) body.Remove(skipped);
+
+        string createText;
+        while (true)
         {
-            ["model"] = model,
-            ["prompt"] = prompt,
-            ["duration"] = duration,
-            ["aspect_ratio"] = aspectRatio,
-        };
+            // Idempotency-Key chroni przed zdublowanym (płatnym) zadaniem; nowy klucz na każdą zmianę ciała żądania
+            using var request = new HttpRequestMessage(HttpMethod.Post, VideoPath) { Content = JsonContent.Create(body) };
+            request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            using var create = await _http.SendAsync(request, ct);
+            createText = await create.Content.ReadAsStringAsync(ct);
+            if (create.IsSuccessStatusCode) break;
 
-        var uris = attachments.Select(a => $"data:{a.Mime};base64,{Convert.ToBase64String(a.Bytes)}").ToList();
-        if (uris.Count == 1) body["image"] = uris[0];
-        else if (uris.Count > 1) body["input_images"] = uris;
+            // Katalog nie mówi, jakie parametry przyjmuje model; gdy API odrzuca jeden, ponawiamy bez niego i zapamiętujemy
+            if (ApiErrors.RejectedParameter(createText) is { } rejected && rejected is not ("model" or "prompt") && body.Remove(rejected))
+            {
+                _rejectedVideoParameters.AddOrUpdate(model, _ => [rejected], (_, known) => [.. known, rejected]);
+                progress?.Invoke($"model nie przyjmuje parametru {rejected}: pomijam");
+                continue;
+            }
 
-        using var create = await _http.PostAsJsonAsync(VideoPath, body, ct);
-        var createText = await create.Content.ReadAsStringAsync(ct);
-        if (!create.IsSuccessStatusCode)
             throw new InvalidOperationException($"HTTP {(int)create.StatusCode}: {createText}");
+        }
 
         using var job = JsonDocument.Parse(createText);
         var pollUrl = job.RootElement.GetProperty("poll_url").GetString()!;
