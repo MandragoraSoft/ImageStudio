@@ -49,24 +49,41 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _selectedQuality = "auto";
 
-    [RelayCommand]
-    private void EditGeneratePrompt()
-    {
-        var initial = new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction);
-        if (_dialogs.ShowPromptEditor("Prompt generowania", initial, RebuildPromptAsync, this) is not { } edit) return;
-        GenerateSystemPrompt = edit.System ?? "";
-        GeneratePrompt = edit.Prompt;
-        EnhancerInstruction = edit.Instruction ?? EnhancerInstruction;
-    }
+    private static List<Preset> PresetsOfKind(string kind) => PresetStore.LoadAll().Where(p => p.Kind == kind).ToList();
 
     [RelayCommand]
-    private void EditEditPrompt()
+    private void EditGeneratePrompt() =>
+        EditPromptWithPresets("Prompt generowania", "generate", new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction), edit =>
+        {
+            GenerateSystemPrompt = edit.System ?? "";
+            GeneratePrompt = edit.Prompt;
+        });
+
+    [RelayCommand]
+    private void EditEditPrompt() =>
+        EditPromptWithPresets("Prompt edycji", "edit", new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction), edit =>
+        {
+            EditSystemPrompt = edit.System ?? "";
+            EditPrompt = edit.Prompt;
+        });
+
+    // Edytor z zestawami. Gdy w oknie nadpisano zestaw, a zatwierdzone pola są z nim zgodne, stan
+    // "zmieniono od ostatniego zapisu" wraca do wartości sprzed otwarcia (zapis jest propagowany do okna głównego)
+    private void EditPromptWithPresets(string title, string kind, PromptEdit initial, Action<PromptEdit> apply)
     {
-        var initial = new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction);
-        if (_dialogs.ShowPromptEditor("Prompt edycji", initial, RebuildPromptAsync, this) is not { } edit) return;
-        EditSystemPrompt = edit.System ?? "";
-        EditPrompt = edit.Prompt;
+        var wasDirty = PresetDirty;
+        Preset? saved = null;
+        var edit = _dialogs.ShowPromptEditor(title, initial, RebuildPromptAsync, this, PresetsOfKind(kind),
+                                             preset => { PresetStore.Save(preset); saved = preset; });
+        if (edit is null) return;
+
+        apply(edit);
         EnhancerInstruction = edit.Instruction ?? EnhancerInstruction;
+        if (saved is null) return;
+
+        Status = $"Zapisano prompt w zestawie: {saved.Name}";
+        if (edit.Prompt == saved.Prompt && (edit.System ?? "") == saved.SystemPrompt)
+            PresetDirty = wasDirty;
     }
 
     [RelayCommand]
@@ -201,6 +218,20 @@ public sealed partial class MainViewModel
 
         File.WriteAllBytes(path, _imageBytes!);
         Status = $"Zapisano: {path}";
+    }
+
+    // Czyści ekran wyniku (obraz lub wideo); plik w galerii i zapis w folderze zostają
+    private bool CanClearResult => Image is not null || ShowVideo;
+
+    [RelayCommand(CanExecute = nameof(CanClearResult))]
+    private void ClearResult()
+    {
+        Image = null;
+        _imageBytes = null;
+        ShowVideo = false;
+        VideoSource = null;
+        SelectedGalleryEntry = null;
+        Status = "Wyczyszczono wynik.";
     }
 
     // 100%: rzeczywisty rozmiar obrazu z przewijaniem

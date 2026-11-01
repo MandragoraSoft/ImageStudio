@@ -71,7 +71,7 @@
 
                 <TextBlock Text="Prompt" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,2"/>
                 <TextBox Text="{Binding SelectedPreset.Prompt, Mode=OneWay}" IsReadOnly="True"
-                         AcceptsReturn="True" TextWrapping="Wrap" Height="110" VerticalScrollBarVisibility="Auto"/>
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="260" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
                 <TextBlock Text="Negatywny prompt" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,2"/>
                 <TextBox Text="{Binding SelectedPreset.NegativePrompt, Mode=OneWay, TargetNullValue=''}" IsReadOnly="True"
                          TextWrapping="Wrap"/>

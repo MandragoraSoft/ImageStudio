@@ -14,7 +14,7 @@ public class ChatApiTests
         var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"role":"assistant","content":"odpowiedź"}}]}""");
         using var http = Client(handler);
 
-        var reply = await ImageGenerationService.ChatAsync(
+        var reply = await OpenAiCompat.ChatAsync(
             http, "/v1/chat/completions", "model-x",
             [new ChatMessage("system", "bądź zwięzły"), new ChatMessage("user", "cześć")], null, default);
 
@@ -35,7 +35,7 @@ public class ChatApiTests
         var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"content":null}}]}""");
         using var http = Client(handler);
 
-        var reply = await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default);
+        var reply = await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default);
 
         Assert.Equal("", reply.Content);
     }
@@ -47,7 +47,7 @@ public class ChatApiTests
         using var http = Client(handler);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default));
+            OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default));
 
         Assert.StartsWith("HTTP 503", error.Message);
         Assert.Contains("no_available_provider", error.Message);
@@ -58,7 +58,7 @@ public class ChatApiTests
     [Fact]
     public void ParseSplit_reads_plain_json()
     {
-        var parts = ImageGenerationService.ParseSplit("""{"system":" styl ","concept":" kot "}""", "stary", "oryginał");
+        var parts = OpenAiCompat.ParseSplit("""{"system":" styl ","concept":" kot "}""", "stary", "oryginał");
 
         Assert.Equal("styl", parts.System);
         Assert.Equal("kot", parts.Concept);
@@ -67,7 +67,7 @@ public class ChatApiTests
     [Fact]
     public void ParseSplit_strips_code_fences()
     {
-        var parts = ImageGenerationService.ParseSplit("```json\n{\"system\":\"s\",\"concept\":\"c\"}\n```", "stary", "oryginał");
+        var parts = OpenAiCompat.ParseSplit("```json\n{\"system\":\"s\",\"concept\":\"c\"}\n```", "stary", "oryginał");
 
         Assert.Equal("s", parts.System);
         Assert.Equal("c", parts.Concept);
@@ -76,7 +76,7 @@ public class ChatApiTests
     [Fact]
     public void ParseSplit_falls_back_to_raw_reply_when_not_json()
     {
-        var parts = ImageGenerationService.ParseSplit("  \"ładny zachód słońca\"  ", "stary system", "oryginał");
+        var parts = OpenAiCompat.ParseSplit("  \"ładny zachód słońca\"  ", "stary system", "oryginał");
 
         Assert.Equal("stary system", parts.System);
         Assert.Equal("ładny zachód słońca", parts.Concept);
@@ -85,7 +85,7 @@ public class ChatApiTests
     [Fact]
     public void ParseSplit_keeps_fallback_system_when_json_has_only_concept()
     {
-        var parts = ImageGenerationService.ParseSplit("""{"concept":"tylko koncept"}""", "  stary system ", "oryginał");
+        var parts = OpenAiCompat.ParseSplit("""{"concept":"tylko koncept"}""", "  stary system ", "oryginał");
 
         Assert.Equal("stary system", parts.System);
         Assert.Equal("tylko koncept", parts.Concept);

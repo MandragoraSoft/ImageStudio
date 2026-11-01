@@ -10,13 +10,32 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="SystemSection" Grid.Row="0" Margin="0,0,0,10">
+        <DockPanel x:Name="PresetBar" Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock x:Name="PresetStatus" DockPanel.Dock="Right" Margin="8,0,0,0" VerticalAlignment="Center"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <Button DockPanel.Dock="Right" Content="Nadpisz wybrany" Padding="12,4" Margin="8,0,0,0" Click="Overwrite_Click"
+                    ToolTip="Zapisuje prompt z okna w wybranym zestawie (po potwierdzeniu); reszta zestawu bez zmian"/>
+            <Button DockPanel.Dock="Right" Content="Wczytaj" Padding="12,4" Margin="8,0,0,0" Click="LoadPreset_Click"
+                    ToolTip="Wstawia prompt z wybranego zestawu do okna"/>
+            <TextBlock DockPanel.Dock="Left" Text="Zapisany prompt:" VerticalAlignment="Center" Margin="0,0,8,0"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <ComboBox x:Name="PresetBox">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </DockPanel>
+
+        <StackPanel x:Name="SystemSection" Grid.Row="1" Margin="0,0,0,10">
             <DockPanel>
                 <TextBlock x:Name="SystemCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Text="Konfiguracja (prompt systemowy: styl, technika, format)" Style="{StaticResource SectionHeader}"/>
@@ -26,15 +45,15 @@
                      TextChanged="Box_TextChanged"/>
         </StackPanel>
 
-        <DockPanel Grid.Row="1">
+        <DockPanel Grid.Row="2">
             <TextBlock x:Name="PromptCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
             <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"/>
         </DockPanel>
-        <TextBox x:Name="PromptBox" Grid.Row="2" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+        <TextBox x:Name="PromptBox" Grid.Row="3" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14"
                  TextChanged="Box_TextChanged"/>
 
-        <StackPanel x:Name="RebuildSection" Grid.Row="3" Margin="0,10,0,0">
+        <StackPanel x:Name="RebuildSection" Grid.Row="4" Margin="0,10,0,0">
             <DockPanel>
                 <TextBlock x:Name="InstructionCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
                 <TextBlock Text="Prompt techniczny dla modelu (polecenia przebudowy konceptu)" Style="{StaticResource SectionHeader}"/>
@@ -56,10 +75,10 @@
             <TextBlock x:Name="RebuildStatus" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="4" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"
+        <TextBlock Grid.Row="5" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"
                    Text="Ctrl+Enter zatwierdza, Esc anuluje. Ctrl+Z cofa zmiany w polu."/>
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Wyczyść wszystko" Padding="12,0" Margin="0,0,8,0" Click="Clear_Click"
                     Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
             <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"

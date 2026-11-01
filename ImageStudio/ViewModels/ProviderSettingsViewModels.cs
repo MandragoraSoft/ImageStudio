@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImageStudio.Services;
 
@@ -19,6 +20,25 @@ public abstract partial class ProviderSettingsViewModel : ObservableObject
     // Lista modeli tego dostawcy: false = wszystkie, true = tylko preferowane
     [ObservableProperty]
     private bool _preferredOnly;
+
+    // Preferowany model tekstowy tego dostawcy wybierany w standardowym selektorze modeli (ModelPicker);
+    // lista zawiera modele znane aplikacji (aktywny dostawca) oraz model domyślny dostawcy
+    public ObservableCollection<string> TextModels { get; } = [];
+
+    [ObservableProperty]
+    private string? _defaultTextModel;
+
+    public string? ProviderDefaultTextModel { get; init; }
+
+    // Do zapisu: null, gdy wybrano model domyślny dostawcy (wtedy zmiana domyślnego w dostawcy działa od razu)
+    public string? PreferredTextModelOrNull => DefaultTextModel == ProviderDefaultTextModel ? null : DefaultTextModel;
+
+    public void SetTextModels(IEnumerable<string> known, string? preferred)
+    {
+        foreach (var model in known.Append(ProviderDefaultTextModel).Append(preferred).OfType<string>().Distinct())
+            TextModels.Add(model);
+        DefaultTextModel = preferred ?? ProviderDefaultTextModel;
+    }
 }
 
 public sealed partial class UberLlmSettingsViewModel : ProviderSettingsViewModel

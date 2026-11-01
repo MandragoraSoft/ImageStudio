@@ -98,7 +98,7 @@ public sealed partial class MainViewModel
     // Wynik: wideo zamiast obrazu w podglądzie
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowImage))]
-    [NotifyCanExecuteChangedFor(nameof(SaveImageAsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveImageAsCommand), nameof(ClearResultCommand))]
     private bool _showVideo;
 
     [ObservableProperty]

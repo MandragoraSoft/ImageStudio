@@ -11,8 +11,19 @@ public sealed partial class MainViewModel : IAppControl
     private static readonly string[] TabNames = ["generate", "edit", "video", "chat"];
 
     // Narzędzia dotykają widoków, więc połączenia z wątków serwera wracają na wątek interfejsu
-    private static Task<string> RunOnUi(Func<Task<string>> action) =>
-        Application.Current.Dispatcher.InvokeAsync(action).Task.Unwrap();
+    // Kontekst przechwycony w konstruktorze (wątek UI); bez kontekstu (testy) akcja idzie od razu
+    private Task<string> RunOnUi(Func<Task<string>> action)
+    {
+        if (_uiContext is null) return action();
+
+        var done = new TaskCompletionSource<string>();
+        _uiContext.Post(async _ =>
+        {
+            try { done.SetResult(await action()); }
+            catch (Exception ex) { done.SetException(ex); }
+        }, null);
+        return done.Task;
+    }
 
     AppState IAppControl.GetState() => new(
         TabNames[Math.Clamp(ActiveTab, 0, TabNames.Length - 1)], _provider.DisplayName,

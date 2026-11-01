@@ -37,21 +37,40 @@ public sealed partial class MainViewModel
                                          SecretStore.Load() ?? "", _settings.Theme, _settings.ProviderId,
                                          SecretStore.Load("openrouter") ?? "",
                                          _settings.OpenAiBaseUrl, SecretStore.Load("openai") ?? "",
-                                         ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly));
+                                         ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).PreferredOnly),
+                                         ProviderRegistry.Available.ToDictionary(p => p.Id, p => _prefs.For(p.Id).DefaultTextModel),
+                                         EnhancerModels.ToList());
         var result = _dialogs.ShowSettings(current);
         if (result is null) return;
 
         foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())
             _prefs.For(id).PreferredOnly = preferredOnly;
+        foreach (var (id, model) in result.DefaultTextModels ?? new Dictionary<string, string?>())
+            _prefs.For(id).DefaultTextModel = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
         _prefs.Save();
 
         AppSettings.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
                          result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey);
         ThemeService.Apply(result.Theme);
         _settings = AppSettings.Load();
-        // Nowe ustawienia (także inny provider) = nowa instancja providera; stara zostaje zwolniona
+        // Nowe ustawienia (także inny provider) = nowa instancja providera
+        await SwitchProviderAsync(ProviderRegistry.Create(result.ProviderId, _settings));
+    }
+
+    // Jedyne miejsce wymiany providera: zwalnia starego, odświeża bindowane właściwości i listy modeli.
+    // Filtry i wybory z poprzedniego providera są zerowane, bo inaczej ukryłyby wszystkie nowe modele.
+    private async Task SwitchProviderAsync(IAiProvider provider)
+    {
         _provider.Dispose();
-        _provider = ProviderRegistry.Create(result.ProviderId, _settings);
+        _provider = provider;
+        OnPropertyChanged(nameof(ProviderId));
+        OnPropertyChanged(nameof(ProviderName));
+
+        SearchText = "";
+        SelectedProvider = AllProviders;
+        SelectedModel = null;
+        SelectedEditModel = null;
+        SelectedVideoModel = null;
         await InitializeAsync();
     }
 
@@ -71,7 +90,8 @@ public sealed partial class MainViewModel
             ? text.Length > 40 ? text[..40] + "..." : text
             : $"Zestaw {DateTime.Now:dd.MM HH:mm}";
 
-        var draft = _dialogs.ShowSavePreset(defaultName);
+        var draft = _dialogs.ShowSavePreset(defaultName, CurrentPromptForTab(),
+                                           SelectedEnhancerModel is null ? null : SuggestPresetDraftAsync);
         if (draft is null) return;
 
         PresetStore.Create(CapturePreset(draft));
@@ -84,6 +104,22 @@ public sealed partial class MainViewModel
     {
         var preset = _dialogs.ShowPresets();
         if (preset is not null) ApplyPreset(preset);
+    }
+
+    // AI proponuje nazwę i opis zestawu na podstawie promptu, modelem tekstowym wybranym w ulepszaniu
+    private async Task<PresetDraft> SuggestPresetDraftAsync()
+    {
+        var prompt = CurrentPromptForTab();
+        var system = ActiveTab == 1 ? EditSystemPrompt : GenerateSystemPrompt;
+        var messages = new List<ChatMessage>
+        {
+            new("system", "You name saved presets of an image generation app. Reply with JSON only, no code fences: " +
+                          "{\"name\": \"...\", \"description\": \"...\"}. name = at most 5 words, description = one short sentence. " +
+                          "Use the language of the prompt."),
+            new("user", string.IsNullOrWhiteSpace(system) ? prompt : $"CONFIG:\n{system}\n\nPROMPT:\n{prompt}"),
+        };
+        var reply = await _provider.ChatAsync(SelectedEnhancerModel!, messages);
+        return PresetSaveViewModel.ParseDraft(reply.Content);
     }
 
     private string CurrentPromptForTab() => ActiveTab == 1 ? EditPrompt : GeneratePrompt;

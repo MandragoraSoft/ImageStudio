@@ -16,13 +16,8 @@
 
             
 
-            <Expander Header="Filtry modeli" Margin="0,4,0,0">
-                <views:ModelFilterBar Margin="0,4,0,0"/>
-            </Expander>
-
-            <TextBlock Text="Model" Style="{StaticResource SectionHeader}"/>
-            <ComboBox ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"
-                      ItemTemplate="{StaticResource ModelItemTemplate}" Margin="0,0,0,6"/>
+            <views:ModelPicker Header="Model" HasFilters="True" Margin="0,4,0,0"
+                               ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"/>
 
             <Expander Header="Parametry obrazu" Margin="0,0,0,6">
                 <StackPanel Margin="0,4,0,0">

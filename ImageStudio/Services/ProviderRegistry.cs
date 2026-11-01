@@ -5,13 +5,13 @@ namespace ImageStudio.Services;
 // Lista dostępnych providerów i ich fabryka. Nowy provider = implementacja IAiProvider + wpis tutaj.
 public static class ProviderRegistry
 {
-    public sealed record ProviderInfo(string Id, string DisplayName);
+    public sealed record ProviderInfo(string Id, string DisplayName, string? DefaultTextModel);
 
     public static IReadOnlyList<ProviderInfo> Available { get; } =
     [
-        new(UberLlmProvider.Identifier, "UberLLM"),
-        new(OpenRouterProvider.Identifier, "OpenRouter"),
-        new(OpenAiProvider.Identifier, "OpenAI"),
+        new(UberLlmProvider.Identifier, "UberLLM", UberLlmProvider.DefaultTextModelId),
+        new(OpenRouterProvider.Identifier, "OpenRouter", OpenRouterProvider.DefaultTextModelId),
+        new(OpenAiProvider.Identifier, "OpenAI", OpenAiProvider.DefaultTextModelId),
     ];
 
     public static IAiProvider Create(string id, AppSettings settings) => id switch

@@ -70,7 +70,7 @@ public class ChatImageTests
     {
         var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"content":"ok"}}]}""");
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
-        await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", history, null, default);
+        await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", history, null, default);
         return JsonDocument.Parse(handler.RequestBody!);
     }
 

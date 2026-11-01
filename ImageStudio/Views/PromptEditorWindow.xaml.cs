@@ -1,6 +1,8 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
 
@@ -11,17 +13,22 @@ public partial class PromptEditorWindow : Window
     private readonly Func<PromptEdit, Task<PromptEdit>>? _rebuild;
     private PromptEdit? _beforeRebuild;
     private bool _busy;
+    private readonly Action<Preset>? _savePreset;
 
     // initial.System == null: rodzaj bez promptu systemowego (np. wideo), sekcja jest ukryta;
     // brak instrukcji albo przebudowy ukrywa sekcję promptu technicznego
     public PromptEditorWindow(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
-                              object? enhancerContext = null)
+                              object? enhancerContext = null,
+                              IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null)
     {
         InitializeComponent();
         _rebuild = rebuild;
         EnhancerHost.DataContext = enhancerContext;
         EnhancerHost.Visibility = enhancerContext is null ? Visibility.Collapsed : Visibility.Visible;
         Title = title;
+        _savePreset = savePreset;
+        PresetBar.Visibility = presets is null ? Visibility.Collapsed : Visibility.Visible;
+        PresetBox.ItemsSource = presets;
         PromptHeader.Text = "Koncept";
         SystemSection.Visibility = initial.System is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
@@ -89,6 +96,43 @@ public partial class PromptEditorWindow : Window
         PromptBox.IsReadOnly = SystemBox.IsReadOnly = busy;
         RebuildStatus.Text = status;
     }
+
+    private void LoadPreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetBox.SelectedItem is not Preset preset) return;
+
+        var hasText = !string.IsNullOrWhiteSpace(PromptBox.Text) || !string.IsNullOrWhiteSpace(SystemBox.Text);
+        var same = PromptBox.Text == preset.Prompt && SystemBox.Text == preset.SystemPrompt;
+        if (hasText && !same && !Confirm($"Zastąpić bieżący prompt w oknie promptem z zestawu „{preset.Name}”?")) return;
+
+        if (SystemSection.Visibility == Visibility.Visible) SystemBox.Text = preset.SystemPrompt;
+        PromptBox.Text = preset.Prompt;
+        if (RebuildSection.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(preset.EnhancerInstruction))
+            InstructionBox.Text = preset.EnhancerInstruction;
+    }
+
+    private void Overwrite_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetBox.SelectedItem is not Preset preset) return;
+        if (!Confirm($"Nadpisać prompt w zestawie „{preset.Name}”?\n\nObecna treść zestawu zostanie utracona (model, rozmiar i parametry zostają).")) return;
+
+        preset.Prompt = PromptBox.Text;
+        if (SystemSection.Visibility == Visibility.Visible) preset.SystemPrompt = SystemBox.Text;
+        if (RebuildSection.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(InstructionBox.Text))
+            preset.EnhancerInstruction = InstructionBox.Text;
+        try
+        {
+            _savePreset?.Invoke(preset);
+            PresetStatus.Text = $"Zapisano w zestawie „{preset.Name}”.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"Nie udało się zapisać zestawu: {ex.Message}", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private bool Confirm(string text) =>
+        MessageBox.Show(this, text, Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     private void Box_TextChanged(object sender, TextChangedEventArgs e) => UpdateCounters();
 

@@ -7,57 +7,6 @@ using System.Text.Json.Serialization;
 
 namespace ImageStudio.Services;
 
-// Atrybuty modelu z /v1/models, używane do filtrowania w UI
-public sealed record ImageModelInfo(string Id, string? OwnedBy, bool Nsfw, IReadOnlyList<string> InputModalities,
-                                    string? Description = null, IReadOnlyList<string>? OutputModalities = null);
-
-public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IReadOnlyList<ImageModelInfo> Edit);
-
-// Model czatu z listą parametrów, które deklaruje (supported_parameters)
-// AcceptsImage: czy katalog deklaruje wejście obrazowe (null = katalog nic o tym nie mówi)
-public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters, bool? AcceptsImage = null);
-
-// Narzędzie dla modelu: nazwa, opis i schemat parametrów (JSON Schema jako tekst)
-public sealed record ToolDefinition(string Name, string Description, string ParametersJson);
-
-// Prośba modelu o wywołanie narzędzia; argumenty to tekst JSON
-public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
-
-// Odpowiedź modelu: tekst i/lub prośby o narzędzia
-public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls);
-
-// Wiadomość czatu (role: system, user, assistant, tool). Wiadomość asystenta może nieść ToolCalls,
-// a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
-public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
-                                 string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null)
-{
-    public bool IsUser => Role == "user";
-    public bool HasImages => Images is { Count: > 0 };
-    public bool HasToolCalls => ToolCalls is { Count: > 0 };
-
-    public string RoleLabel => Role switch
-    {
-        "user" => "Ty",
-        "assistant" => HasToolCalls ? "Model (wywołuje narzędzie)" : "Model",
-        "tool" => $"Narzędzie {ToolName}".TrimEnd(),
-        _ => "System",
-    };
-
-    // Tekst wiadomości, a przy prośbach o narzędzia także lista wywołań
-    public string DisplayText => HasToolCalls
-        ? string.Join("\n", (string.IsNullOrWhiteSpace(Content) ? [] : new[] { Content })
-            .Concat(ToolCalls!.Select(c => $"→ {c.Name}({c.ArgumentsJson})")))
-        : Content;
-}
-
-// Wynik generowania/edycji: bajty obrazu i koszt z API (null, gdy API go nie zwróciło)
-public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
-
-// Opcjonalne parametry generowania; null = nie wysyłamy (API odrzuca nieznane klucze)
-public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality);
-
-// Prompt rozdzielony: System = konfiguracja (styl, technika), Concept = treść wskazana przez użytkownika
-public sealed record PromptParts(string System, string Concept);
 
 public sealed class ImageGenerationService : IDisposable
 {
@@ -162,90 +111,8 @@ public sealed class ImageGenerationService : IDisposable
 
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default) =>
-        ChatAsync(_http, "/v1/chat/completions", model, messages, tools, ct);
+        OpenAiCompat.ChatAsync(_http, "/v1/chat/completions", model, messages, tools, ct);
 
-    // Wspólne dla providerów: /chat/completions (format OpenAI) z pełną historią i opcjonalnymi narzędziami
-    internal static async Task<ChatReply> ChatAsync(HttpClient http, string path, string model,
-                                                    IReadOnlyList<ChatMessage> messages,
-                                                    IReadOnlyList<ToolDefinition>? tools, CancellationToken ct)
-    {
-        var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
-        if (tools is { Count: > 0 })
-            body["tools"] = tools.Select(t => new
-            {
-                type = "function",
-                function = new
-                {
-                    name = t.Name,
-                    description = t.Description,
-                    parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersJson),
-                },
-            }).ToList();
-
-        using var response = await http.PostAsJsonAsync(path, body, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
-
-        using var doc = JsonDocument.Parse(text);
-        var message = doc.RootElement.GetProperty("choices")[0].GetProperty("message");
-        var content = message.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()! : "";
-
-        var calls = new List<ToolCall>();
-        if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var call in toolCalls.EnumerateArray())
-            {
-                var function = call.GetProperty("function");
-                // Argumenty to zwykle tekst JSON; część serwerów zwraca obiekt
-                var arguments = function.TryGetProperty("arguments", out var a)
-                    ? a.ValueKind == JsonValueKind.String ? a.GetString() ?? "" : a.GetRawText()
-                    : "";
-                var id = call.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String
-                    ? i.GetString()!
-                    : Guid.NewGuid().ToString("N");
-                calls.Add(new ToolCall(id, function.GetProperty("name").GetString()!,
-                                       string.IsNullOrWhiteSpace(arguments) ? "{}" : arguments));
-            }
-        }
-
-        return new ChatReply(content, calls);
-    }
-
-    // Wiadomość w formacie API: asystent z prośbami o narzędzia niesie tool_calls, wynik narzędzia tool_call_id
-    private static Dictionary<string, object?> ToWire(ChatMessage m)
-    {
-        var wire = new Dictionary<string, object?> { ["role"] = m.Role };
-        if (m.Role == "tool")
-        {
-            wire["tool_call_id"] = m.ToolCallId;
-            wire["content"] = m.Content;
-        }
-        else if (m.HasToolCalls)
-        {
-            wire["content"] = string.IsNullOrEmpty(m.Content) ? null : m.Content;
-            wire["tool_calls"] = m.ToolCalls!.Select(call => new
-            {
-                id = call.Id,
-                type = "function",
-                function = new { name = call.Name, arguments = call.ArgumentsJson },
-            }).ToList();
-        }
-        else if (m.Role == "user" && m.HasImages)
-        {
-            // Wiadomość z obrazami: lista części (tekst, potem obrazy jako data URI)
-            var parts = new List<object>();
-            if (!string.IsNullOrEmpty(m.Content)) parts.Add(new { type = "text", text = m.Content });
-            parts.AddRange(m.Images!.Select(image => new { type = "image_url", image_url = new { url = image.DataUri } }));
-            wire["content"] = parts;
-        }
-        else
-        {
-            wire["content"] = m.Content;
-        }
-
-        return wire;
-    }
 
     // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).
     // Model zwraca JSON; przy błędzie parsowania koncept to surowa odpowiedź, a system zostaje bez zmian.
@@ -257,7 +124,7 @@ public sealed class ImageGenerationService : IDisposable
             ["model"] = model,
             ["messages"] = new[]
             {
-                new { role = "system", content = $"{instruction}\n\n{SplitFormat}" },
+                new { role = "system", content = $"{instruction}\n\n{OpenAiCompat.SplitFormat}" },
                 new { role = "user", content = $"SYSTEM (config):\n{system}\n\nCONCEPT:\n{concept}" },
             },
         };
@@ -271,44 +138,12 @@ public sealed class ImageGenerationService : IDisposable
         using var doc = JsonDocument.Parse(text);
         var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
             .GetProperty("content").GetString() ?? "";
-        var parts = ParseSplit(content, system, concept);
+        var parts = OpenAiCompat.ParseSplit(content, system, concept);
         if (string.IsNullOrWhiteSpace(parts.Concept))
             throw new InvalidOperationException("Model nie zwrócił promptu.");
         return parts;
     }
 
-    internal const string SplitFormat =
-        "Split the input into two parts and reply with JSON only, no code fences: " +
-        "{\"system\": \"...\", \"concept\": \"...\"}. " +
-        "\"system\" = technical configuration (style, lighting, camera, quality, format, constraints), keep existing system text. " +
-        "\"concept\" = what the user wants depicted, improved and vivid. Keep the input language.";
-
-    internal static PromptParts ParseSplit(string content, string fallbackSystem, string fallbackConcept)
-    {
-        var json = content.Trim();
-        if (json.StartsWith("```"))
-            json = json.Trim('`').Trim();
-        if (json.StartsWith("json", StringComparison.OrdinalIgnoreCase))
-            json = json[4..].Trim();
-
-        try
-        {
-            using var parsed = JsonDocument.Parse(json);
-            var root = parsed.RootElement;
-            var system = root.TryGetProperty("system", out var s) && s.ValueKind == JsonValueKind.String
-                ? s.GetString()!.Trim()
-                : fallbackSystem.Trim();
-            var concept = root.TryGetProperty("concept", out var c) && c.ValueKind == JsonValueKind.String
-                ? c.GetString()!.Trim()
-                : "";
-            return new PromptParts(system, concept);
-        }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
-        {
-            // Nie-JSON albo JSON niebędący obiektem (np. sam tekst w cudzysłowie): traktujemy jak surową odpowiedź
-            return new PromptParts(fallbackSystem.Trim(), content.Trim().Trim('"'));
-        }
-    }
 
 
     public async Task<ImageResult> GenerateAsync(string model, string prompt, string size, ImageOptions? options = null,

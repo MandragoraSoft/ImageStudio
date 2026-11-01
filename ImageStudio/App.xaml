@@ -28,6 +28,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Icon" Value="pack://application:,,,/Assets/AppIcon.ico"/>
         </Style>
 
         <Style x:Key="MutedTextBlock" TargetType="TextBlock">

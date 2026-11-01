@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="ImageStudio.Tests/ImageStudio.Tests.csproj" />
+  <Folder Name="/Providers/">
+    <Project Path="ImageStudio.Providers.Core/ImageStudio.Providers.Core.csproj" />
+    <Project Path="ImageStudio.Providers.OpenAi/ImageStudio.Providers.OpenAi.csproj" />
+    <Project Path="ImageStudio.Providers.OpenRouter/ImageStudio.Providers.OpenRouter.csproj" />
+    <Project Path="ImageStudio.Providers.UberLlm/ImageStudio.Providers.UberLlm.csproj" />
+  </Folder>
+  <Project Path="ImageStudio/ImageStudio.csproj" />
+</Solution>

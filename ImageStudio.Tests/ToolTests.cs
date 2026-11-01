@@ -223,7 +223,7 @@ public class ChatToolApiTests
         using var http = Client(handler);
         var tools = new[] { new ToolDefinition("fs__read", "Czyta plik", """{"type":"object","properties":{"path":{"type":"string"}}}""") };
 
-        await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], tools, default);
+        await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], tools, default);
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var function = body.RootElement.GetProperty("tools")[0];
@@ -240,7 +240,7 @@ public class ChatToolApiTests
         var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"content":"ok"}}]}""");
         using var http = Client(handler);
 
-        await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], [], default);
+        await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], [], default);
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         Assert.False(body.RootElement.TryGetProperty("tools", out _));
@@ -257,7 +257,7 @@ public class ChatToolApiTests
             """);
         using var http = Client(handler);
 
-        var reply = await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default);
+        var reply = await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default);
 
         Assert.Equal("", reply.Content);
         Assert.Equal(3, reply.ToolCalls.Count);
@@ -279,7 +279,7 @@ public class ChatToolApiTests
             new ChatMessage("tool", "treść", ToolCallId: "c1", ToolName: "fs__read"),
         };
 
-        await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", history, null, default);
+        await OpenAiCompat.ChatAsync(http, "/v1/chat/completions", "m", history, null, default);
 
         using var body = JsonDocument.Parse(handler.RequestBody!);
         var messages = body.RootElement.GetProperty("messages");

@@ -76,18 +76,28 @@ internal sealed class FakeDialogs : IDialogService
     public string? ChooseSaveFile(string suggestedFileName) => throw new NotSupportedException();
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     public SettingsResult? ShowSettings(SettingsResult current) => throw new NotSupportedException();
-    public PresetDraft? ShowSavePreset(string defaultName) => throw new NotSupportedException();
+    public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) => throw new NotSupportedException();
     public PromptEdit? PromptEditResult { get; set; }
+    public ImageStudio.Configuration.Preset? OverwritePreset { get; set; }
     public PromptEdit? LastInitial { get; private set; }
     public Func<PromptEdit, Task<PromptEdit>>? LastRebuild { get; private set; }
-    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null, object? enhancerContext = null)
+    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null, object? enhancerContext = null, IReadOnlyList<ImageStudio.Configuration.Preset>? presets = null, Action<ImageStudio.Configuration.Preset>? savePreset = null)
     {
         LastInitial = initial;
         LastRebuild = rebuild;
+        // Symuluje "Nadpisz wybrany" w oknie: prompt z wyniku trafia do zestawu przez delegat zapisu
+        if (OverwritePreset is { } preset && PromptEditResult is { } result && savePreset is not null)
+        {
+            preset.Prompt = result.Prompt;
+            preset.SystemPrompt = result.System ?? "";
+            savePreset(preset);
+        }
         return PromptEditResult;
     }
     public ImageStudio.Configuration.Preset? ShowPresets() => throw new NotSupportedException();
     public bool ConfirmToolCall(ToolCall call) => true;
+    public bool ConfirmAnswer { get; set; } = true;
+    public bool Confirm(string text, string title) => ConfirmAnswer;
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) => throw new NotSupportedException();
 }
 

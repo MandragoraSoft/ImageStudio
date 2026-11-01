@@ -19,7 +19,6 @@ public sealed partial class MainViewModel : ObservableObject
         "You improve image generation prompts. Make the concept vivid and detailed, " +
         "keep the same language, subject and intent.";
 
-    private const string DefaultEnhancer = "venice/uncensored";
     private const string DefaultGeneration = "venice/z-image-turbo";
     private const string DefaultEdit = "venice/grok-imagine-edit";
 
@@ -31,6 +30,7 @@ public sealed partial class MainViewModel : ObservableObject
     private static readonly ILogger Log = AppLog.For<MainViewModel>();
 
     private IAiProvider _provider;
+    private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
     private readonly IDialogService _dialogs;
     private readonly ImageDownloadService _downloads;
     private readonly UserState _state;
@@ -60,7 +60,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isBusy;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CopyImageCommand), nameof(SaveImageAsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CopyImageCommand), nameof(SaveImageAsCommand), nameof(ClearResultCommand))]
     private BitmapSource? _image;
 
     // Podgląd wyniku: dopasowany do okna (domyślnie) albo w skali ręcznej; nie zmienia pliku
@@ -148,6 +148,13 @@ public sealed partial class MainViewModel : ObservableObject
     public ICollectionView ModelsView { get; }
     public ICollectionView EditModelsView { get; }
     public ObservableCollection<string> Providers { get; } = [];
+
+    // Aktywny dostawca AI; odświeżane w SwitchProviderAsync
+    public string ProviderId => _provider.Id;
+
+    // Preferowany model tekstowy użytkownika dla tego dostawcy, a gdy go nie ma, domyślny z kontraktu dostawcy
+    private string? EffectiveDefaultTextModel => _prefs.For(_provider.Id).DefaultTextModel ?? _provider.DefaultTextModel;
+    public string ProviderName => _provider.DisplayName;
 
     // Modele czatu do ulepszania promptu i ich widoczne parametry
     public ObservableCollection<string> EnhancerModels { get; } = [];
@@ -305,7 +312,7 @@ public sealed partial class MainViewModel : ObservableObject
             ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
 
             SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
-                                    : chat.Any(m => m.Id == DefaultEnhancer) ? DefaultEnhancer
+                                    : chat.Any(m => m.Id == EffectiveDefaultTextModel) ? EffectiveDefaultTextModel
                                     : chat.FirstOrDefault()?.Id;
             Chat.SelectedModel = _state.ChatModel is { } chatModel && EnhancerModels.Contains(chatModel)
                 ? chatModel

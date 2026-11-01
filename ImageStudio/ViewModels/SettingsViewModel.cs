@@ -45,10 +45,17 @@ public sealed partial class SettingsViewModel : ObservableObject
         _maxSide = current.MaxSide;
         _selectedTheme = current.Theme;
         _selectedProvider = current.ProviderId;
-        UberLlm = new UberLlmSettingsViewModel(current.BaseUrl, current.MarketUrl, current.ApiKey);
-        OpenRouter = new OpenRouterSettingsViewModel(current.OpenRouterKey);
-        OpenAi = new OpenAiSettingsViewModel(current.OpenAiBaseUrl, current.OpenAiKey);
+        UberLlm = new UberLlmSettingsViewModel(current.BaseUrl, current.MarketUrl, current.ApiKey)
+            { ProviderDefaultTextModel = UberLlmProvider.DefaultTextModelId };
+        OpenRouter = new OpenRouterSettingsViewModel(current.OpenRouterKey)
+            { ProviderDefaultTextModel = OpenRouterProvider.DefaultTextModelId };
+        OpenAi = new OpenAiSettingsViewModel(current.OpenAiBaseUrl, current.OpenAiKey)
+            { ProviderDefaultTextModel = OpenAiProvider.DefaultTextModelId };
         foreach (var provider in new ProviderSettingsViewModel[] { UberLlm, OpenRouter, OpenAi })
+        {
             provider.PreferredOnly = current.PreferredOnly?.GetValueOrDefault(provider.ProviderId) ?? false;
+            provider.SetTextModels(provider.ProviderId == current.ProviderId ? current.ActiveTextModels ?? [] : [],
+                                   current.DefaultTextModels?.GetValueOrDefault(provider.ProviderId));
+        }
     }
 }

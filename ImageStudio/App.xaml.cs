@@ -1,13 +1,28 @@
+using System.IO;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Windows;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
+using ImageStudio.Views;
 
 namespace ImageStudio;
 
 public partial class App : Application
 {
     private MainViewModel? _viewModel;
+
+    // Biblioteki dostawców leżą w podfolderze providers\ (patrz ImageStudio.csproj); domyślny kontekst ich nie widzi sam
+    static App()
+    {
+        var providersDir = Path.Combine(AppContext.BaseDirectory, "providers");
+        AssemblyLoadContext.Default.Resolving += (context, name) =>
+        {
+            var path = Path.Combine(providersDir, name.Name + ".dll");
+            return File.Exists(path) ? context.LoadFromAssemblyPath(path) : null;
+        };
+    }
 
     // Zapis wyborów modeli i parametrów przy zamykaniu
     protected override void OnExit(ExitEventArgs e)

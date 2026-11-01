@@ -8,6 +8,10 @@ public interface IAiProvider : IDisposable
     string Id { get; }
     string DisplayName { get; }
 
+    // Domyślny model tekstowy dostawcy (ulepszanie promptów, czat, nazwy zestawów); null = pierwszy z listy.
+    // Użytkownik może go nadpisać w Ustawieniach (preferowany model domyślny tego dostawcy)
+    string? DefaultTextModel => null;
+
     Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<ImageModelInfo>> GetVideoModelsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default);

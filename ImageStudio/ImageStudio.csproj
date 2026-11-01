@@ -4,12 +4,9 @@
     <!-- Debug: okno konsoli z logami (ILogger); Release: bez konsoli -->
     <OutputType>WinExe</OutputType>
     <OutputType Condition="'$(Configuration)' == 'Debug'">Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
     <RootNamespace>ImageStudio</RootNamespace>
     <AssemblyName>ImageStudio</AssemblyName>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,12 +21,40 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="ModelContextProtocol" Version="2.3.0" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+    <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
+    <!-- Dostawcy: Private=false nie kopiuje ich do katalogu głównego; target niżej układa je w providers\ -->
+    <ProjectReference Include="..\ImageStudio.Providers.UberLlm\ImageStudio.Providers.UberLlm.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenRouter\ImageStudio.Providers.OpenRouter.csproj" Private="false" />
+    <ProjectReference Include="..\ImageStudio.Providers.OpenAi\ImageStudio.Providers.OpenAi.csproj" Private="false" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="ModelContextProtocol" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+  <!-- Biblioteki dostawców trafiają do podfolderu providers\ (build i publish); wczytuje je App (AssemblyLoadContext.Resolving) -->
+  <Target Name="CollectProviderDlls" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <ProviderDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Providers.')) And '%(Filename)' != 'ImageStudio.Providers.Core'" />
+      <ProviderFile Include="@(ProviderDll)" />
+      <ProviderFile Include="@(ProviderDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyProviderDlls" AfterTargets="Build" DependsOnTargets="CollectProviderDlls">
+    <Copy SourceFiles="@(ProviderFile)" DestinationFolder="$(OutDir)providers" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishProviderDlls" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="CollectProviderDlls">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(ProviderFile)" RelativePath="providers\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
 </Project>

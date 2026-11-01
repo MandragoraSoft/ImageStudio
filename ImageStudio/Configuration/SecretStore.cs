@@ -50,6 +50,8 @@ public static class SecretStore
 
 public static class AppPaths
 {
-    public static string UserDataDir { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ImageStudio");
+    // IMAGESTUDIO_DATA_DIR nadpisuje katalog danych (testy używają katalogu tymczasowego)
+    public static string UserDataDir { get; } = Environment.GetEnvironmentVariable("IMAGESTUDIO_DATA_DIR") is { Length: > 0 } dir
+        ? dir
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ImageStudio");
 }

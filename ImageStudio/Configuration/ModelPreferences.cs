@@ -8,6 +8,9 @@ namespace ImageStudio.Configuration;
 public sealed class ProviderModelPrefs
 {
     public bool PreferredOnly { get; set; }
+
+    // Preferowany model tekstowy użytkownika (ulepszanie promptów, czat); null = domyślny dostawcy
+    public string? DefaultTextModel { get; set; }
     public HashSet<string> Preferred { get; set; } = [];
 }
 

@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
+using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
 
@@ -33,8 +33,11 @@ public sealed partial class PresetsViewModel : ObservableObject
     // Ustawiane przez okno, żeby ViewModel mógł je zamknąć
     public event Action? CloseRequested;
 
-    public PresetsViewModel()
+    private readonly IDialogService _dialogs;
+
+    public PresetsViewModel(IDialogService dialogs)
     {
+        _dialogs = dialogs;
         Reload(null);
     }
 
@@ -102,9 +105,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     {
         if (SelectedPreset is null) return;
 
-        var answer = MessageBox.Show($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu",
-                                     MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!_dialogs.Confirm($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu")) return;
 
         PresetStore.Delete(SelectedPreset);
         Reload(null);

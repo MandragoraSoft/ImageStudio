@@ -38,6 +38,12 @@
                   IsChecked="{Binding ActiveProvider.PreferredOnly}"
                   ToolTip="Preferowane wybierasz w oknie „Przeglądaj modele” obok filtrów. Pusta lista preferowanych pokazuje wszystkie modele."/>
 
+        <views:ModelPicker Header="Domyślny model tekstowy dostawcy"
+                           ItemsSource="{Binding ActiveProvider.TextModels}"
+                           SelectedItem="{Binding ActiveProvider.DefaultTextModel}"/>
+        <TextBlock Text="Ulepszanie promptów, czat i nazwy zestawów. Pełna lista modeli jest widoczna dla aktywnego dostawcy."
+                   TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
+
         <TextBlock Text="Maksymalny długi bok obrazu źródłowego (px)" Style="{StaticResource SectionHeader}"/>
         <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>
 

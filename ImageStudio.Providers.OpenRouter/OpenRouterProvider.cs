@@ -41,6 +41,8 @@ public sealed class OpenRouterProvider : IAiProvider
     }
 
     public string Id => Identifier;
+    public const string DefaultTextModelId = "openai/gpt-4o-mini";
+    public string? DefaultTextModel => DefaultTextModelId;
     public string DisplayName => "OpenRouter";
 
     public async Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default)
@@ -203,7 +205,7 @@ public sealed class OpenRouterProvider : IAiProvider
 
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default) =>
-        ImageGenerationService.ChatAsync(_http, ChatPath, model, messages, tools, ct);
+        OpenAiCompat.ChatAsync(_http, ChatPath, model, messages, tools, ct);
 
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,
@@ -214,7 +216,7 @@ public sealed class OpenRouterProvider : IAiProvider
             ["model"] = model,
             ["messages"] = new[]
             {
-                new { role = "system", content = $"{instruction}\n\n{ImageGenerationService.SplitFormat}" },
+                new { role = "system", content = $"{instruction}\n\n{OpenAiCompat.SplitFormat}" },
                 new { role = "user", content = $"SYSTEM (config):\n{system}\n\nCONCEPT:\n{concept}" },
             },
         };
@@ -228,7 +230,7 @@ public sealed class OpenRouterProvider : IAiProvider
         using var doc = JsonDocument.Parse(text);
         var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
             .GetProperty("content").GetString() ?? "";
-        var parts = ImageGenerationService.ParseSplit(content, system, concept);
+        var parts = OpenAiCompat.ParseSplit(content, system, concept);
         if (string.IsNullOrWhiteSpace(parts.Concept))
             throw new InvalidOperationException("Model nie zwrócił promptu.");
         return parts;

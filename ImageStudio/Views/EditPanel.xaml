@@ -55,13 +55,8 @@
 
             
 
-            <Expander Header="Filtry modeli" Margin="0,4,0,0">
-                <views:ModelFilterBar Margin="0,4,0,0"/>
-            </Expander>
-
-            <TextBlock Text="Model edycji" Style="{StaticResource SectionHeader}"/>
-            <ComboBox ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"
-                      ItemTemplate="{StaticResource ModelItemTemplate}" Margin="0,0,0,6"/>
+            <views:ModelPicker Header="Model edycji" HasFilters="True" Margin="0,4,0,0"
+                               ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
 
             <Expander Header="Proporcje i rozmiar wyjścia" IsExpanded="True" Margin="0,0,0,6">
                 <StackPanel>

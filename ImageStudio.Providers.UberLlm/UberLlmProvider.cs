@@ -15,6 +15,8 @@ public sealed class UberLlmProvider : IAiProvider
     }
 
     public string Id => Identifier;
+    public const string DefaultTextModelId = "venice/uncensored";
+    public string? DefaultTextModel => DefaultTextModelId;
     public string DisplayName => "UberLLM";
 
     public Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default) => _api.GetImageModelsAsync(ct);
