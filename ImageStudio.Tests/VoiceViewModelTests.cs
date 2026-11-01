@@ -19,9 +19,10 @@ public sealed class VoiceViewModelTests : IDisposable
 
     private static ModelPricing Price(decimal usd, string unit) => new(usd, null, null, unit, null, null);
 
-    private TestApp App(Action<UserState>? state = null)
+    private TestApp App(Action<UserState>? state = null, bool withTextModel = true)
     {
         var provider = new FakeProvider();
+        if (withTextModel) provider.ChatCatalog = [new ChatModelInfo("txt/m", [])];
         provider.SpeechCatalog.AddRange([new AudioModelInfo("tts/a", "A", Price(0.1m, "1K characters")), new AudioModelInfo("tts/b", "B")]);
         provider.TranscriptionCatalog.Add(new AudioModelInfo("stt/a", "A", Price(0.006m, "minute")));
         provider.VoiceCatalog["tts/a"] = ["dan", "jess"];
@@ -234,6 +235,91 @@ public sealed class VoiceViewModelTests : IDisposable
         Assert.Contains("brak środków", app.Vm.Status);
         Assert.False(voice.IsBusy);
         Assert.True(voice.SynthesizeCommand.CanExecute(null));
+    }
+
+    // ---- język mowy ----
+
+    [Fact]
+    public async Task Without_a_chosen_language_the_text_is_read_as_typed_with_no_translation_call()
+    {
+        using var app = await LoadedAsync(App());
+        Fake(app).OnSynthesize = (_, _, _, _, _) => new AudioResult([1], "mp3", null);
+        var voice = app.Vm.Voice;
+        voice.SpeechText = "Guten Tag";
+
+        await voice.SynthesizeCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, Fake(app).ChatCalls);
+        Assert.Equal("Guten Tag", Fake(app).LastSpeech!.Value.Text);
+        Assert.Null(voice.SelectedSpeechLanguage!.Code);
+    }
+
+    [Fact]
+    public async Task A_chosen_language_translates_with_the_text_model_and_reads_the_translation()
+    {
+        using var app = await LoadedAsync(App());
+        Fake(app).OnChat = (_, _) => "  Dzień dobry" + Environment.NewLine;
+        Fake(app).OnSynthesize = (_, _, _, _, _) => new AudioResult([1], "mp3", null);
+        var voice = app.Vm.Voice;
+        voice.SpeechText = "Good morning";
+        voice.SelectedSpeechLanguage = voice.Languages.Single(l => l.Code == "pl");
+
+        await voice.SynthesizeCommand.ExecuteAsync(null);
+
+        Assert.Equal("txt/m", Fake(app).LastModel);
+        Assert.Equal(["system", "user"], Fake(app).LastMessages.Select(m => m.Role));
+        Assert.Contains("into Polish", Fake(app).LastMessages[0].Content);
+        Assert.Equal("Good morning", Fake(app).LastMessages[1].Content);
+        Assert.Equal("Dzień dobry", Fake(app).LastSpeech!.Value.Text);
+        var item = voice.Items.Single();
+        Assert.Equal("Dzień dobry", item.Text);
+        Assert.Contains("przetłumaczono: Polski", item.Footer);
+    }
+
+    [Fact]
+    public async Task Translation_is_refused_without_a_text_model_and_nothing_is_synthesized()
+    {
+        using var app = await LoadedAsync(App(withTextModel: false));
+        Fake(app).OnSynthesize = (_, _, _, _, _) => new AudioResult([1], "mp3", null);
+        var voice = app.Vm.Voice;
+        voice.SpeechText = "Hello";
+        voice.SelectedSpeechLanguage = voice.Languages.Single(l => l.Code == "de");
+
+        await voice.SynthesizeCommand.ExecuteAsync(null);
+
+        Assert.Contains("Brak modelu tekstowego", app.Vm.Status);
+        Assert.Null(Fake(app).LastSpeech);
+        Assert.Empty(voice.Items);
+    }
+
+    [Fact]
+    public async Task An_empty_translation_stops_before_synthesis()
+    {
+        using var app = await LoadedAsync(App());
+        Fake(app).OnChat = (_, _) => "   ";
+        Fake(app).OnSynthesize = (_, _, _, _, _) => new AudioResult([1], "mp3", null);
+        var voice = app.Vm.Voice;
+        voice.SpeechText = "Hello";
+        voice.SelectedSpeechLanguage = voice.Languages.Single(l => l.Code == "fr");
+
+        await voice.SynthesizeCommand.ExecuteAsync(null);
+
+        Assert.Contains("nie zwrócił tłumaczenia", app.Vm.Status);
+        Assert.Null(Fake(app).LastSpeech);
+    }
+
+    [Fact]
+    public async Task Chosen_language_is_remembered()
+    {
+        var app = App();
+        await LoadedAsync(app);
+        using var _ = app;
+        app.Vm.Voice.SelectedSpeechLanguage = app.Vm.Voice.Languages.Single(l => l.Code == "es");
+        app.Vm.SaveState();
+        Assert.Equal("es", app.Get<IUserStateStore>().Load().VoiceSpeechLanguage);
+
+        using var again = await LoadedAsync(App(s => s.VoiceSpeechLanguage = "ja"));
+        Assert.Equal("ja", again.Vm.Voice.SelectedSpeechLanguage!.Code);
     }
 
     // ---- rozpoznawanie ----

@@ -33,6 +33,7 @@ public sealed class UserState
     public string? VoiceLanguage { get; set; }
     public string? VoiceMicrophone { get; set; }
     public string? VoiceSpeaker { get; set; }
+    public string? VoiceSpeechLanguage { get; set; }
     public bool UseTools { get; set; }
     public bool? RequireToolApproval { get; set; }
     public List<string> McpEnabled { get; set; } = [];

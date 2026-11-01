@@ -161,12 +161,14 @@ public sealed partial class MainViewModel : ObservableObject
                                  activity, ChatModelOptions, () => _settings.UseStreaming, chatSessions);
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
-                                   Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state);
+                                   Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
+                                   () => SelectedEnhancerModel);
         Voice.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)
                 or nameof(VoiceViewModel.Speed) or nameof(VoiceViewModel.Format) or nameof(VoiceViewModel.SelectedTranscriptionModel)
-                or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone) or nameof(VoiceViewModel.SelectedSpeaker)) SaveState();
+                or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone) or nameof(VoiceViewModel.SelectedSpeaker)
+                or nameof(VoiceViewModel.SelectedSpeechLanguage)) SaveState();
         };
         Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));

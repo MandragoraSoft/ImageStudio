@@ -4,6 +4,9 @@
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <!-- DataContext = VoiceViewModel. Wyniki (odtwarzanie, zapis) są w prawym panelu okna głównego -->
     <UserControl.Resources>
+        <DataTemplate x:Key="LanguageTemplate">
+            <TextBlock Text="{Binding Name}"/>
+        </DataTemplate>
         <DataTemplate x:Key="AudioDeviceTemplate">
             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
         </DataTemplate>
@@ -27,6 +30,13 @@
 
                     <TextBlock Text="{Binding Speed, StringFormat='Prędkość: {0:0.0}×'}" Margin="0,8,0,0"/>
                     <Slider Minimum="0.5" Maximum="2" Value="{Binding Speed}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+
+                    <TextBlock Text="Język mowy" Style="{StaticResource SectionHeader}"/>
+                    <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedSpeechLanguage}"
+                              ItemTemplate="{StaticResource LanguageTemplate}"
+                              ToolTip="Modele mowy czytają tekst w jego języku. Wybrany język: tekst jest najpierw tłumaczony modelem tekstowym"/>
+                    <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Text="Wybór języka tłumaczy tekst modelem tekstowym (osobny, tani koszt tokenów) i czyta tłumaczenie. Głos powinien obsługiwać ten język, inaczej mówi z obcym akcentem."/>
 
                     <TextBlock Text="Format" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}"/>
