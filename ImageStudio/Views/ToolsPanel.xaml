@@ -8,6 +8,11 @@
             <CheckBox Content="Pytaj o zgodę przed każdym wywołaniem" IsChecked="{Binding RequireApproval}" Margin="0,4,0,0"
                       ToolTip="Zalecane: narzędzia mogą czytać pliki, wysyłać dane i zmieniać rzeczy poza aplikacją"/>
 
+            <CheckBox IsChecked="{Binding AppControlEnabled}" Margin="0,4,0,0"
+                      ToolTip="Narzędzia imagestudio__*: wybór modeli, prompty, rozmiar, galeria i generowanie (kosztuje, ale pyta o zgodę)">
+                <TextBlock Text="Model może sterować aplikacją (modele, prompty, generowanie)" TextWrapping="Wrap"/>
+            </CheckBox>
+
             <TextBlock Text="Serwery z mcp.json" Style="{StaticResource SectionHeader}"/>
             <ItemsControl ItemsSource="{Binding Servers}">
                 <ItemsControl.ItemTemplate>
@@ -28,6 +33,21 @@
                 <Button Content="Otwórz mcp.json" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenConfigCommand}"/>
                 <Button Content="Wczytaj ponownie" Padding="10,4" Command="{Binding ReloadCommand}"/>
             </StackPanel>
+
+            <TextBlock Text="Serwer MCP aplikacji (sterowanie z zewnątrz)" Style="{StaticResource SectionHeader}"/>
+            <CheckBox IsChecked="{Binding Server.Enabled}">
+                <TextBlock Text="Udostępnij sterowanie aplikacją klientom MCP (tylko ten komputer)" TextWrapping="Wrap"/>
+            </CheckBox>
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <TextBlock Text="Port:" VerticalAlignment="Center" Margin="0,0,6,0" Style="{StaticResource MutedTextBlock}"/>
+                <TextBox Text="{Binding Server.Port, UpdateSourceTrigger=LostFocus}" Width="70"/>
+            </StackPanel>
+            <TextBlock Text="{Binding Server.Status}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0"/>
+            <Button Content="Kopiuj konfigurację klienta" Padding="10,4" Margin="0,6,0,0" HorizontalAlignment="Left"
+                    Command="{Binding Server.CopyConfigCommand}"
+                    ToolTip="Wkleja się do konfiguracji klienta MCP; zawiera token dostępu"/>
+            <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"
+                       Text="Dostęp tylko z tego komputera i z tokenem. Każde generowanie z zewnątrz wymaga potwierdzenia w aplikacji."/>
 
             <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"
                        Text="Format jak w Claude Desktop: {&quot;mcpServers&quot;: {&quot;nazwa&quot;: {&quot;command&quot;: &quot;npx&quot;, &quot;args&quot;: [...]}}} albo {&quot;url&quot;: &quot;https://...&quot;, &quot;headers&quot;: {...}}. Tokeny w pliku są zwykłym tekstem."/>

@@ -121,7 +121,11 @@ public sealed partial class MainViewModel : ObservableObject
         SeedText = _state.SeedText ?? "";
         NegativePrompt = _state.NegativePrompt ?? "";
         SelectedQuality = _state.Quality ?? "auto";
-        Tools = new ToolsViewModel(new McpToolHost(), _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled);
+        var appTools = new AppControlTools(this, _dialogs.ConfirmToolCall);
+        var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
+                                            _state.McpServerPort ?? AppServerViewModel.DefaultPort);
+        Tools = new ToolsViewModel(new McpToolHost(), _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
+                                   null, appTools, _state.AppControlEnabled, server);
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
                                  Tools, _dialogs.ConfirmToolCall,
                                  new ChatImageSupport(_dialogs,
@@ -360,6 +364,9 @@ public sealed partial class MainViewModel : ObservableObject
         _state.UseTools = Tools.UseTools;
         _state.RequireToolApproval = Tools.RequireApproval;
         _state.McpEnabled = Tools.EnabledServers.ToList();
+        _state.AppControlEnabled = Tools.AppControlEnabled;
+        _state.McpServerEnabled = Tools.Server?.Enabled ?? false;
+        _state.McpServerPort = Tools.Server?.Port;
         _state.EnhancerInstruction = EnhancerInstruction;
         _state.SeedText = SeedText;
         _state.NegativePrompt = NegativePrompt;

@@ -70,9 +70,11 @@ public sealed class WpfDialogService : IDialogService
             : null;
     }
 
+    public void CopyText(string text) => Clipboard.SetText(text);
+
     public bool ConfirmToolCall(ToolCall call) =>
         MessageBox.Show(OwnerWindow(),
-                        $"Model chce wywołać narzędzie:\n\n{call.Name}\n\nArgumenty:\n{call.ArgumentsJson}\n\nPozwolić?",
+                        $"Wywołanie narzędzia (czat albo klient MCP):\n\n{call.Name}\n\nArgumenty:\n{call.ArgumentsJson}\n\nPozwolić?",
                         "Wywołanie narzędzia", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No)
         == MessageBoxResult.Yes;
 

@@ -25,6 +25,9 @@ public sealed class UserState
     public bool UseTools { get; set; }
     public bool? RequireToolApproval { get; set; }
     public List<string> McpEnabled { get; set; } = [];
+    public bool AppControlEnabled { get; set; }
+    public bool McpServerEnabled { get; set; }
+    public int? McpServerPort { get; set; }
     public string? EnhancerInstruction { get; set; }
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }

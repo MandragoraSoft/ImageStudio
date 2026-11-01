@@ -58,15 +58,29 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private McpConfig _config = new();
     private bool _initialized;
 
+    private readonly AppControlTools? _appTools;
+
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
-                          string? configPath = null)
+                          string? configPath = null, AppControlTools? appTools = null, bool appControlEnabled = false,
+                          AppServerViewModel? server = null)
     {
         _host = host;
         _configPath = configPath;
         _useTools = useTools;
         _requireApproval = requireApproval;
         _enabledNames = new HashSet<string>(enabledServers);
+        _appTools = appTools;
+        _appControlEnabled = appControlEnabled;
+        Server = server;
     }
+
+    // Lokalny serwer MCP z narzędziami sterującymi aplikacją (dla zewnętrznych klientów); null = niedostępny
+    public AppServerViewModel? Server { get; }
+
+    // Model w czacie może sterować aplikacją (imagestudio__*): modele, prompty, rozmiar, generowanie, galeria
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Tools), nameof(Summary))]
+    private bool _appControlEnabled;
 
     public ObservableCollection<McpServerItem> Servers { get; } = [];
 
@@ -81,14 +95,31 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     [ObservableProperty]
     private string _info = "";
 
-    public IReadOnlyList<ToolDefinition> Tools => UseTools ? _host.Tools : [];
+    public IReadOnlyList<ToolDefinition> Tools => !UseTools
+        ? []
+        : [.. _host.Tools, .. AppToolDefinitions()];
 
-    public string Summary => UseTools ? $"Dostępne narzędzia: {_host.Tools.Count}" : "Narzędzia wyłączone";
+    public string Summary => UseTools ? $"Dostępne narzędzia: {Tools.Count}" : "Narzędzia wyłączone";
+
+    private IEnumerable<ToolDefinition> AppToolDefinitions() =>
+        AppControlEnabled && _appTools is not null
+            ? _appTools.Definitions.Select(d => d with { Name = AppControlTools.ChatPrefix + d.Name })
+            : [];
 
     // Nazwy zaznaczonych serwerów, także tych, których chwilowo nie ma w mcp.json (żeby ich nie zgubić przy zapisie stanu)
     public IReadOnlyCollection<string> EnabledServers => _enabledNames;
 
-    public Task<string> CallAsync(ToolCall call, CancellationToken ct = default) => _host.CallAsync(call, ct);
+    // Narzędzia aplikacji (przedrostek imagestudio__) obsługuje AppControlTools, reszta idzie do serwerów MCP.
+    // Gdy czat wymaga zgody, użytkownik już zatwierdził to wywołanie, więc kosztowne nie pytają drugi raz.
+    public Task<string> CallAsync(ToolCall call, CancellationToken ct = default)
+    {
+        if (!call.Name.StartsWith(AppControlTools.ChatPrefix, StringComparison.Ordinal) || _appTools is null)
+            return _host.CallAsync(call, ct);
+
+        return AppControlEnabled
+            ? _appTools.CallAsync(call.Name[AppControlTools.ChatPrefix.Length..], call.ArgumentsJson, alreadyApproved: RequireApproval)
+            : Task.FromResult("Sterowanie aplikacją jest wyłączone.");
+    }
 
     // Wczytuje listę serwerów i łączy zaznaczone; wywoływane raz po starcie aplikacji
     public async Task InitializeAsync()
@@ -97,6 +128,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         _initialized = true;
 
         LoadServers();
+        if (Server is not null) await Server.InitializeAsync();
         await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
     }
 
@@ -169,5 +201,9 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         }
     }
 
-    public ValueTask DisposeAsync() => _host.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _host.DisposeAsync();
+        if (Server is not null) await Server.DisposeAsync();
+    }
 }

@@ -23,6 +23,8 @@ public interface IDialogService
     SettingsResult? ShowSettings(SettingsResult current);
     PresetDraft? ShowSavePreset(string defaultName);
 
+    void CopyText(string text);
+
     // Zgoda na wywołanie narzędzia, o które poprosił model; false = odmowa
     bool ConfirmToolCall(ToolCall call);
 

@@ -64,6 +64,8 @@ internal sealed class FakeDialogs : IDialogService
 {
     public string[]? PickResult { get; set; }
     public BitmapSource? Clipboard { get; set; }
+    public string? CopiedText { get; private set; }
+    public void CopyText(string text) => CopiedText = text;
 
     public string[]? PickImageFiles() => PickResult;
     public BitmapSource? GetClipboardImage() => Clipboard;
