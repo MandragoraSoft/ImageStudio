@@ -167,8 +167,8 @@ public sealed partial class MainViewModel : ObservableObject
         var appTools = new AppControlTools(this, _dialogs.ConfirmToolCall);
         var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
                                             _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
-        var builtin = new BuiltinTools(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
-                                       _dialogs.ConfirmToolCall);
+        var builtin = BuiltinToolRegistry.Create(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
+                                                 _dialogs.ConfirmToolCall);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
                                    _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
                                    _state.BuiltinToolsEnabled ?? true, memory);

@@ -20,6 +20,10 @@
     <ProjectReference Include="..\ImageStudio.Providers.Mistral\ImageStudio.Providers.Mistral.csproj" />
     <ProjectReference Include="..\ImageStudio.Providers.Kilo\ImageStudio.Providers.Kilo.csproj" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tools.Core\ImageStudio.Tools.Core.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tools.Files\ImageStudio.Tools.Files.csproj" />
     <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" />
     <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" />

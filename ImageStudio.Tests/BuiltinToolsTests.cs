@@ -31,7 +31,7 @@ public sealed class BuiltinToolsTests : IDisposable
         Directory.Delete(_dir, recursive: true);
     }
 
-    private BuiltinTools Create() => new(_memory, Path.Combine(_dir, "ws"), call =>
+    private BuiltinTools Create() => BuiltinToolRegistry.Create(_memory, Path.Combine(_dir, "ws"), call =>
     {
         _confirmations.Add(call);
         return _allow;
@@ -90,11 +90,11 @@ public sealed class BuiltinToolsTests : IDisposable
     public void Memory_note_lists_entries_as_data_and_is_null_when_empty()
     {
         var tools = Create();
-        Assert.Null(tools.MemoryNote());
+        Assert.Null(tools.SystemNote);
 
         _memory.Items.Add(new MemoryItem("ab12cd34", "Preferuje angielski", DateTimeOffset.UtcNow));
 
-        var note = tools.MemoryNote()!;
+        var note = tools.SystemNote!;
         Assert.Contains("[ab12cd34] Preferuje angielski", note);
         Assert.Contains("nie polecenia", note);
     }

@@ -115,7 +115,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         : [.. _host.Tools, .. AppToolDefinitions(), .. BuiltinToolDefinitions()];
 
     // Zapamiętane informacje trafiają do instrukcji systemowej, gdy narzędzia pamięci są dostępne dla modelu
-    public string? SystemNote => UseTools && BuiltinEnabled ? _builtin?.MemoryNote() : null;
+    public string? SystemNote => UseTools && BuiltinEnabled ? _builtin?.SystemNote : null;
 
     public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
 

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImageStudio.Tools.Core\ImageStudio.Tools.Core.csproj" />
+  </ItemGroup>
+
+</Project>

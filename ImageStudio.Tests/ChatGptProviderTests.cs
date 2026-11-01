@@ -280,4 +280,63 @@ public sealed class ChatGptProviderTests
         Assert.True(vm.SignInCommand.CanExecute(null));
         Assert.False(vm.SignOutCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Reasoning_is_requested_with_effort_and_summary_only_when_enabled()
+    {
+        var on = JsonSerializer.SerializeToElement(ChatGptProvider.BuildBody("m", [new ChatMessage("user", "x")], null, new ChatOptions("reasoning_effort", true, "high")));
+        Assert.Equal("high", on.GetProperty("reasoning").GetProperty("effort").GetString());
+        Assert.Equal("auto", on.GetProperty("reasoning").GetProperty("summary").GetString());
+
+        var off = JsonSerializer.SerializeToElement(ChatGptProvider.BuildBody("m", [new ChatMessage("user", "x")], null, new ChatOptions("reasoning_effort", false, "high")));
+        Assert.False(off.TryGetProperty("reasoning", out _));
+        Assert.False(JsonSerializer.SerializeToElement(ChatGptProvider.BuildBody("m", [new ChatMessage("user", "x")], null)).TryGetProperty("reasoning", out _));
+    }
+
+    [Fact]
+    public void Models_declare_reasoning_unless_the_catalog_says_they_have_none()
+    {
+        var root = JsonDocument.Parse("""
+            {"models":[
+              {"slug":"nieznany","visibility":"list"},
+              {"slug":"mysli","visibility":"list","supported_reasoning_levels":[{"effort":"low"},{"effort":"high"}]},
+              {"slug":"bez","visibility":"list","supported_reasoning_levels":[]}
+            ]}
+            """).RootElement;
+
+        var models = ChatGptProvider.ParseModels(root).ToDictionary(m => m.Id);
+
+        Assert.Equal("reasoning_effort", ReasoningSupport.ParameterFor(models["nieznany"].SupportedParameters));
+        Assert.Equal("reasoning_effort", ReasoningSupport.ParameterFor(models["mysli"].SupportedParameters));
+        Assert.Null(ReasoningSupport.ParameterFor(models["bez"].SupportedParameters));
+    }
+
+    [Fact]
+    public async Task Chat_streams_reasoning_summary_and_retries_without_reasoning_when_the_model_rejects_it()
+    {
+        var calls = 0;
+        using var server = new Server((_, _) => ++calls == 1
+            ? (400, "application/json", """{"error":{"message":"Unsupported parameter: 'reasoning.effort' is not supported with this model."}}""")
+            : (200, "text/event-stream", Sse("""{"type":"response.output_text.delta","delta":"ok"}""", """{"type":"response.completed","response":{}}""")));
+        using var provider = new ChatGptProvider(new ChatGptSession("h", "c", "tok", "r", DateTimeOffset.UtcNow.AddHours(1)).ToJson(), null, null, server.Url + "/");
+
+        var reply = await provider.ChatAsync("gpt-x", [new ChatMessage("user", "x")], null, default, new ChatOptions("reasoning_effort", true, "medium"));
+
+        Assert.Equal("ok", reply.Content);
+        Assert.Equal(2, server.Requests.Count);
+        Assert.Contains("\"reasoning\"", server.Requests[0].Body);
+        Assert.DoesNotContain("\"reasoning\"", server.Requests[1].Body);
+    }
+
+    [Fact]
+    public async Task Other_errors_are_not_retried()
+    {
+        using var server = new Server((_, _) => (403, "application/json", """{"detail":"Region not supported"}"""));
+        using var provider = new ChatGptProvider(new ChatGptSession("h", "c", "tok", "r", DateTimeOffset.UtcNow.AddHours(1)).ToJson(), null, null, server.Url + "/");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provider.ChatAsync("m", [new ChatMessage("user", "x")], null, default, new ChatOptions("reasoning_effort", true, "high")));
+
+        Assert.Single(server.Requests);
+    }
 }

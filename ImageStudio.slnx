@@ -14,6 +14,12 @@
     <Project Path="ImageStudio.Providers.OpenRouter/ImageStudio.Providers.OpenRouter.csproj" />
     <Project Path="ImageStudio.Providers.UberLlm/ImageStudio.Providers.UberLlm.csproj" />
   </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="ImageStudio.Tools.Core/ImageStudio.Tools.Core.csproj" />
+    <Project Path="ImageStudio.Tools.DateTime/ImageStudio.Tools.DateTime.csproj" />
+    <Project Path="ImageStudio.Tools.Files/ImageStudio.Tools.Files.csproj" />
+    <Project Path="ImageStudio.Tools.Memory/ImageStudio.Tools.Memory.csproj" />
+  </Folder>
   <Folder Name="/Tabs/">
     <Project Path="ImageStudio.Shared/ImageStudio.Shared.csproj" />
     <Project Path="ImageStudio.Tabs.Chat/ImageStudio.Tabs.Chat.csproj" />

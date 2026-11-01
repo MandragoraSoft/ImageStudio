@@ -56,11 +56,23 @@ public sealed class ChatGptProvider : OpenAiChatProvider
         if (root.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array)
             return models.EnumerateArray()
                 .Where(m => Text(m, "visibility") is null or "list" && Text(m, "slug") is not null)
-                .Select(m => new ChatModelInfo(Text(m, "slug")!, [], null, "openai", ["text", "image"], Text(m, "display_name")))
+                .Select(m => new ChatModelInfo(Text(m, "slug")!, ReasoningParameters(m), null, "openai", ["text", "image"], Text(m, "display_name")))
                 .ToList();
 
-        return ModelEntries(root).Select(m => new ChatModelInfo(m.GetProperty("id").GetString()!, [], null, "openai", ["text", "image"]))
+        return ModelEntries(root).Select(m => new ChatModelInfo(m.GetProperty("id").GetString()!, [ReasoningParameter], null, "openai", ["text", "image"]))
             .ToList();
+    }
+
+    // Parametr, pod którym czat widzi sterowanie rozumowaniem (ReasoningSupport.ParameterFor)
+    private const string ReasoningParameter = "reasoning_effort";
+
+    // Katalog konta może podawać poziomy rozumowania modelu (supported_reasoning_levels: lista nazw albo obiektów z "effort").
+    // Pusta lista = model nie rozumuje; brak pola = nie wiemy, więc sterowanie jest dostępne, a odrzucony parametr obsługuje ponowienie
+    private static IReadOnlyList<string> ReasoningParameters(JsonElement model)
+    {
+        if (!model.TryGetProperty("supported_reasoning_levels", out var levels) || levels.ValueKind != JsonValueKind.Array) return [ReasoningParameter];
+
+        return levels.GetArrayLength() > 0 ? [ReasoningParameter] : [];
     }
 
     public override Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
@@ -74,10 +86,30 @@ public sealed class ChatGptProvider : OpenAiChatProvider
                                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
                                                           CancellationToken ct = default, ChatOptions? options = null)
     {
-        using var response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools)),
-                                             HttpCompletionOption.ResponseHeadersRead, ct);
+        var response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools, options)),
+                                       HttpCompletionOption.ResponseHeadersRead, ct);
         if (!response.IsSuccessStatusCode)
-            throw ApiErrors.Failure(response.StatusCode, await response.Content.ReadAsStringAsync(ct));
+        {
+            var error = await response.Content.ReadAsStringAsync(ct);
+            var status = response.StatusCode;
+            response.Dispose();
+
+            // Model bez rozumowania odrzuca parametr reasoning: ponawiamy raz bez niego (jak z innymi odrzuconymi parametrami)
+            if (options is not { Enabled: true } || !error.Contains("reasoning", StringComparison.OrdinalIgnoreCase))
+                throw ApiErrors.Failure(status, error);
+
+            response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools)),
+                                       HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var retryError = await response.Content.ReadAsStringAsync(ct);
+                var retryStatus = response.StatusCode;
+                response.Dispose();
+                throw ApiErrors.Failure(retryStatus, retryError);
+            }
+        }
+
+        using var _ = response;
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
@@ -114,7 +146,7 @@ public sealed class ChatGptProvider : OpenAiChatProvider
 
     // Ciało żądania Responses: role system wędrują do instructions, wywołania i wyniki narzędzi to osobne pozycje wejścia
     public static Dictionary<string, object?> BuildBody(string model, IReadOnlyList<ChatMessage> messages,
-                                                        IReadOnlyList<ToolDefinition>? tools)
+                                                        IReadOnlyList<ToolDefinition>? tools, ChatOptions? options = null)
     {
         var input = new List<object>();
         var instructions = new List<string>();
@@ -152,6 +184,11 @@ public sealed class ChatGptProvider : OpenAiChatProvider
 
         var body = new Dictionary<string, object?> { ["model"] = model, ["input"] = input, ["store"] = false, ["stream"] = true };
         if (instructions.Count > 0) body["instructions"] = string.Join("\n\n", instructions);
+
+        // Rozumowanie: poziom wysiłku i prośba o podsumowanie (strumień niesie je jako response.reasoning_summary_text.delta).
+        // Wyłączone = brak parametru, model użyje swojego domyślnego poziomu
+        if (options is { Parameter: ReasoningParameter, Enabled: true })
+            body["reasoning"] = new { effort = options.Effort ?? ReasoningSupport.DefaultEffort, summary = "auto" };
         if (tools is { Count: > 0 })
             body["tools"] = tools.Select(t => new
             {

@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ImageStudio.Providers.Core\ImageStudio.Providers.Core.csproj" />
     <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
+    <ProjectReference Include="..\ImageStudio.Tools.Core\ImageStudio.Tools.Core.csproj" />
     <!-- Zakładki lewego panelu: osobne projekty, ich DLL-e trafiają do podfolderu tabs\ (jak dostawcy do providers\) -->
     <ProjectReference Include="..\ImageStudio.Tabs.Generate\ImageStudio.Tabs.Generate.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Tabs.Edit\ImageStudio.Tabs.Edit.csproj" Private="$(PluginsInBundle)" />
@@ -44,6 +45,10 @@
     <ProjectReference Include="..\ImageStudio.Providers.Mistral\ImageStudio.Providers.Mistral.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.Kilo\ImageStudio.Providers.Kilo.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" Private="$(PluginsInBundle)" />
+    <!-- Grupy narzędzi czatu (IChatToolGroup): jak dostawcy, trafiają do podfolderu tools\ -->
+    <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Tools.Files\ImageStudio.Tools.Files.csproj" Private="$(PluginsInBundle)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,6 +66,9 @@
       <ProviderDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Providers.')) And '%(Filename)' != 'ImageStudio.Providers.Core'" />
       <ProviderFile Include="@(ProviderDll)" />
       <ProviderFile Include="@(ProviderDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
+      <ToolDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Tools.')) And '%(Filename)' != 'ImageStudio.Tools.Core'" />
+      <ToolFile Include="@(ToolDll)" />
+      <ToolFile Include="@(ToolDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
       <TabDll Include="@(ReferencePath)" Condition="$([System.String]::new('%(Filename)').StartsWith('ImageStudio.Tabs.'))" />
       <TabFile Include="@(TabDll)" />
       <TabFile Include="@(TabDll->'%(RootDir)%(Directory)%(Filename).pdb')" Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
@@ -70,12 +78,14 @@
   <Target Name="CopyPluginDlls" AfterTargets="Build" Condition="'$(PluginsInBundle)' != 'true'" DependsOnTargets="CollectPluginDlls">
     <Copy SourceFiles="@(ProviderFile)" DestinationFolder="$(OutDir)providers" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(TabFile)" DestinationFolder="$(OutDir)tabs" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ToolFile)" DestinationFolder="$(OutDir)tools" SkipUnchangedFiles="true" />
   </Target>
 
   <Target Name="PublishPluginDlls" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(PluginsInBundle)' != 'true'" DependsOnTargets="CollectPluginDlls">
     <ItemGroup>
       <ResolvedFileToPublish Include="@(ProviderFile)" RelativePath="providers\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
       <ResolvedFileToPublish Include="@(TabFile)" RelativePath="tabs\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="@(ToolFile)" RelativePath="tools\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 
