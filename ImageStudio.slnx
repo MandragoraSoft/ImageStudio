@@ -1,0 +1,21 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="ImageStudio.Tests/ImageStudio.Tests.csproj" />
+  <Folder Name="/Providers/">
+    <Project Path="ImageStudio.Providers.Core/ImageStudio.Providers.Core.csproj" />
+    <Project Path="ImageStudio.Providers.OpenAi/ImageStudio.Providers.OpenAi.csproj" />
+    <Project Path="ImageStudio.Providers.OpenRouter/ImageStudio.Providers.OpenRouter.csproj" />
+    <Project Path="ImageStudio.Providers.UberLlm/ImageStudio.Providers.UberLlm.csproj" />
+  </Folder>
+  <Folder Name="/Tabs/">
+    <Project Path="ImageStudio.Shared/ImageStudio.Shared.csproj" />
+    <Project Path="ImageStudio.Tabs.Chat/ImageStudio.Tabs.Chat.csproj" />
+    <Project Path="ImageStudio.Tabs.Edit/ImageStudio.Tabs.Edit.csproj" />
+    <Project Path="ImageStudio.Tabs.Generate/ImageStudio.Tabs.Generate.csproj" />
+    <Project Path="ImageStudio.Tabs.Video/ImageStudio.Tabs.Video.csproj" />
+  </Folder>
+  <Project Path="ImageStudio/ImageStudio.csproj" />
+</Solution>

@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
+using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
 
@@ -33,8 +33,15 @@ public sealed partial class PresetsViewModel : ObservableObject
     // Ustawiane przez okno, żeby ViewModel mógł je zamknąć
     public event Action? CloseRequested;
 
-    public PresetsViewModel()
+    private readonly IDialogService _dialogs;
+    private readonly IPresetStore _presets;
+    private readonly LegacyPromptImporter _importer;
+
+    public PresetsViewModel(IDialogService dialogs, IPresetStore presets, LegacyPromptImporter importer)
     {
+        _dialogs = dialogs;
+        _presets = presets;
+        _importer = importer;
         Reload(null);
     }
 
@@ -51,7 +58,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     private void Reload(string? selectFilePath)
     {
         Presets.Clear();
-        foreach (var preset in PresetStore.LoadAll()) Presets.Add(preset);
+        foreach (var preset in _presets.LoadAll()) Presets.Add(preset);
         SelectedPreset = Presets.FirstOrDefault(p => p.FilePath == selectFilePath) ?? Presets.FirstOrDefault();
     }
 
@@ -62,8 +69,12 @@ public sealed partial class PresetsViewModel : ObservableObject
         CloseRequested?.Invoke();
     }
 
+    // Zapis aktywny tylko po zmianie nazwy lub opisu zaznaczonego zestawu
+    private bool DetailsChanged => SelectedPreset is { } p
+                                   && (EditName.Trim() != p.Name || EditDescription.Trim() != (p.Description ?? ""));
+
     // Nazwa i opis są w pliku; nazwa pliku się nie zmienia
-    [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
+    [RelayCommand(CanExecute = nameof(DetailsChanged))]
     private void SaveDetails()
     {
         if (SelectedPreset is null) return;
@@ -77,7 +88,7 @@ public sealed partial class PresetsViewModel : ObservableObject
 
         SelectedPreset.Name = name;
         SelectedPreset.Description = EditDescription.Trim();
-        PresetStore.Save(SelectedPreset);
+        _presets.Save(SelectedPreset);
         Reload(SelectedPreset.FilePath);
         Status = "Zapisano nazwę i opis.";
     }
@@ -86,7 +97,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     [RelayCommand]
     private void ImportLegacy()
     {
-        var result = LegacyPromptImporter.Import();
+        var result = _importer.Import();
         if (!result.FileFound)
         {
             Status = "Nie znaleziono starej historii (prompts.json).";
@@ -102,11 +113,9 @@ public sealed partial class PresetsViewModel : ObservableObject
     {
         if (SelectedPreset is null) return;
 
-        var answer = MessageBox.Show($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu",
-                                     MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!_dialogs.Confirm($"Usunąć zestaw „{SelectedPreset.Name}”?", "Usuwanie zestawu")) return;
 
-        PresetStore.Delete(SelectedPreset);
+        _presets.Delete(SelectedPreset);
         Reload(null);
         Status = "Usunięto zestaw.";
     }

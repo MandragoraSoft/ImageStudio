@@ -1,41 +1,25 @@
-using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
-using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
 
-public sealed record ThemeOption(string Code, string Label);
-
+// Okno ustawień: kontener wstrzykniętych zakładek (ISettingsTab). Wynik składa się z wartości wszystkich zakładek
 public sealed partial class SettingsViewModel : ObservableObject
 {
-    public static IReadOnlyList<ThemeOption> Themes { get; } =
-    [
-        new(ThemeService.System, "Systemowy"),
-        new(ThemeService.Light, "Jasny"),
-        new(ThemeService.Dark, "Ciemny"),
-    ];
+    private readonly SettingsResult _current;
+
+    public IReadOnlyList<ISettingsTab> Tabs { get; }
 
     [ObservableProperty]
-    private string _baseUrl;
+    private ISettingsTab _selectedTab;
 
-    [ObservableProperty]
-    private string _marketUrl;
-
-    [ObservableProperty]
-    private int _maxSide;
-
-    [ObservableProperty]
-    private string _apiKey;
-
-    [ObservableProperty]
-    private string _selectedTheme;
-
-    public SettingsViewModel(SettingsResult current)
+    public SettingsViewModel(SettingsResult current, IEnumerable<ISettingsTab> tabs)
     {
-        _baseUrl = current.BaseUrl;
-        _marketUrl = current.MarketUrl;
-        _maxSide = current.MaxSide;
-        _apiKey = current.ApiKey;
-        _selectedTheme = current.Theme;
+        _current = current;
+        Tabs = tabs.OrderBy(t => t.Order).ToList();
+        if (Tabs.Count == 0) throw new ArgumentException("Okno ustawień wymaga co najmniej jednej zakładki.", nameof(tabs));
+        _selectedTab = Tabs[0];
     }
+
+    // Bieżący stan wszystkich zakładek jako wynik (przy zapisie okna)
+    public SettingsResult ToResult() => Tabs.Aggregate(_current, (result, tab) => tab.Apply(result));
 }

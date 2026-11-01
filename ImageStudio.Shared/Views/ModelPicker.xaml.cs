@@ -1,0 +1,77 @@
+using System.Collections;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace ImageStudio.Views;
+
+public partial class ModelPicker : UserControl
+{
+    public static readonly DependencyProperty ItemsSourceProperty =
+        DependencyProperty.Register(nameof(ItemsSource), typeof(IEnumerable), typeof(ModelPicker));
+    public static readonly DependencyProperty SelectedItemProperty =
+        DependencyProperty.Register(nameof(SelectedItem), typeof(object), typeof(ModelPicker),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+    public static readonly DependencyProperty HeaderProperty =
+        DependencyProperty.Register(nameof(Header), typeof(string), typeof(ModelPicker));
+    public static readonly DependencyProperty HasFiltersProperty =
+        DependencyProperty.Register(nameof(HasFilters), typeof(bool), typeof(ModelPicker));
+    public static readonly DependencyProperty FiltersContextProperty =
+        DependencyProperty.Register(nameof(FiltersContext), typeof(object), typeof(ModelPicker),
+            new PropertyMetadata(null, (d, e) =>
+            {
+                var bar = ((ModelPicker)d).FilterBar;
+                if (e.NewValue is null) bar.ClearValue(DataContextProperty);
+                else bar.DataContext = e.NewValue;
+            }));
+    public static readonly DependencyProperty ReloadCommandProperty =
+        DependencyProperty.Register(nameof(ReloadCommand), typeof(ICommand), typeof(ModelPicker),
+            new PropertyMetadata(null, (d, e) => ((ModelPicker)d).ReloadButton.Visibility =
+                e.NewValue is null ? Visibility.Collapsed : Visibility.Visible));
+
+    public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
+    public object? SelectedItem { get => GetValue(SelectedItemProperty); set => SetValue(SelectedItemProperty, value); }
+    public string? Header { get => (string?)GetValue(HeaderProperty); set => SetValue(HeaderProperty, value); }
+    // Pokazuje przycisk panelu filtrów (filtry działają na DataContext rodzica, czyli MainViewModel)
+    public bool HasFilters { get => (bool)GetValue(HasFiltersProperty); set => SetValue(HasFiltersProperty, value); }
+
+    // Obiekt z właściwościami filtrów (SearchText, SelectedProvider, ...); domyślnie DataContext rodzica.
+    // Panel czatu ma DataContext = ChatViewModel, więc filtry (wspólne z obrazami) podaje stąd MainViewModel
+    public object? FiltersContext { get => GetValue(FiltersContextProperty); set => SetValue(FiltersContextProperty, value); }
+
+    // Odświeża listy modeli z dostawcy (IAiProvider.ReloadAsync); bez komendy przycisk jest ukryty
+    public ICommand? ReloadCommand { get => (ICommand?)GetValue(ReloadCommandProperty); set => SetValue(ReloadCommandProperty, value); }
+
+    public ModelPicker()
+    {
+        InitializeComponent();
+    }
+
+    // Wybór użytkownika trafia do SelectedItem. Gdy filtr ukryje wybraną pozycję, lista zgłasza brak zaznaczenia, ale to nie jest
+    // decyzja użytkownika: wybrany model zostaje (nagłówek dalej go pokazuje), a lista pokazuje tylko przefiltrowane pozycje
+    private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (List.SelectedItem is { } item && !Equals(item, SelectedItem)) SelectedItem = item;
+    }
+
+    // Klik w pozycję zwija akordeon; klik w pasek przewijania czy puste miejsce go nie rusza
+    private void List_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject d && ItemsControl.ContainerFromElement(List, d) is ListBoxItem)
+            Accordion.IsExpanded = false;
+    }
+
+    // Klawiatura: Enter lub Esc zwija akordeon (bez uruchamiania przycisku domyślnego / zamykania okna)
+    private void List_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Enter or Key.Escape)) return;
+        Accordion.IsExpanded = false;
+        e.Handled = true;
+    }
+
+    // Po rozwinięciu lista pokazuje wybrany model (przy długiej liście byłby poza widokiem)
+    private void Accordion_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (List.SelectedItem is { } item) List.ScrollIntoView(item);
+    }
+}

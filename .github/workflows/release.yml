@@ -1,0 +1,60 @@
+name: Release
+
+# Ręcznie: podaj wersję (np. 1.2.0), pipeline utworzy tag v1.2.0 i wydanie.
+# Albo wypchnij własny tag v*: pipeline zbuduje i dołączy artefakty do wydania z tego tagu.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Wersja bez "v" (np. 1.2.0)
+        required: true
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Wersja i tag
+        shell: bash
+        run: |
+          VERSION="${VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "Zła wersja: $VERSION"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Testy
+        run: dotnet test ImageStudio.Tests -m:1
+
+      - name: Publikacja (zwykła i samodzielna)
+        run: |
+          dotnet publish ImageStudio -p:PublishProfile=Portable -p:Version=$env:VERSION -m:1
+          dotnet publish ImageStudio -p:PublishProfile=SelfHosted -p:Version=$env:VERSION -m:1
+
+      - name: Paczki
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item publish\portable\ImageStudio.exe "dist\ImageStudio-$env:VERSION-win-x64-wymaga-dotnet.exe"
+          Copy-Item publish\selfhosted\ImageStudio.exe "dist\ImageStudio-$env:VERSION-win-x64-samodzielna.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ImageStudio-${{ env.VERSION }}
+          path: dist/*.exe
+
+      # gh tworzy tag v<wersja> na tym commicie, gdy jeszcze go nie ma
+      - name: Wydanie
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" dist/*.exe --target "$GITHUB_SHA" --title "ImageStudio $VERSION" --generate-notes

@@ -20,6 +20,16 @@ public sealed class UserState
     public string? GenerationModel { get; set; }
     public string? EditModel { get; set; }
     public string? EnhancerModel { get; set; }
+    public string? ChatModel { get; set; }
+    public string? ChatSystemPrompt { get; set; }
+    public bool? ChatReasoningEnabled { get; set; }
+    public string? ChatReasoningEffort { get; set; }
+    public bool UseTools { get; set; }
+    public bool? RequireToolApproval { get; set; }
+    public List<string> McpEnabled { get; set; } = [];
+    public bool AppControlEnabled { get; set; }
+    public bool McpServerEnabled { get; set; }
+    public int? McpServerPort { get; set; }
     public string? EnhancerInstruction { get; set; }
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }

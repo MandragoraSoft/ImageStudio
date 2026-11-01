@@ -21,7 +21,11 @@ public sealed class GalleryEntry
     public string FilePath { get; set; } = "";
 
     [JsonIgnore]
-    public BitmapImage? Thumbnail { get; set; }
+    public BitmapSource? Thumbnail { get; set; }
+
+    // Wideo bez miniatury (brak kodeka) dostaje w widoku ikonę, a każde wideo znaczek odtwarzania
+    [JsonIgnore]
+    public bool IsVideo => Kind == "video";
 
     [JsonIgnore]
     public string KindLabel => Kind switch
@@ -70,17 +74,27 @@ public static class GalleryStore
     }
 
     // Miniatura dekodowana w małym rozmiarze, żeby galeria nie trzymała pełnych obrazów w pamięci
-    public static BitmapImage? Thumbnail(string path)
+    public static BitmapSource? Thumbnail(string path)
     {
         if (!File.Exists(path)) return null;
 
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.DecodePixelWidth = 120;
-        image.UriSource = new Uri(path);
-        image.EndInit();
-        image.Freeze();
-        return image;
+        // Wideo: klatka z powłoki Windows (WIC nie czyta mp4); uszkodzone pliki nie są obrazami, wtedy miniatura zostaje pusta
+        if (VideoThumbnail.IsVideoFile(path)) return VideoThumbnail.TryGet(path);
+
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 120;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

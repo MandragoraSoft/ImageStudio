@@ -1,0 +1,55 @@
+<UserControl x:Class="ImageStudio.Tabs.Video.VideoPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+        <StackPanel>
+            <Button Content="Edytuj prompt..." Height="34" Command="{Binding EditVideoPromptCommand}"
+                    ToolTip="Edytor promptu w osobnym oknie: konfiguracja, koncept, przebudowa AI"/>
+
+            <Expander Header="Załączniki (obrazy wejściowe)" IsExpanded="True" Margin="0,8,0,0">
+                <StackPanel Margin="0,4,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Content="Dodaj..." Width="90" Margin="0,0,6,0" Command="{Binding AddVideoAttachmentsCommand}"/>
+                        <Button Content="Wyczyść" Width="90" Margin="0,0,6,0" Command="{Binding ClearVideoAttachmentsCommand}"/>
+                        <Button Content="Wklej ze schowka" Padding="10,6" Command="{Binding PasteVideoAttachmentCommand}"
+                                ToolTip="Wkleja obraz ze schowka jako załącznik wideo"/>
+                    </StackPanel>
+                    <ListBox ItemsSource="{Binding VideoAttachments}" Height="110">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel ToolTip="{Binding Source}">
+                                    <Button DockPanel.Dock="Right" Content="×" Width="26" Padding="0" Margin="6,0,0,0"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding DataContext.RemoveVideoAttachmentCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}"/>
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="{Binding VideoHint}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource WarningBrush}"/>
+                </StackPanel>
+            </Expander>
+
+            <views:ModelPicker Header="Model wideo" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}" ItemsSource="{Binding VideoModelsView}" SelectedItem="{Binding SelectedVideoModel}"/>
+
+            <Expander Header="Czas i proporcje" IsExpanded="True" Margin="0,8,0,0">
+                <StackPanel Margin="0,4,0,0">
+                    <TextBlock Text="{Binding VideoDuration, StringFormat='Czas: {0} s'}"/>
+                    <Slider Minimum="2" Maximum="10" Value="{Binding VideoDuration}"
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBlock Text="Proporcje" Style="{StaticResource SectionHeader}"/>
+                    <ComboBox ItemsSource="{Binding VideoAspects}" SelectedItem="{Binding VideoAspect}"/>
+                </StackPanel>
+            </Expander>
+
+            <TextBlock Text="{Binding VideoEstimateLabel}" Style="{StaticResource MutedTextBlock}"
+                       TextWrapping="Wrap" Margin="0,10,0,10"/>
+            <Button Content="Generuj wideo" Height="34" Command="{Binding GenerateVideoCommand}"/>
+            <TextBlock Text="Generowanie wideo jest płatne. Każde kliknięcie tworzy nowe zadanie."
+                       Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -9,10 +9,12 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Wyczyść" Width="80" Margin="8,0,0,0"
+                    Command="{Binding ClearResultCommand}" ToolTip="Czyści ekran wyniku (galeria zostaje)"/>
             <Button DockPanel.Dock="Right" Content="Zapisz jako..." Width="110" Margin="8,0,0,0"
-                    Command="{Binding SaveImageAsCommand}"/>
+                    Command="{Binding SaveImageAsCommand}" ToolTip="Zapisz wynik w wybranym miejscu (Ctrl+S)"/>
             <Button DockPanel.Dock="Right" Content="Kopiuj" Width="90" Margin="8,0,0,0"
-                    Command="{Binding CopyImageCommand}"/>
+                    Command="{Binding CopyImageCommand}" ToolTip="Kopiuj obraz do schowka"/>
             <Button DockPanel.Dock="Right" Content="100%" Width="60" Margin="8,0,0,0"
                     Command="{Binding ResetZoomCommand}" ToolTip="Rzeczywisty rozmiar"/>
             <Button DockPanel.Dock="Right" Content="Dopasuj" Width="80" Margin="8,0,0,0"
@@ -24,6 +26,10 @@
         <Border Grid.Row="1" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="6"
                 Background="{DynamicResource SurfaceBrush}" ClipToBounds="True">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <!-- Obraz: tryb dopasowania i tryb ręczny -->
                 <Grid Visibility="{Binding ShowImage, Converter={StaticResource BoolToVis}}">
                     <Image Source="{Binding Image}" Stretch="Uniform" Margin="8"
@@ -39,10 +45,26 @@
                     </ScrollViewer>
                 </Grid>
 
-                <!-- Wideo: odtwarzanie od razu po wczytaniu -->
-                <MediaElement Source="{Binding VideoSource}" LoadedBehavior="Play" UnloadedBehavior="Manual"
+                <!-- Wideo: odtwarza się od razu po wczytaniu, potem sterujesz paskiem poniżej (ponowne odtworzenie, pauza, zapętlenie) -->
+                <MediaElement x:Name="Player" Source="{Binding VideoSource}" LoadedBehavior="Manual" UnloadedBehavior="Manual"
                               Stretch="Uniform" Margin="8"
+                              MediaOpened="Player_MediaOpened" MediaEnded="Player_MediaEnded" MediaFailed="Player_MediaFailed"
+                              IsVisibleChanged="Player_IsVisibleChanged"
                               Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}"/>
+
+                <DockPanel x:Name="VideoControls" Grid.Row="1" Margin="8,0,8,8"
+                           Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}">
+                    <Button x:Name="PlayPauseButton" DockPanel.Dock="Left" Content="⏸ Pauza" Padding="10,3" Margin="0,0,6,0" MinWidth="86"
+                            Click="PlayPause_Click"/>
+                    <Button DockPanel.Dock="Left" Content="↻ Od początku" Padding="10,3" Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButton}" Click="Restart_Click" ToolTip="Odtwarza wideo jeszcze raz od początku"/>
+                    <CheckBox x:Name="LoopBox" DockPanel.Dock="Left" Content="Zapętl" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="TimeText" DockPanel.Dock="Right" Text="00:00 / 00:00" VerticalAlignment="Center" Margin="8,0,0,0"
+                               FontFamily="Consolas" Style="{StaticResource MutedTextBlock}"/>
+                    <Slider x:Name="Seek" Minimum="0" Maximum="1" VerticalAlignment="Center" IsMoveToPointEnabled="True"
+                            Thumb.DragStarted="Seek_DragStarted" Thumb.DragCompleted="Seek_DragCompleted"
+                            PreviewMouseLeftButtonUp="Seek_MouseUp"/>
+                </DockPanel>
             </Grid>
         </Border>
 
@@ -65,14 +87,73 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Width="132" Margin="0,0,8,0" ToolTip="{Binding Prompt}">
+                            <!-- Opis tylko w dymku (prompt, rodzaj, koszt); prawy przycisk: usuń, usuń z dysku, kopiuj prompt -->
+                            <StackPanel Width="132" Margin="0,0,8,0" Background="Transparent"
+                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <StackPanel.ToolTip>
+                                    <StackPanel MaxWidth="360">
+                                        <TextBlock Text="{Binding Prompt}" TextWrapping="Wrap"/>
+                                        <TextBlock Margin="0,6,0,0" Style="{StaticResource MutedTextBlock}">
+                                            <Run Text="{Binding KindLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CostLabel, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </StackPanel.ToolTip>
+                                <StackPanel.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Usuń z galerii"
+                                                  Command="{Binding PlacementTarget.Tag.RemoveGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="Usuń z galerii i z dysku..."
+                                                  Command="{Binding PlacementTarget.Tag.DeleteGalleryEntryFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="Kopiuj prompt"
+                                                  Command="{Binding PlacementTarget.Tag.CopyGalleryPromptCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    </ContextMenu>
+                                </StackPanel.ContextMenu>
                                 <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderSoftBrush}"
                                         BorderThickness="1" CornerRadius="6" Height="96" Padding="4">
-                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                    <Grid>
+                                        <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                        <!-- Wideo bez miniatury (np. brak kodeka): ikona zamiast pustego pola -->
+                                        <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="30" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding IsVideo}" Value="True"/>
+                                                                <Condition Binding="{Binding Thumbnail}" Value="{x:Null}"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <!-- Znaczek odtwarzania w rogu miniatury wideo -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="10" Width="20" Height="20"
+                                                Background="#99000000">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="9" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
                                 </Border>
                                 <TextBlock Text="{Binding CostLabel}" FontFamily="Consolas" Margin="0,4,0,0"/>
                                 <TextBlock Text="{Binding KindLabel}" Style="{StaticResource MutedTextBlock}"/>
-                                <TextBlock Text="{Binding Prompt}" TextTrimming="CharacterEllipsis" Style="{StaticResource MutedTextBlock}"/>
                             </StackPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
