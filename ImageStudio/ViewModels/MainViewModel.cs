@@ -41,9 +41,6 @@ public sealed partial class MainViewModel : ObservableObject
     // Stan zapisywany dopiero po wczytaniu modeli, żeby puste wartości startowe nie nadpisały zapamiętanych
     private bool _ready;
 
-    // Tekst sprzed ulepszenia; "Cofnij" przywraca go, dopóki nie zostanie użyty ponownie
-    private PromptParts? _undoGenerate;
-    private PromptParts? _undoEdit;
 
     // Surowe bajty wyniku: zapis zachowuje oryginalny format (PNG/JPEG), bez ponownego kodowania
     private byte[]? _imageBytes;
@@ -59,8 +56,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EditCommand), nameof(AddReferencesCommand),
                                 nameof(CopyImageCommand), nameof(SaveImageAsCommand), nameof(OpenSettingsCommand),
-                                nameof(AddReferenceFromUrlCommand), nameof(EnhanceGeneratePromptCommand),
-                                nameof(EnhanceEditPromptCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand))]
+                                nameof(AddReferenceFromUrlCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -218,10 +214,6 @@ public sealed partial class MainViewModel : ObservableObject
     private bool CanGenerate => !IsBusy && !string.IsNullOrWhiteSpace(GeneratePrompt) && SelectedModel is not null;
     private bool CanEdit => !IsBusy && !string.IsNullOrWhiteSpace(EditPrompt)
                             && References.Count > 0 && SelectedEditModel is not null;
-    private bool CanEnhanceGenerate => !IsBusy && !string.IsNullOrWhiteSpace(GeneratePrompt) && SelectedEnhancerModel is not null;
-    private bool CanEnhanceEdit => !IsBusy && !string.IsNullOrWhiteSpace(EditPrompt) && SelectedEnhancerModel is not null;
-    private bool CanUndoGenerate => !IsBusy && _undoGenerate is not null;
-    private bool CanUndoEdit => !IsBusy && _undoEdit is not null;
     private bool CanPickOrCopy => !IsBusy;
     private bool HasImage => Image is not null;
     private bool HasSource => SourceImage is not null;

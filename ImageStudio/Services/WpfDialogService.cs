@@ -70,6 +70,13 @@ public sealed class WpfDialogService : IDialogService
             : null;
     }
 
+    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
+                                       object? enhancerContext = null)
+    {
+        var window = new PromptEditorWindow(title, initial, rebuild, enhancerContext) { Owner = OwnerWindow() };
+        return window.ShowDialog() == true ? window.Result : null;
+    }
+
     public void CopyText(string text) => Clipboard.SetText(text);
 
     public bool ConfirmToolCall(ToolCall call) =>

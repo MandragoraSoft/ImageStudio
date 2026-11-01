@@ -1,0 +1,70 @@
+<Window x:Class="ImageStudio.Views.PromptEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:ImageStudio.Views"
+        Style="{StaticResource WindowBase}"
+        Width="820" Height="860" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <!-- Edytor promptu w oknie modalnym: konfiguracja (opcjonalnie) + koncept, liczniki, Ctrl+Enter zatwierdza -->
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="SystemSection" Grid.Row="0" Margin="0,0,0,10">
+            <DockPanel>
+                <TextBlock x:Name="SystemCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Text="Konfiguracja (prompt systemowy: styl, technika, format)" Style="{StaticResource SectionHeader}"/>
+            </DockPanel>
+            <TextBox x:Name="SystemBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="130"
+                     VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"
+                     TextChanged="Box_TextChanged"/>
+        </StackPanel>
+
+        <DockPanel Grid.Row="1">
+            <TextBlock x:Name="PromptCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+            <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"/>
+        </DockPanel>
+        <TextBox x:Name="PromptBox" Grid.Row="2" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14"
+                 TextChanged="Box_TextChanged"/>
+
+        <StackPanel x:Name="RebuildSection" Grid.Row="3" Margin="0,10,0,0">
+            <DockPanel>
+                <TextBlock x:Name="InstructionCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+                <TextBlock Text="Prompt techniczny dla modelu (polecenia przebudowy konceptu)" Style="{StaticResource SectionHeader}"/>
+            </DockPanel>
+            <TextBox x:Name="InstructionBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90"
+                     VerticalScrollBarVisibility="Auto" TextChanged="Box_TextChanged"
+                     ToolTip="Instrukcja dla modelu ulepszającego, np. „dodaj oświetlenie, zachowaj język i sens”"/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button x:Name="RebuildButton" Content="Przebuduj koncept AI" Padding="12,4" Margin="0,0,8,0" Click="Rebuild_Click"
+                        ToolTip="Model ulepszający przepisze koncept (i rozdzieli konfigurację) według powyższych poleceń"/>
+                <Button x:Name="UndoButton" Content="Cofnij przebudowę" Padding="12,4" Margin="0,0,8,0" Click="UndoRebuild_Click" IsEnabled="False"
+                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <Button Content="Instrukcja domyślna" Padding="12,4" Click="DefaultInstruction_Click"
+                        Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            </StackPanel>
+            <Expander x:Name="EnhancerHost" Header="Model i parametry przetwarzania tekstu" IsExpanded="True" Margin="0,8,0,0">
+                <views:EnhancerPanel Margin="0,4,0,0"/>
+            </Expander>
+            <TextBlock x:Name="RebuildStatus" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"
+                   Text="Ctrl+Enter zatwierdza, Esc anuluje. Ctrl+Z cofa zmiany w polu."/>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Wyczyść wszystko" Padding="12,0" Margin="0,0,8,0" Click="Clear_Click"
+                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <Button Content="Anuluj" IsCancel="True" Width="90" Margin="0,0,8,0"
+                    Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <Button Content="Zastosuj" IsDefault="True" Width="90" Click="Apply_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

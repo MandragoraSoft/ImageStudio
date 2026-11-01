@@ -16,7 +16,7 @@ public sealed partial class MainViewModel
 {
     // --- Generowanie ---
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EnhanceGeneratePromptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private string _generatePrompt = "";
 
     // Część konfiguracyjna promptu (styl, technika); dołączana przed konceptem
@@ -49,9 +49,44 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _selectedQuality = "auto";
 
+    [RelayCommand]
+    private void EditGeneratePrompt()
+    {
+        var initial = new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction);
+        if (_dialogs.ShowPromptEditor("Prompt generowania", initial, RebuildPromptAsync, this) is not { } edit) return;
+        GenerateSystemPrompt = edit.System ?? "";
+        GeneratePrompt = edit.Prompt;
+        EnhancerInstruction = edit.Instruction ?? EnhancerInstruction;
+    }
+
+    [RelayCommand]
+    private void EditEditPrompt()
+    {
+        var initial = new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction);
+        if (_dialogs.ShowPromptEditor("Prompt edycji", initial, RebuildPromptAsync, this) is not { } edit) return;
+        EditSystemPrompt = edit.System ?? "";
+        EditPrompt = edit.Prompt;
+        EnhancerInstruction = edit.Instruction ?? EnhancerInstruction;
+    }
+
+    [RelayCommand]
+    private void EditVideoPrompt()
+    {
+        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(null, VideoPrompt)) is { } edit) VideoPrompt = edit.Prompt;
+    }
+
+    // Przebudowa z okna edytora: bieżące pola i prompt techniczny z okna, bez zmiany stanu aplikacji (zapis dopiero po Zastosuj)
+    private async Task<PromptEdit> RebuildPromptAsync(PromptEdit current)
+    {
+        var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model ulepszania w „Ustawieniach ulepszania AI”.");
+        var instruction = string.IsNullOrWhiteSpace(current.Instruction) ? DefaultInstruction : current.Instruction;
+        var parts = await _provider.EnhancePromptAsync(model, instruction, current.System ?? "", current.Prompt, EnhancerParameterValues());
+        return current with { System = parts.System, Prompt = parts.Concept };
+    }
+
     // --- Edycja / generowanie z referencjami ---
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(EnhanceEditPromptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand))]
     private string _editPrompt = "";
 
     [ObservableProperty]
@@ -74,7 +109,6 @@ public sealed partial class MainViewModel
 
     // Model tekstowy do ulepszania promptów (wspólny dla obu zakładek) i jego instrukcja
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(EnhanceGeneratePromptCommand), nameof(EnhanceEditPromptCommand))]
     private string? _selectedEnhancerModel;
 
     [ObservableProperty]
@@ -94,66 +128,9 @@ public sealed partial class MainViewModel
 
     // --- Ulepszanie promptu ---
 
-    [RelayCommand(CanExecute = nameof(CanEnhanceGenerate))]
-    private Task EnhanceGeneratePromptAsync() => EnhancePromptAsync(GenerateSystemPrompt, GeneratePrompt,
-        v => _undoGenerate = v, v => ApplyParts(v, s => GenerateSystemPrompt = s, c => GeneratePrompt = c));
-
-    [RelayCommand(CanExecute = nameof(CanEnhanceEdit))]
-    private Task EnhanceEditPromptAsync() => EnhancePromptAsync(EditSystemPrompt, EditPrompt,
-        v => _undoEdit = v, v => ApplyParts(v, s => EditSystemPrompt = s, c => EditPrompt = c));
-
-    [RelayCommand(CanExecute = nameof(CanUndoGenerate))]
-    private void UndoEnhanceGeneratePrompt()
-    {
-        ApplyParts(_undoGenerate!, s => GenerateSystemPrompt = s, c => GeneratePrompt = c);
-        _undoGenerate = null;
-        UndoEnhanceGeneratePromptCommand.NotifyCanExecuteChanged();
-    }
-
-    [RelayCommand(CanExecute = nameof(CanUndoEdit))]
-    private void UndoEnhanceEditPrompt()
-    {
-        ApplyParts(_undoEdit!, s => EditSystemPrompt = s, c => EditPrompt = c);
-        _undoEdit = null;
-        UndoEnhanceEditPromptCommand.NotifyCanExecuteChanged();
-    }
-
-    // Ulepszony tekst zastępuje pole; oryginał zostaje do cofnięcia
-    // AI rozdziela tekst na konfigurację (system) i koncept, a koncept ulepsza; oryginał zostaje do cofnięcia
-    private async Task EnhancePromptAsync(string system, string concept, Action<PromptParts> keepOriginal, Action<PromptParts> apply)
-    {
-        IsBusy = true;
-        Status = "Rozdzielanie i ulepszanie promptu...";
-        try
-        {
-            var instruction = string.IsNullOrWhiteSpace(EnhancerInstruction) ? DefaultInstruction : EnhancerInstruction;
-            var parts = await _provider.EnhancePromptAsync(SelectedEnhancerModel!, instruction, system, concept, EnhancerParameterValues());
-            keepOriginal(new PromptParts(system, concept));
-            apply(parts);
-            Status = $"Prompt rozdzielony i ulepszony ({SelectedEnhancerModel}): konfiguracja + koncept";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Błąd ulepszania promptu: {ex.Message}";
-            Log.LogError("{Message}", Status);
-        }
-        finally
-        {
-            IsBusy = false;
-            UndoEnhanceGeneratePromptCommand.NotifyCanExecuteChanged();
-            UndoEnhanceEditPromptCommand.NotifyCanExecuteChanged();
-        }
-    }
-
     // Prompt wysyłany do modelu: najpierw konfiguracja, potem koncept
     private static string Compose(string system, string concept) =>
         string.IsNullOrWhiteSpace(system) ? concept.Trim() : $"{system.Trim()}\n\n{concept.Trim()}";
-
-    private static void ApplyParts(PromptParts parts, Action<string> setSystem, Action<string> setConcept)
-    {
-        setSystem(parts.System);
-        setConcept(parts.Concept);
-    }
 
     // --- Komendy generowania / zapisu ---
 

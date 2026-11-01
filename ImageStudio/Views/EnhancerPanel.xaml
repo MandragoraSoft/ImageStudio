@@ -4,12 +4,8 @@
              xmlns:vm="clr-namespace:ImageStudio.ViewModels">
     <Border Style="{StaticResource Panel}">
         <StackPanel>
-            <TextBlock Text="Model AI do ulepszania promptu" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
+            <TextBlock Text="Model AI do przetwarzania tekstu" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
             <ComboBox ItemsSource="{Binding EnhancerModels}" SelectedItem="{Binding SelectedEnhancerModel}"/>
-
-            <TextBlock Text="Instrukcja dla modelu" Style="{StaticResource SectionHeader}"/>
-            <TextBox Text="{Binding EnhancerInstruction, UpdateSourceTrigger=PropertyChanged}"
-                     AcceptsReturn="True" TextWrapping="Wrap" Height="70" VerticalScrollBarVisibility="Auto"/>
 
             <TextBlock Text="Parametry modelu (włączone są wysyłane)" Style="{StaticResource SectionHeader}"/>
             <ItemsControl ItemsSource="{Binding EnhancerParameters}">

@@ -52,7 +52,10 @@ internal sealed class FakeProvider : IAiProvider
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
-                                                CancellationToken ct = default) => throw new NotSupportedException();
+                                                CancellationToken ct = default) =>
+        Enhance?.Invoke(instruction, system, concept) is { } parts ? Task.FromResult(parts) : throw new NotSupportedException();
+
+    public Func<string, string, string, PromptParts?>? Enhance { get; set; }
 
     public void Dispose()
     {
@@ -74,6 +77,15 @@ internal sealed class FakeDialogs : IDialogService
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     public SettingsResult? ShowSettings(SettingsResult current) => throw new NotSupportedException();
     public PresetDraft? ShowSavePreset(string defaultName) => throw new NotSupportedException();
+    public PromptEdit? PromptEditResult { get; set; }
+    public PromptEdit? LastInitial { get; private set; }
+    public Func<PromptEdit, Task<PromptEdit>>? LastRebuild { get; private set; }
+    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null, object? enhancerContext = null)
+    {
+        LastInitial = initial;
+        LastRebuild = rebuild;
+        return PromptEditResult;
+    }
     public ImageStudio.Configuration.Preset? ShowPresets() => throw new NotSupportedException();
     public bool ConfirmToolCall(ToolCall call) => true;
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) => throw new NotSupportedException();

@@ -3,9 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <TextBlock Text="Prompt wideo" Style="{StaticResource SectionHeader}"/>
-            <TextBox Text="{Binding VideoPrompt, UpdateSourceTrigger=PropertyChanged}"
-                     AcceptsReturn="True" TextWrapping="Wrap" Height="110" VerticalScrollBarVisibility="Auto"/>
+            <Button Content="Edytuj prompt..." Height="34" Command="{Binding EditVideoPromptCommand}"
+                    ToolTip="Edytor promptu w osobnym oknie: konfiguracja, koncept, przebudowa AI"/>
 
             <Expander Header="Załączniki (obrazy wejściowe)" IsExpanded="True" Margin="0,8,0,0">
                 <StackPanel Margin="0,4,0,0">
