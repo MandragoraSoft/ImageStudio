@@ -1,3 +1,4 @@
+using ImageStudio.Localization;
 using ImageStudio.Composition;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
@@ -189,8 +190,11 @@ internal sealed class TestApp : IDisposable
 
     public ServiceProvider Services { get; }
 
-    public static TestApp Create(Action<IServiceCollection>? configure = null, FakeProvider? provider = null, FakeDialogs? dialogs = null) =>
-        new(configure, provider, dialogs);
+    public static TestApp Create(Action<IServiceCollection>? configure = null, FakeProvider? provider = null, FakeDialogs? dialogs = null)
+    {
+        Loc.Set(Loc.Polish);  // język jest stanem globalnym: zapis ustawień ("system") dawał na CI angielski i psuł kolejne testy
+        return new(configure, provider, dialogs);
+    }
 
     // Skrót: sam MainViewModel z (opcjonalnie własnymi) atrapami
     public static MainViewModel CreateVm(FakeProvider? provider = null, FakeDialogs? dialogs = null) => Create(null, provider, dialogs).Vm;

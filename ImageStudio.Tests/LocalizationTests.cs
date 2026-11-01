@@ -324,8 +324,8 @@ public sealed class LocalizationTests
     {
         WpfHost.Run(() =>
         {
-            Loc.Set(Loc.English);  // okno otwarte od razu po angielsku: listy budowane raz (np. urządzenia) też muszą być przetłumaczone
             using var app = TestApp.Create();
+            Loc.Set(Loc.English);
             var window = app.Get<ImageStudio.MainWindow>();
             window.ShowInTaskbar = false;
             window.Show();
