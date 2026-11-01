@@ -1,0 +1,59 @@
+# Wydawanie nowej wersji
+
+Wydanie robi pipeline `.github/workflows/release.yml` (GitHub Actions, `windows-latest`). Człowiek przygotowuje tylko opis wersji i podaje numer.
+
+## Numer wersji
+
+Semantyczny: `MAJOR.MINOR.PATCH`.
+
+- **PATCH** (1.1.0 → 1.1.1): poprawki bez nowych funkcji.
+- **MINOR** (1.1.0 → 1.2.0): nowa funkcja, np. zakładka.
+- **MAJOR** (1.x → 2.0.0): zmiany łamiące (format danych użytkownika, układ plików).
+- Przyrostek, np. `1.2.0-beta.1`, tworzy **wydanie wstępne**: nie jest oznaczone jako „najnowsze”, więc zwykli użytkownicy go nie dostaną.
+
+Numer trafia do plików exe i instalatora; ręcznie nigdzie go nie wpisujesz.
+
+## Kroki
+
+1. **Napisz opis wersji** w `docs/release-notes/<wersja>.md` (po polsku, dla użytkownika): co nowego, poprawki, znane ograniczenia i krótka lista plików do pobrania. Wzór: `docs/release-notes/1.1.0.md`.
+2. **Zatwierdź i wypchnij na `main`** (razem ze zmianami, które wchodzą do wydania). Testy lokalnie: `dotnet test ImageStudio.Tests`.
+3. **Uruchom wydanie**, jedną z dróg:
+   - polecenie: `gh workflow run release.yml --ref main -f version=1.2.0`,
+   - albo w GitHubie: Actions → Release → Run workflow → pole „version”,
+   - albo wypchnij własny tag: `git tag v1.2.0 && git push origin v1.2.0` (opis wersji musi być już w tym commicie).
+4. **Obserwuj przebieg**: `gh run watch`. Podsumowanie przebiegu zawiera link do wydania i listę plików.
+5. **Sprawdź wydanie**: https://github.com/prachwal/uberllm-proxy/releases/latest. Zainstaluj nowy `Setup.exe` na swoim komputerze nad poprzednią wersją i sprawdź, że ustawienia i dane zostały.
+
+## Co robi pipeline
+
+| Krok | Po co | Gdy się nie uda |
+|---|---|---|
+| Wersja | sprawdza format (`1.2.0` albo `1.2.0-beta.1`) | przebieg kończy się od razu |
+| Wersja nie może już istnieć | wydanie ani tag o tej nazwie nie mogą istnieć | przebieg kończy się od razu, bez nadpisywania starego wydania |
+| Notatki wydania | wymaga niepustego `docs/release-notes/<wersja>.md` | przebieg kończy się przed budowaniem |
+| Build i testy | budowanie rozwiązania i wszystkie testy | **wydanie nie powstaje** |
+| Publikacja i paczki | dwa exe w jednym pliku i instalator Inno Setup | wydanie nie powstaje |
+| Artefakt przebiegu | te same pliki w zakładce przebiegu | |
+| Wydanie | tag, wydanie z treścią z pliku i trzema plikami | |
+
+Ręczne uruchomienie działa tylko z gałęzi `main`. Dwa wydania naraz ustawiają się w kolejce.
+
+## Pliki w wydaniu
+
+- `ImageStudio-<wersja>-Setup.exe`: instalator dla bieżącego użytkownika (bez uprawnień administratora), aktualizuje poprzednią wersję w miejscu. Zalecany.
+- `ImageStudio-<wersja>-win-x64-samodzielna.exe`: jeden plik z wbudowanym .NET, bez instalacji.
+- `ImageStudio-<wersja>-win-x64-wymaga-dotnet.exe`: mały plik, wymaga .NET 10 Desktop i ASP.NET Core Runtime.
+
+Pliki nie są podpisane certyfikatem, więc Windows SmartScreen może pokazać ostrzeżenie.
+
+## Gdy coś pójdzie źle
+
+- **Przebieg padł przed wydaniem** (testy, brak notatek): popraw i uruchom ponownie z tą samą wersją; nic nie powstało.
+- **Wydanie jest, ale ma błąd**: nie nadpisuj go. Wydaj kolejny PATCH. Złe wydanie możesz usunąć razem z tagiem: `gh release delete v1.2.0 --cleanup-tag`, a potem wydać tę samą wersję od nowa.
+- **Poprawa samego opisu**: `gh release edit v1.2.0 --notes-file docs/release-notes/1.2.0.md` (po zmianie pliku w repozytorium).
+
+## Co nie jest zautomatyzowane
+
+- Automatyczne aktualizacje w aplikacji (użytkownik pobiera nowy instalator sam).
+- Podpisywanie plików certyfikatem.
+- Testy instalatora na czystym Windowsie (sprawdzasz ręcznie w kroku 5).

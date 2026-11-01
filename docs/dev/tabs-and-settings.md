@@ -1,0 +1,11 @@
+# Zakładki okna głównego i okno Ustawień
+
+_Kiedy czytać: dodajesz albo zmieniasz zakładkę lewego panelu, jej widok, albo zakładkę Ustawień. Lista kontrolna nowej zakładki: skill `new-main-tab`._
+
+## Lewy panel okna głównego = wstrzykiwane zakładki w osobnych projektach
+
+(`IMainTab` z `ImageStudio.Shared`: `Title`, `Order`, `Content` = DataContext widoku). Każda zakładka to projekt `ImageStudio.Tabs.*` (Generate, Edit, Video, Chat, Voice) z widokiem i rekordem zakładki (`GenerateTab` itd. w swoim namespace); widoki wiążą się z `MainViewModel`/`ChatViewModel` tylko przez bindingi, więc projekty nie referują aplikacji. Wspólne kontrolki (`ModelPicker`, `ModelFilterBar`, `SizePanel`) i `ModelOption` leżą w `ImageStudio.Shared` (namespace bez zmian; w XAML trzeba `;assembly=ImageStudio.Shared`). DLL-e zakładek trafiają do podfolderu `tabs\` (jak dostawcy do `providers\`, targety w `ImageStudio.csproj`, wczytuje je `App` przez `AssemblyLoadContext.Resolving`). Zakładki są rejestrowane w kontenerze jako `IMainTab` (dodatkowa = kolejna rejestracja); `MainWindow` dostaje je w konstruktorze i tworzy po jednym widoku na zakładkę z `DataTemplate` wg typu (brak szablonu = wyjątek przy tworzeniu okna). `ActiveTab` to indeks w `Tabs`; wbudowane zajmują 0-4 (Głos = 4, prawy panel `VoiceResults` zamiast obrazu; `IsOutputTab` to zakładki 0-2), a logika zależna od zakładki (`RunActiveTab`, `IsChatTab`, `TabNames`) opiera się na tych indeksach. Nowa zakładka: skill `new-main-tab` (pełna lista kontrolna: projekt, referencje `Private="$(PluginsInBundle)"`, `DataTemplate`, filtry modeli, indeksy, testy).
+
+## Okno Ustawień = wstrzykiwane zakładki
+
+(`ISettingsTab`: `Title`, `Order`, `Apply(SettingsResult)`). `MainViewModel.OpenSettingsAsync` podaje zakładki do `IDialogService.ShowSettings`; dziś `AppSettingsTab` (ogólne), `AudioSettingsTab` (domyślny mikrofon i wyjście dźwięku, po nazwie urządzenia: `SettingsResult.Microphone`/`Speaker`, trafia do `VoiceViewModel.ApplyDevices`) i `ProviderSettingsTab` (dostawca). `SettingsViewModel` tylko je porządkuje i składa wynik. Nowa zakładka Ustawień (skill `new-main-tab`, część o Ustawieniach) = ViewModel implementujący `ISettingsTab` + widok + `DataTemplate` w `SettingsWindow.xaml`; brak szablonu wykrywa `SettingsWindow.EnsureTabViews` (wyjątek przed otwarciem okna).

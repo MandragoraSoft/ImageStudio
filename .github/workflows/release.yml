@@ -1,12 +1,13 @@
 name: Release
 
-# Ręcznie: podaj wersję (np. 1.2.0), pipeline utworzy tag v1.2.0 i wydanie.
+# Proces wydania: docs/RELEASING.md.
+# Ręcznie (Actions → Release → Run workflow): podaj wersję (np. 1.2.0), pipeline utworzy tag v1.2.0 i wydanie z gałęzi main.
 # Albo wypchnij własny tag v*: pipeline zbuduje i dołączy artefakty do wydania z tego tagu.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Wersja bez "v" (np. 1.2.0)
+        description: Wersja bez "v" (np. 1.2.0; z przyrostkiem, np. 1.2.0-beta.1, powstaje wydanie wstępne)
         required: true
   push:
     tags: ['v*']
@@ -14,31 +15,62 @@ on:
 permissions:
   contents: write
 
+# Dwa wydania naraz nie mają sensu (ten sam tag, te same pliki): kolejne czeka na poprzednie
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    # Ręcznie wydajemy tylko z main; z innych gałęzi nie powstaje wydanie
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    timeout-minutes: 30
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
-      - name: Wersja i tag
+      # 1. Kontrole wstępne: najtańsze błędy wychodzą przed budowaniem
+      - name: Wersja
         shell: bash
         run: |
           VERSION="${VERSION#v}"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "Zła wersja: $VERSION"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "Zła wersja: $VERSION (oczekiwane np. 1.2.0 albo 1.2.0-beta.1)"; exit 1; }
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # przyrostek po myślniku = wydanie wstępne (nie jest "najnowszym" wydaniem)
+          [[ "$VERSION" == *-* ]] && echo "PRERELEASE=--prerelease" >> "$GITHUB_ENV" || echo "PRERELEASE=" >> "$GITHUB_ENV"
 
+      - name: Wersja nie może już istnieć
+        shell: bash
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then echo "Wydanie v$VERSION już istnieje. Podnieś wersję albo usuń je: gh release delete v$VERSION --cleanup-tag"; exit 1; fi
+          # ręczne uruchomienie sam tworzy tag, więc gotowy tag o tej nazwie oznacza pomyłkę (tag wypchnięty ręcznie jest dozwolony)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION już istnieje. Użyj nowej wersji albo wypchnij ten tag zamiast uruchamiać ręcznie."; exit 1
+          fi
+
+      # Opis wydania to plik w repozytorium (po polsku: co wnosi ta wersja); bez niego pipeline kończy się błędem przed budowaniem
+      - name: Notatki wydania
+        shell: bash
+        run: |
+          NOTES="docs/release-notes/$VERSION.md"
+          [ -s "$NOTES" ] || { echo "Brak notatek wydania: dodaj $NOTES (co wnosi wersja $VERSION) i uruchom ponownie."; exit 1; }
+          echo "NOTES=$NOTES" >> "$GITHUB_ENV"
+
+      # 2. Budowanie i testy
       - name: Build
         run: dotnet build ImageStudio.slnx -c Release -m:1
 
       - name: Testy
         run: dotnet test ImageStudio.slnx -c Release --no-build
 
+      # 3. Paczki: dwa exe w jednym pliku i instalator
       - name: Publikacja (zwykła i samodzielna)
         run: |
           dotnet publish ImageStudio -p:PublishProfile=Portable -p:Version=$env:VERSION -m:1
@@ -57,14 +89,27 @@ jobs:
           & $iscc "/DAppVersion=$env:VERSION" installer\ImageStudio.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ImageStudio-${{ env.VERSION }}
           path: dist/*.exe
 
-      # gh tworzy tag v<wersja> na tym commicie, gdy jeszcze go nie ma
+      # 4. Wydanie: przy ręcznym uruchomieniu gh tworzy tag v<wersja> na tym commicie; przy tagu wypchniętym ręcznie tag już jest
       - name: Wydanie
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "v$VERSION" dist/*.exe --target "$GITHUB_SHA" --title "ImageStudio $VERSION" --generate-notes
+        run: |
+          TARGET=()
+          [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && TARGET=(--target "$GITHUB_SHA")
+          gh release create "v$VERSION" dist/*.exe "${TARGET[@]}" --title "ImageStudio $VERSION" --notes-file "$NOTES" $PRERELEASE
+
+      - name: Podsumowanie
+        shell: bash
+        run: |
+          {
+            echo "## ImageStudio $VERSION"
+            echo
+            echo "Wydanie: $(gh release view "v$VERSION" --json url -q .url)"
+            echo
+            echo "Pliki:"
+            for f in dist/*.exe; do echo "- $(basename "$f") ($(( $(stat -c %s "$f") / 1048576 )) MB)"; done
+          } >> "$GITHUB_STEP_SUMMARY"
