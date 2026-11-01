@@ -8,18 +8,27 @@ namespace ImageStudio.Tests;
 internal sealed class FakeProvider : IAiProvider
 {
     public Func<string, IReadOnlyList<ChatMessage>, string> OnChat { get; set; } = (_, _) => "";
+
+    // Gdy ustawione, zastępuje OnChat i pozwala zwracać prośby o narzędzia
+    public Func<IReadOnlyList<ChatMessage>, ChatReply>? OnReply { get; set; }
+
     public string? LastModel { get; private set; }
     public List<ChatMessage> LastMessages { get; } = [];
+    public IReadOnlyList<ToolDefinition>? LastTools { get; private set; }
+    public int ChatCalls { get; private set; }
 
     public string Id => "fake";
     public string DisplayName => "Fake";
 
-    public Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
+    public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
     {
+        ChatCalls++;
         LastModel = model;
+        LastTools = tools;
         LastMessages.Clear();
         LastMessages.AddRange(messages);
-        return Task.FromResult(OnChat(model, messages));
+        return Task.FromResult(OnReply?.Invoke(messages) ?? new ChatReply(OnChat(model, messages), []));
     }
 
     public Task<ImageModels> GetImageModelsAsync(CancellationToken ct = default) => throw new NotSupportedException();
@@ -44,6 +53,21 @@ internal sealed class FakeProvider : IAiProvider
 
     public void Dispose()
     {
+    }
+}
+
+// Źródło narzędzi do testów pętli czatu
+internal sealed class FakeToolHost : IToolHost
+{
+    public IReadOnlyList<ToolDefinition> Tools { get; set; } = [new ToolDefinition("fs__read", "Czyta plik", """{"type":"object","properties":{}}""")];
+    public bool RequireApproval { get; set; }
+    public Func<ToolCall, string> OnCall { get; set; } = _ => "wynik";
+    public List<ToolCall> Calls { get; } = [];
+
+    public Task<string> CallAsync(ToolCall call, CancellationToken ct = default)
+    {
+        Calls.Add(call);
+        return Task.FromResult(OnCall(call));
     }
 }
 

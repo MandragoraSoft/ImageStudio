@@ -70,6 +70,12 @@ public sealed class WpfDialogService : IDialogService
             : null;
     }
 
+    public bool ConfirmToolCall(ToolCall call) =>
+        MessageBox.Show(OwnerWindow(),
+                        $"Model chce wywołać narzędzie:\n\n{call.Name}\n\nArgumenty:\n{call.ArgumentsJson}\n\nPozwolić?",
+                        "Wywołanie narzędzia", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No)
+        == MessageBoxResult.Yes;
+
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         new ModelBrowserWindow { DataContext = viewModel, Owner = OwnerWindow() }.ShowDialog();
 

@@ -11,7 +11,7 @@
                 <StackPanel>
                     <TextBlock Text="{Binding RoleLabel}" FontSize="11" Style="{StaticResource MutedTextBlock}"/>
                     <!-- TextBox tylko do odczytu, żeby dało się zaznaczać i kopiować fragmenty odpowiedzi -->
-                    <TextBox Text="{Binding Content, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                    <TextBox Text="{Binding DisplayText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
                              BorderThickness="0" Padding="0" Background="Transparent"/>
                 </StackPanel>
             </Border>

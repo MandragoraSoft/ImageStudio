@@ -16,11 +16,36 @@ public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IRead
 // Model czatu z listą parametrów, które deklaruje (supported_parameters)
 public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters);
 
-// Wiadomość czatu (role: system, user, assistant); IsUser i RoleLabel służą szablonowi rozmowy
-public sealed record ChatMessage(string Role, string Content)
+// Narzędzie dla modelu: nazwa, opis i schemat parametrów (JSON Schema jako tekst)
+public sealed record ToolDefinition(string Name, string Description, string ParametersJson);
+
+// Prośba modelu o wywołanie narzędzia; argumenty to tekst JSON
+public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
+
+// Odpowiedź modelu: tekst i/lub prośby o narzędzia
+public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls);
+
+// Wiadomość czatu (role: system, user, assistant, tool). Wiadomość asystenta może nieść ToolCalls,
+// a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
+public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
+                                 string? ToolCallId = null, string? ToolName = null)
 {
     public bool IsUser => Role == "user";
-    public string RoleLabel => Role switch { "user" => "Ty", "assistant" => "Model", _ => "System" };
+    public bool HasToolCalls => ToolCalls is { Count: > 0 };
+
+    public string RoleLabel => Role switch
+    {
+        "user" => "Ty",
+        "assistant" => HasToolCalls ? "Model (wywołuje narzędzie)" : "Model",
+        "tool" => $"Narzędzie {ToolName}".TrimEnd(),
+        _ => "System",
+    };
+
+    // Tekst wiadomości, a przy prośbach o narzędzia także lista wywołań
+    public string DisplayText => HasToolCalls
+        ? string.Join("\n", (string.IsNullOrWhiteSpace(Content) ? [] : new[] { Content })
+            .Concat(ToolCalls!.Select(c => $"→ {c.Name}({c.ArgumentsJson})")))
+        : Content;
 }
 
 // Wynik generowania/edycji: bajty obrazu i koszt z API (null, gdy API go nie zwróciło)
@@ -130,22 +155,83 @@ public sealed class ImageGenerationService : IDisposable
             .ToList();
     }
 
-    public Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default) =>
-        ChatAsync(_http, "/v1/chat/completions", model, messages, ct);
+    public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default) =>
+        ChatAsync(_http, "/v1/chat/completions", model, messages, tools, ct);
 
-    // Wspólne dla providerów: /chat/completions z pełną historią; zwraca treść odpowiedzi
-    internal static async Task<string> ChatAsync(HttpClient http, string path, string model,
-                                                 IReadOnlyList<ChatMessage> messages, CancellationToken ct)
+    // Wspólne dla providerów: /chat/completions (format OpenAI) z pełną historią i opcjonalnymi narzędziami
+    internal static async Task<ChatReply> ChatAsync(HttpClient http, string path, string model,
+                                                    IReadOnlyList<ChatMessage> messages,
+                                                    IReadOnlyList<ToolDefinition>? tools, CancellationToken ct)
     {
-        var body = new { model, messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList() };
+        var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
+        if (tools is { Count: > 0 })
+            body["tools"] = tools.Select(t => new
+            {
+                type = "function",
+                function = new
+                {
+                    name = t.Name,
+                    description = t.Description,
+                    parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersJson),
+                },
+            }).ToList();
+
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
 
         using var doc = JsonDocument.Parse(text);
-        return doc.RootElement.GetProperty("choices")[0].GetProperty("message")
-            .GetProperty("content").GetString() ?? "";
+        var message = doc.RootElement.GetProperty("choices")[0].GetProperty("message");
+        var content = message.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()! : "";
+
+        var calls = new List<ToolCall>();
+        if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var call in toolCalls.EnumerateArray())
+            {
+                var function = call.GetProperty("function");
+                // Argumenty to zwykle tekst JSON; część serwerów zwraca obiekt
+                var arguments = function.TryGetProperty("arguments", out var a)
+                    ? a.ValueKind == JsonValueKind.String ? a.GetString() ?? "" : a.GetRawText()
+                    : "";
+                var id = call.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.String
+                    ? i.GetString()!
+                    : Guid.NewGuid().ToString("N");
+                calls.Add(new ToolCall(id, function.GetProperty("name").GetString()!,
+                                       string.IsNullOrWhiteSpace(arguments) ? "{}" : arguments));
+            }
+        }
+
+        return new ChatReply(content, calls);
+    }
+
+    // Wiadomość w formacie API: asystent z prośbami o narzędzia niesie tool_calls, wynik narzędzia tool_call_id
+    private static Dictionary<string, object?> ToWire(ChatMessage m)
+    {
+        var wire = new Dictionary<string, object?> { ["role"] = m.Role };
+        if (m.Role == "tool")
+        {
+            wire["tool_call_id"] = m.ToolCallId;
+            wire["content"] = m.Content;
+        }
+        else if (m.HasToolCalls)
+        {
+            wire["content"] = string.IsNullOrEmpty(m.Content) ? null : m.Content;
+            wire["tool_calls"] = m.ToolCalls!.Select(call => new
+            {
+                id = call.Id,
+                type = "function",
+                function = new { name = call.Name, arguments = call.ArgumentsJson },
+            }).ToList();
+        }
+        else
+        {
+            wire["content"] = m.Content;
+        }
+
+        return wire;
     }
 
     // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).

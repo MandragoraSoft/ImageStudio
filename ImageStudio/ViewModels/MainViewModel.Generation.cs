@@ -89,6 +89,7 @@ public sealed partial class MainViewModel
     public bool IsChatTab => ActiveTab == 3;
     public bool IsNotChatTab => !IsChatTab;
 
+    public ToolsViewModel Tools { get; }
     public ChatViewModel Chat { get; }
 
     // --- Ulepszanie promptu ---

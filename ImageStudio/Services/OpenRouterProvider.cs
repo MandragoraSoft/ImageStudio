@@ -201,8 +201,9 @@ public sealed class OpenRouterProvider : IAiProvider
         }
     }
 
-    public Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default) =>
-        ImageGenerationService.ChatAsync(_http, ChatPath, model, messages, ct);
+    public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default) =>
+        ImageGenerationService.ChatAsync(_http, ChatPath, model, messages, tools, ct);
 
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,

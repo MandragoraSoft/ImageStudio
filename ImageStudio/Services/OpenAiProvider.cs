@@ -110,8 +110,9 @@ public sealed class OpenAiProvider : IAiProvider
                                                 Action<string>? progress = null, CancellationToken ct = default) =>
         throw new NotSupportedException("Provider OpenAI nie obsługuje tu generowania wideo. Wybierz UberLLM.");
 
-    public Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default) =>
-        ImageGenerationService.ChatAsync(_http, "v1/chat/completions", model, messages, ct);
+    public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
+                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default) =>
+        ImageGenerationService.ChatAsync(_http, "v1/chat/completions", model, messages, tools, ct);
 
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,

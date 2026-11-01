@@ -121,7 +121,9 @@ public sealed partial class MainViewModel : ObservableObject
         SeedText = _state.SeedText ?? "";
         NegativePrompt = _state.NegativePrompt ?? "";
         SelectedQuality = _state.Quality ?? "auto";
-        Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "");
+        Tools = new ToolsViewModel(new McpToolHost(), _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled);
+        Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
+                                 Tools, _dialogs.ConfirmToolCall);
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
@@ -281,6 +283,16 @@ public sealed partial class MainViewModel : ObservableObject
         await LoadEnhancersAsync();
         _ready = true;
         SaveState();
+
+        // Łączenie z serwerami MCP może trwać (npx), więc nie blokuje startu; błędy trafiają do statusu serwera
+        _ = Tools.InitializeAsync();
+    }
+
+    // Zapis stanu i zamknięcie połączeń MCP przy wyjściu (kończy procesy serwerów)
+    public void Shutdown()
+    {
+        SaveState();
+        Task.Run(() => Tools.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(3));
     }
 
     // Brak modeli czatu nie blokuje generowania, tylko wyłącza ulepszanie promptu
@@ -342,6 +354,9 @@ public sealed partial class MainViewModel : ObservableObject
         _state.EnhancerModel = SelectedEnhancerModel ?? _state.EnhancerModel;
         _state.ChatModel = Chat.SelectedModel ?? _state.ChatModel;
         _state.ChatSystemPrompt = Chat.SystemPrompt;
+        _state.UseTools = Tools.UseTools;
+        _state.RequireToolApproval = Tools.RequireApproval;
+        _state.McpEnabled = Tools.EnabledServers.ToList();
         _state.EnhancerInstruction = EnhancerInstruction;
         _state.SeedText = SeedText;
         _state.NegativePrompt = NegativePrompt;

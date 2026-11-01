@@ -16,9 +16,10 @@ public class ChatApiTests
 
         var reply = await ImageGenerationService.ChatAsync(
             http, "/v1/chat/completions", "model-x",
-            [new ChatMessage("system", "bądź zwięzły"), new ChatMessage("user", "cześć")], default);
+            [new ChatMessage("system", "bądź zwięzły"), new ChatMessage("user", "cześć")], null, default);
 
-        Assert.Equal("odpowiedź", reply);
+        Assert.Equal("odpowiedź", reply.Content);
+        Assert.Empty(reply.ToolCalls);
         Assert.Equal("/v1/chat/completions", handler.RequestPath);
         using var body = JsonDocument.Parse(handler.RequestBody!);
         Assert.Equal("model-x", body.RootElement.GetProperty("model").GetString());
@@ -34,9 +35,9 @@ public class ChatApiTests
         var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"content":null}}]}""");
         using var http = Client(handler);
 
-        var reply = await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], default);
+        var reply = await ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default);
 
-        Assert.Equal("", reply);
+        Assert.Equal("", reply.Content);
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public class ChatApiTests
         using var http = Client(handler);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], default));
+            ImageGenerationService.ChatAsync(http, "/v1/chat/completions", "m", [new ChatMessage("user", "x")], null, default));
 
         Assert.StartsWith("HTTP 503", error.Message);
         Assert.Contains("no_available_provider", error.Message);

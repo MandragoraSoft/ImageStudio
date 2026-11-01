@@ -12,7 +12,7 @@ public partial class App : Application
     // Zapis wyborów modeli i parametrów przy zamykaniu
     protected override void OnExit(ExitEventArgs e)
     {
-        _viewModel?.SaveState();
+        _viewModel?.Shutdown();
         base.OnExit(e);
     }
 

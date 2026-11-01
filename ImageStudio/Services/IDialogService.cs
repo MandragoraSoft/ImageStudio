@@ -23,6 +23,9 @@ public interface IDialogService
     SettingsResult? ShowSettings(SettingsResult current);
     PresetDraft? ShowSavePreset(string defaultName);
 
+    // Zgoda na wywołanie narzędzia, o które poprosił model; false = odmowa
+    bool ConfirmToolCall(ToolCall call);
+
     // Modalna przeglądarka modeli z opisami i dodawaniem do preferowanych
     void ShowModelBrowser(ModelBrowserViewModel viewModel);
 
