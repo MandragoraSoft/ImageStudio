@@ -15,6 +15,16 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         MainTabs.SelectedIndex = Math.Clamp(viewModel.ActiveTab, 0, MainTabs.Items.Count - 1);
 
+        // Zakładki bez modeli są ukrywane po załadowaniu katalogu dostawcy
+        void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.TabVisibility)) ApplyTabVisibility(viewModel.TabVisibility);
+        }
+
+        viewModel.PropertyChanged += OnViewModelChanged;
+        ApplyTabVisibility(viewModel.TabVisibility);
+        Closed += (_, _) => viewModel.PropertyChanged -= OnViewModelChanged;
+
         // Tytuły zakładek są zwykłym tekstem (IMainTab.Title), więc po zmianie języka odświeżamy je ręcznie
         Loc.LanguageChanged += RefreshTabTitles;
         Closed += (_, _) => Loc.LanguageChanged -= RefreshTabTitles;
@@ -30,6 +40,13 @@ public partial class MainWindow : Window
             foreach (TabItem item in MainTabs.Items)
                 if (item.Tag is IMainTab tab) item.Header = tab.Title;
         });
+    }
+
+    // Indeks zakładki = indeks w TabVisibility; zakładki dodatkowe (za wbudowanymi) są zawsze widoczne
+    private void ApplyTabVisibility(IReadOnlyList<bool> visible)
+    {
+        for (var i = 0; i < MainTabs.Items.Count; i++)
+            if (MainTabs.Items[i] is TabItem item) item.Visibility = i < visible.Count && !visible[i] ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();

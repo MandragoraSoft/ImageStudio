@@ -410,6 +410,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice.ApplyCatalog(catalog);
 
         RefreshOwners();
+        UpdateTabVisibility();
         Status = Loc.T("models.msg.loaded", Models.Count, EditModels.Count, VideoModels.Count);
         if (catalog.Warnings.Count > 0)
         {
