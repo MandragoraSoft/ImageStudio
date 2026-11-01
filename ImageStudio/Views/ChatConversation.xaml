@@ -11,6 +11,13 @@
                     Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderSoftBrush}">
                 <StackPanel>
                     <TextBlock Text="{Binding RoleLabel}" FontSize="11" Style="{StaticResource MutedTextBlock}"/>
+                    <!-- Podgląd rozumowania modelu (jeśli odpowiedź je zawiera); domyślnie zwinięty -->
+                    <Expander Header="Rozumowanie" FontSize="12" Margin="0,2,0,2"
+                              Visibility="{Binding HasReasoning, Converter={StaticResource BoolToVis}}">
+                        <TextBox Text="{Binding Reasoning, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontStyle="Italic"
+                                 BorderThickness="0" Padding="4" Background="Transparent" MaxHeight="260"
+                                 VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource TextMutedBrush}"/>
+                    </Expander>
                     <!-- Obrazy dołączone do wiadomości -->
                     <ItemsControl ItemsSource="{Binding Images}">
                         <ItemsControl.ItemsPanel>

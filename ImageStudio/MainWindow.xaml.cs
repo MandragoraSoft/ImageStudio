@@ -15,6 +15,8 @@ public partial class MainWindow : Window
         MainTabs.SelectedIndex = Math.Clamp(viewModel.ActiveTab, 0, MainTabs.Items.Count - 1);
     }
 
+    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+
     // Widoki zakładek powstają raz (stan paneli, np. rozwinięte akordeony, przeżywa przełączanie zakładek).
     // Zakładka bez DataTemplate to błąd programisty: wyjątek już przy tworzeniu okna
     private void BuildTabs(IReadOnlyList<IMainTab> tabs)

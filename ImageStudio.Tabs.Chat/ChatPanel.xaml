@@ -9,6 +9,18 @@
             <views:ModelPicker Header="Model czatu"
                                ReloadCommand="{Binding DataContext.ReloadModelsCommand, RelativeSource={RelativeSource AncestorType=Window}}" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"/>
 
+            <!-- Rozumowanie: tylko dla modeli, które je deklarują (supported_parameters) -->
+            <StackPanel Visibility="{Binding SupportsReasoning, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="Rozumowanie modelu" Style="{StaticResource SectionHeader}"/>
+                <CheckBox Content="Włącz rozumowanie" IsChecked="{Binding ReasoningEnabled}"
+                          ToolTip="Model pokaże tok rozumowania (jeśli go zwraca). Część modeli nie da się całkiem wyłączyć"/>
+                <DockPanel Margin="0,6,0,0" IsEnabled="{Binding ReasoningEnabled}">
+                    <TextBlock Text="Poziom:" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
+                    <ComboBox ItemsSource="{Binding ReasoningEfforts}" SelectedItem="{Binding SelectedReasoningEffort}"
+                              ToolTip="low, medium lub high; wysyłane tylko modelom, które obsługują poziom"/>
+                </DockPanel>
+            </StackPanel>
+
             <TextBlock Text="Instrukcja systemowa (opcjonalna)" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding SystemPrompt, UpdateSourceTrigger=PropertyChanged}"
                      AcceptsReturn="True" TextWrapping="Wrap" Height="120" VerticalScrollBarVisibility="Auto"

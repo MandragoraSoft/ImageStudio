@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddImageStudioCore(this IServiceCollection services)
     {
+        services.AddSingleton<IActivityTracker, ActivityTracker>();
         services.AddSingleton<ImageDownloadService>();
         services.AddSingleton<McpToolHost>();
         services.AddSingleton<LegacyPromptImporter>();

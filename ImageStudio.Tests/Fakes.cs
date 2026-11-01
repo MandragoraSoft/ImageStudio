@@ -19,13 +19,16 @@ internal sealed class FakeProvider : IAiProvider
     public List<ChatMessage> LastMessages { get; } = [];
     public IReadOnlyList<ToolDefinition>? LastTools { get; private set; }
     public int ChatCalls { get; private set; }
+    public ChatOptions? LastOptions { get; private set; }
 
     public string Id => "fake";
     public string DisplayName => "Fake";
 
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
-                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
+                                     IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
+                                     ChatOptions? options = null)
     {
+        LastOptions = options;
         ChatCalls++;
         LastModel = model;
         LastTools = tools;

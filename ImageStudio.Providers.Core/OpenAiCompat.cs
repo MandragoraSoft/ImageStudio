@@ -11,7 +11,8 @@ public static class OpenAiCompat
     // Wspólne dla providerów: /chat/completions (format OpenAI) z pełną historią i opcjonalnymi narzędziami
     public static async Task<ChatReply> ChatAsync(HttpClient http, string path, string model,
                                                     IReadOnlyList<ChatMessage> messages,
-                                                    IReadOnlyList<ToolDefinition>? tools, CancellationToken ct)
+                                                    IReadOnlyList<ToolDefinition>? tools, CancellationToken ct,
+                                                    ChatOptions? options = null)
     {
         var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
         if (tools is { Count: > 0 })
@@ -25,6 +26,8 @@ public static class OpenAiCompat
                     parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersJson),
                 },
             }).ToList();
+
+        ApplyReasoning(body, options);
 
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
@@ -53,7 +56,50 @@ public static class OpenAiCompat
             }
         }
 
-        return new ChatReply(content, calls);
+        return new ChatReply(content, calls, ReadReasoning(message));
+    }
+
+    // Poziom i włączenie rozumowania wg parametru, który model deklaruje; bez options żądanie jest bez zmian
+    private static void ApplyReasoning(Dictionary<string, object?> body, ChatOptions? options)
+    {
+        switch (options?.Parameter)
+        {
+            case "reasoning_effort":
+                // Wyłączenie = brak parametru (model używa domyślnego poziomu)
+                if (options.Enabled) body["reasoning_effort"] = options.Effort ?? ReasoningSupport.DefaultEffort;
+                break;
+            case "reasoning":
+                body["reasoning"] = options.Enabled
+                    ? new { effort = options.Effort ?? ReasoningSupport.DefaultEffort, exclude = false }
+                    : new { enabled = false };
+                break;
+            case "include_reasoning":
+                body["include_reasoning"] = options.Enabled;
+                break;
+        }
+    }
+
+    // Rozumowanie z odpowiedzi: reasoning_content (DeepSeek, Venice), reasoning (OpenRouter), a w ostateczności reasoning_details
+    private static string? ReadReasoning(JsonElement message)
+    {
+        foreach (var name in new[] { "reasoning_content", "reasoning" })
+        {
+            if (message.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(value.GetString()))
+                return value.GetString();
+        }
+
+        if (message.TryGetProperty("reasoning_details", out var details) && details.ValueKind == JsonValueKind.Array)
+        {
+            var parts = details.EnumerateArray()
+                .Select(d => d.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString()
+                           : d.TryGetProperty("summary", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null)
+                .Where(x => !string.IsNullOrWhiteSpace(x));
+            var joined = string.Join("\n", parts);
+            return joined.Length > 0 ? joined : null;
+        }
+
+        return null;
     }
 
     // Wiadomość w formacie API: asystent z prośbami o narzędzia niesie tool_calls, wynik narzędzia tool_call_id

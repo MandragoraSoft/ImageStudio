@@ -23,14 +23,22 @@ public sealed partial class ChatViewModel : ObservableObject
     private readonly Action<string, bool> _report;
     private readonly Func<ToolCall, bool>? _confirm;
     private readonly ChatImageSupport? _images;
+    private readonly Func<string, ChatModelInfo?>? _modelInfo;
+    private readonly IActivityTracker? _activity;
 
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
     public ChatViewModel(Func<IAiProvider> provider, ObservableCollection<string> models,
                          Action<string, bool> report, string systemPrompt,
                          IToolHost? tools = null, Func<ToolCall, bool>? confirm = null,
-                         ChatImageSupport? images = null)
+                         ChatImageSupport? images = null, Func<string, ChatModelInfo?>? modelInfo = null,
+                         bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
+                         IActivityTracker? activity = null)
     {
+        _activity = activity;
+        _modelInfo = modelInfo;
+        _reasoningEnabled = reasoningEnabled;
+        _selectedReasoningEffort = reasoningEffort;
         _provider = provider;
         Models = models;
         _report = report;
@@ -58,8 +66,28 @@ public sealed partial class ChatViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyPropertyChangedFor(nameof(ImageWarning))]
+    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(SupportsReasoning))]
     private string? _selectedModel;
+
+    // Rozumowanie: sterowanie pojawia się tylko dla modeli, które je deklarują (supported_parameters z katalogu)
+    public IReadOnlyList<string> ReasoningEfforts => ReasoningSupport.Levels;
+
+    [ObservableProperty]
+    private bool _reasoningEnabled;
+
+    [ObservableProperty]
+    private string _selectedReasoningEffort;
+
+    private string? ReasoningParameter =>
+        SelectedModel is { } model && _modelInfo?.Invoke(model) is { } info ? ReasoningSupport.ParameterFor(info.SupportedParameters) : null;
+
+    public bool SupportsReasoning => ReasoningParameter is not null;
+
+    // Katalog modeli mógł się właśnie wczytać: widoczność sterowania liczy się od nowa
+    public void RefreshReasoningSupport() => OnPropertyChanged(nameof(SupportsReasoning));
+
+    private ChatOptions? BuildOptions() =>
+        ReasoningParameter is { } parameter ? new ChatOptions(parameter, ReasoningEnabled, SelectedReasoningEffort) : null;
 
     [ObservableProperty]
     private string _systemPrompt;
@@ -99,10 +127,11 @@ public sealed partial class ChatViewModel : ObservableObject
             var definitions = Tools?.Tools ?? [];
             for (var round = 0; ; round++)
             {
-                var reply = await _provider().ChatAsync(SelectedModel!, BuildHistory(), definitions.Count > 0 ? definitions : null);
+                var reply = await _provider().ChatAsync(SelectedModel!, BuildHistory(), definitions.Count > 0 ? definitions : null,
+                                                         options: BuildOptions());
                 if (reply.ToolCalls.Count == 0)
                 {
-                    Messages.Add(new ChatMessage("assistant", reply.Content));
+                    Messages.Add(new ChatMessage("assistant", reply.Content, Reasoning: reply.Reasoning));
                     break;
                 }
 
@@ -113,7 +142,7 @@ public sealed partial class ChatViewModel : ObservableObject
                     break;
                 }
 
-                Messages.Add(new ChatMessage("assistant", reply.Content, reply.ToolCalls));
+                Messages.Add(new ChatMessage("assistant", reply.Content, reply.ToolCalls, Reasoning: reply.Reasoning));
                 foreach (var call in reply.ToolCalls)
                     Messages.Add(new ChatMessage("tool", await RunToolAsync(call), ToolCallId: call.Id, ToolName: call.Name));
                 _report("Model odpowiada...", false);
@@ -156,6 +185,8 @@ public sealed partial class ChatViewModel : ObservableObject
         _report($"Narzędzie {call.Name}...", false);
         try
         {
+            // Wywołanie narzędzia (serwer MCP) to też operacja sieciowa: spinner w stopce
+            using var _ = _activity?.Begin($"Narzędzie {call.Name}");
             return await Tools.CallAsync(call);
         }
         catch (Exception ex)

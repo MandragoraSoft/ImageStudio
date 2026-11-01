@@ -56,8 +56,10 @@ public interface IAiProvider : IDisposable
                                          Action<string>? progress = null, CancellationToken ct = default);
     // Zwykła rozmowa: cała historia (system, user, assistant, tool) na wejściu, odpowiedź modelu na wyjściu.
     // Z tools model może zamiast tekstu poprosić o wywołanie narzędzi (ChatReply.ToolCalls).
+    // options (opcjonalne) włącza/wyłącza i ustawia poziom rozumowania modelu, który to deklaruje
     Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
-                              IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default);
+                              IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
+                              ChatOptions? options = null);
 
     Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                          IReadOnlyDictionary<string, object> parameters,

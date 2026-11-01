@@ -18,13 +18,34 @@ public sealed record ToolDefinition(string Name, string Description, string Para
 public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
 
 // Odpowiedź modelu: tekst i/lub prośby o narzędzia
-public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls);
+// Reasoning: widoczne rozumowanie modelu, jeśli API je zwraca (reasoning_content / reasoning), inaczej null
+public sealed record ChatReply(string Content, IReadOnlyList<ToolCall> ToolCalls, string? Reasoning = null);
+
+// Rozumowanie w żądaniu czatu. Parameter to parametr, który model deklaruje w supported_parameters
+// ("reasoning_effort", "reasoning" albo "include_reasoning"); Enabled włącza lub wyłącza, Effort ustawia poziom
+public sealed record ChatOptions(string Parameter, bool Enabled, string? Effort = null);
+
+public static class ReasoningSupport
+{
+    public static readonly IReadOnlyList<string> Levels = ["low", "medium", "high"];
+    public const string DefaultEffort = "medium";
+
+    // Który parametr rozumowania obsługuje model (null = model nie daje sterować rozumowaniem)
+    public static string? ParameterFor(IEnumerable<string> supportedParameters)
+    {
+        var supported = supportedParameters.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return new[] { "reasoning_effort", "reasoning", "include_reasoning" }.FirstOrDefault(supported.Contains);
+    }
+}
 
 // Wiadomość czatu (role: system, user, assistant, tool). Wiadomość asystenta może nieść ToolCalls,
 // a wynik narzędzia (rola tool) odwołuje się do nich przez ToolCallId. IsUser, RoleLabel i DisplayText służą widokowi.
 public sealed record ChatMessage(string Role, string Content, IReadOnlyList<ToolCall>? ToolCalls = null,
-                                 string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null)
+                                 string? ToolCallId = null, string? ToolName = null, IReadOnlyList<ChatImage>? Images = null,
+                                 string? Reasoning = null)
 {
+    // Rozumowanie jest tylko do podglądu: nie wraca do API w historii rozmowy
+    public bool HasReasoning => !string.IsNullOrWhiteSpace(Reasoning);
     public bool IsUser => Role == "user";
     public bool HasImages => Images is { Count: > 0 };
     public bool HasToolCalls => ToolCalls is { Count: > 0 };

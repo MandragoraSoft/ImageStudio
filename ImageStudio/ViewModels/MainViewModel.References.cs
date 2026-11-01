@@ -46,7 +46,9 @@ public sealed partial class MainViewModel
         Status = "Pobieranie obrazu z linku...";
         try
         {
-            var path = await _downloads.DownloadAsync(url);
+            string path;
+            using (Activity.Begin("Pobieranie obrazu"))
+                path = await _downloads.DownloadAsync(url);
             References.Add(new ReferenceItem(path, ReferenceItem.Shorten(url), url));
             if (SourceImage is null) LoadPrimary();
             ReferenceUrl = "";

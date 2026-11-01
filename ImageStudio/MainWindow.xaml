@@ -6,6 +6,7 @@
         xmlns:video="clr-namespace:ImageStudio.Tabs.Video;assembly=ImageStudio.Tabs.Video"
         xmlns:chat="clr-namespace:ImageStudio.Tabs.Chat;assembly=ImageStudio.Tabs.Chat"
         xmlns:views="clr-namespace:ImageStudio.Views"
+        xmlns:shared="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
         Style="{StaticResource WindowBase}"
         Title="ImageStudio" Height="800" Width="1220" MinHeight="560" MinWidth="860">
     <!-- Skróty: Ctrl+Enter = akcja aktywnej zakładki (Generuj / Edytuj), Ctrl+S = zapis wyniku -->
@@ -30,13 +31,59 @@
         <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveImageAsCommand}"/>
     </Window.InputBindings>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <DockPanel>
+        <!-- Menu klasyczne: te same polecenia co przyciski w panelach -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Plik">
+                <MenuItem Header="_Zapisz jako..." InputGestureText="Ctrl+S" Command="{Binding SaveImageAsCommand}"/>
+                <MenuItem Header="_Kopiuj obraz" Command="{Binding CopyImageCommand}"/>
+                <MenuItem Header="_Wyczyść wynik" Command="{Binding ClearResultCommand}"/>
+                <Separator/>
+                <MenuItem Header="Wyjś_cie" InputGestureText="Alt+F4" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Zestawy">
+                <MenuItem Header="_Zapisz zestaw" Command="{Binding SavePresetCommand}"/>
+                <MenuItem Header="Z_estawy..." Command="{Binding OpenPresetsCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Modele">
+                <MenuItem Header="_Przeglądaj modele..." Command="{Binding OpenModelBrowserCommand}"/>
+                <MenuItem Header="_Odśwież listy modeli" Command="{Binding ReloadModelsCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Narzędzia">
+                <MenuItem Header="_Ustawienia..." Command="{Binding OpenSettingsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Wyczyść _galerię" Command="{Binding ClearGalleryCommand}"/>
+            </MenuItem>
+        </Menu>
 
-        <Grid Grid.Row="0" Margin="12">
+        <!-- Stopka: status, aktywny dostawca i spinner z opisem trwającej operacji sieciowej -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem Grid.Column="0">
+                <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
+            </StatusBarItem>
+            <StatusBarItem Grid.Column="1" Margin="12,0">
+                <TextBlock Text="{Binding ProviderName, StringFormat='Dostawca: {0}'}" Style="{StaticResource MutedTextBlock}"/>
+            </StatusBarItem>
+            <StatusBarItem Grid.Column="2" MinWidth="220">
+                <StackPanel Orientation="Horizontal" Visibility="{Binding Activity.IsActive, Converter={StaticResource BoolToVis}}">
+                    <shared:Spinner Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding Activity.Label}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid Margin="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="390" MinWidth="280" views:WindowMemory.ColumnKey="MainWindow.LeftPanel"/>
                 <ColumnDefinition Width="6"/>
@@ -60,26 +107,22 @@
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           ResizeBehavior="PreviousAndNext" Background="{DynamicResource BorderSoftBrush}"/>
 
-            <!-- OUTPUT: wynik z zachowaniem proporcji -->
-            <views:OutputPanel Grid.Column="2" Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
-            <Grid Grid.Column="2" Visibility="{Binding IsChatTab, Converter={StaticResource BoolToVis}}">
-                <views:ChatConversation DataContext="{Binding Chat}"/>
+            <!-- OUTPUT: wynik z zachowaniem proporcji; w czasie operacji sieciowej okno odpowiedzi jest przyciemnione -->
+            <Grid Grid.Column="2">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Activity.IsActive}" Value="True">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <views:OutputPanel Visibility="{Binding IsNotChatTab, Converter={StaticResource BoolToVis}}"/>
+                <Grid Visibility="{Binding IsChatTab, Converter={StaticResource BoolToVis}}">
+                    <views:ChatConversation DataContext="{Binding Chat}"/>
+                </Grid>
             </Grid>
         </Grid>
-
-        <!-- Pasek stanu -->
-        <Grid Grid.Row="1" Margin="12,0,12,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="200"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis"
-                       Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="Ustawienia..." Padding="10,2" Margin="0,0,12,0"
-                    Command="{Binding OpenSettingsCommand}"/>
-            <ProgressBar Grid.Column="2" IsIndeterminate="True" Height="6"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
-        </Grid>
-    </Grid>
+    </DockPanel>
 </Window>

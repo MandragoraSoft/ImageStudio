@@ -22,6 +22,8 @@ public sealed class UserState
     public string? EnhancerModel { get; set; }
     public string? ChatModel { get; set; }
     public string? ChatSystemPrompt { get; set; }
+    public bool? ChatReasoningEnabled { get; set; }
+    public string? ChatReasoningEffort { get; set; }
     public bool UseTools { get; set; }
     public bool? RequireToolApproval { get; set; }
     public List<string> McpEnabled { get; set; } = [];

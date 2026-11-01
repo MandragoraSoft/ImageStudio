@@ -110,11 +110,15 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _preferredOnly;
 
+    // Trwające operacje sieciowe (spinner w stopce, przyciemnione okno odpowiedzi)
+    public IActivityTracker Activity { get; }
+
     // Wszystkie zależności przychodzą z kontenera DI (patrz Composition/ServiceCollectionExtensions)
     public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
-                         ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes)
+                         ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
+                         IActivityTracker activity)
     {
         _provider = provider;
         _providers = providers;
@@ -130,6 +134,7 @@ public sealed partial class MainViewModel : ObservableObject
         _toolHost = toolHost;
         _mcp = mcp;
         _themes = themes;
+        Activity = activity;
 
         // Ostatnio wpisane prompty i wybory wracają po uruchomieniu
         _state = _stateStore.Load();
@@ -150,7 +155,15 @@ public sealed partial class MainViewModel : ObservableObject
                                  Tools, _dialogs.ConfirmToolCall,
                                  new ChatImageSupport(_dialogs,
                                                       id => _chatModels.TryGetValue(id, out var info) ? info.AcceptsImage : null,
-                                                      () => _settings.MaxSide));
+                                                      () => _settings.MaxSide),
+                                 id => _chatModels.GetValueOrDefault(id),
+                                 _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
+                                 activity);
+        // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)
+        Chat.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(ChatViewModel.ReasoningEnabled) or nameof(ChatViewModel.SelectedReasoningEffort)) SaveState();
+        };
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
@@ -358,6 +371,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _chatModels.Clear();
         foreach (var model in chat) _chatModels[model.Id] = model;
+        Chat.RefreshReasoningSupport();
         ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
 
         SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
@@ -403,6 +417,8 @@ public sealed partial class MainViewModel : ObservableObject
         _state.EnhancerModel = SelectedEnhancerModel ?? _state.EnhancerModel;
         _state.ChatModel = Chat.SelectedModel ?? _state.ChatModel;
         _state.ChatSystemPrompt = Chat.SystemPrompt;
+        _state.ChatReasoningEnabled = Chat.ReasoningEnabled;
+        _state.ChatReasoningEffort = Chat.SelectedReasoningEffort;
         _state.UseTools = Tools.UseTools;
         _state.RequireToolApproval = Tools.RequireApproval;
         _state.McpEnabled = Tools.EnabledServers.ToList();
