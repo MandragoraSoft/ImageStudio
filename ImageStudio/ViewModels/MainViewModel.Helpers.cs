@@ -35,13 +35,13 @@ public sealed partial class MainViewModel
     }
 
     // Modele czatu jako pozycje z opisem: możliwości z katalogu (obraz na wejściu, rozumowanie), właściciel z katalogu lub z id
-    private void ReplaceChatOptions(IEnumerable<ChatModelInfo> chat)
+    private void ReplaceChatOptions(IEnumerable<ChatModelInfo> chat, IReadOnlyDictionary<string, ModelPricing> pricing)
     {
         ChatModelOptions.Clear();
         foreach (var info in chat.OrderBy(i => i.Id, StringComparer.OrdinalIgnoreCase))
         {
             var input = info.InputModalities ?? (info.AcceptsImage == true ? ["text", "image"] : ["text"]);
-            ChatModelOptions.Add(new ModelOption(info.Id, info.OwnedBy ?? OwnerFromId(info.Id), false, input, null, info.Description,
+            ChatModelOptions.Add(new ModelOption(info.Id, info.OwnedBy ?? OwnerFromId(info.Id), false, input, pricing.GetValueOrDefault(info.Id), info.Description,
                                                  ["text"], Reasoning: ReasoningSupport.ParameterFor(info.SupportedParameters) is not null));
         }
     }

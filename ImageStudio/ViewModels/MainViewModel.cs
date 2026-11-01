@@ -367,7 +367,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         // Brak modeli tekstowych nie blokuje generowania, tylko wyłącza ulepszanie promptu
-        if (catalog.Chat is { } chat) ApplyChatModels(chat);
+        if (catalog.Chat is { } chat) ApplyChatModels(chat, pricing);
 
         RefreshOwners();
         Status = $"Modele: {Models.Count} generowania, {EditModels.Count} edycji, {VideoModels.Count} wideo";
@@ -386,13 +386,13 @@ public sealed partial class MainViewModel : ObservableObject
         Task.Run(() => Tools.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(3));
     }
 
-    private void ApplyChatModels(IReadOnlyList<ChatModelInfo> chat)
+    private void ApplyChatModels(IReadOnlyList<ChatModelInfo> chat, IReadOnlyDictionary<string, ModelPricing> pricing)
     {
         _chatModels.Clear();
         foreach (var model in chat) _chatModels[model.Id] = model;
         Chat.RefreshReasoningSupport();
         ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
-        ReplaceChatOptions(chat);
+        ReplaceChatOptions(chat, pricing);
 
         SelectedEnhancerModel = chat.Any(m => m.Id == _state.EnhancerModel) ? _state.EnhancerModel
                                 : chat.Any(m => m.Id == EffectiveDefaultTextModel) ? EffectiveDefaultTextModel

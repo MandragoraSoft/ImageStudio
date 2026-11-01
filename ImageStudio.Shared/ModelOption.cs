@@ -30,7 +30,10 @@ public sealed record ModelOption(
             if (Pricing is not { } p) return "Brak ceny w katalogu (dostawca podaje ceny tylko dla części modeli).";
 
             var unit = p.Unit == ModelPricing.TokenUnit ? "za 1M tokenów" : $"za {p.Unit ?? "szt."}";
-            var lines = new List<string> { $"Cena teraz: ${p.PriceNow:0.####} {unit}" };
+            var lines = p.OutputPrice is { } output
+                ? new List<string> { $"Wejście: ${p.PriceNow:0.####} {unit}", $"Wyjście: ${output:0.####} {unit}" }
+                : new List<string> { $"Cena teraz: ${p.PriceNow:0.####} {unit}" };
+            if (p.CachePrice is { } cache) lines.Add($"Odczyt z cache: ${cache:0.####} {unit}");
             if (p.ListUsd is { } list) lines.Add($"Cena katalogowa: ${list:0.####}");
             if (p.DiscountPct is > 0 and var discount) lines.Add($"Rabat: {discount:0.#}%");
             if (p.MarketOffers is { } offers) lines.Add($"Oferty na rynku: {offers:0}");
@@ -40,7 +43,10 @@ public sealed record ModelOption(
     }
 
     // Cena wyrównywana do prawej w dropdownie (szablon w App.xaml)
-    public string PriceText => Pricing is null
-        ? "—"
-        : $"${Pricing.PriceNow:0.####}/{Pricing.Unit ?? "szt."}";
+    public string PriceText => Pricing switch
+    {
+        null => "—",
+        { OutputPrice: { } output } p => $"${p.PriceNow:0.###}/${output:0.###} za 1M",  // tekst: wejście/wyjście
+        var p => $"${p.PriceNow:0.####}/{p.Unit ?? "szt."}",
+    };
 }

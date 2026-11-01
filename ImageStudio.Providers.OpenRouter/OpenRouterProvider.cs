@@ -26,7 +26,8 @@ public sealed class OpenRouterProvider : IAiProvider
     private string[] Modalities(string model) => _imageOnly.Contains(model) ? ["image"] : ["image", "text"];
 
     private sealed record RawModel(string Id, IReadOnlyList<string> Input, IReadOnlyList<string> Output,
-                                   IReadOnlyList<string> Supported, string? Description = null, decimal? ImageTokenUsd = null);
+                                   IReadOnlyList<string> Supported, string? Description = null, decimal? ImageTokenUsd = null,
+                                   decimal? PromptUsd = null, decimal? CompletionUsd = null);
 
     public OpenRouterProvider(string apiKey)
     {
@@ -80,6 +81,10 @@ public sealed class OpenRouterProvider : IAiProvider
             .Where(m => m.ImageTokenUsd is > 0)
             .ToDictionary(m => m.Id, m => new ModelPricing(m.ImageTokenUsd!.Value * 1_000_000m, null, null,
                                                            ModelPricing.TokenUnit, null, null));
+        // Modele tekstowe: cena promptu i odpowiedzi za 1M tokenów (modele z ceną obrazu zostają przy cenie obrazu)
+        foreach (var m in (await GetModelsAsync(ct)).Where(m => m.ImageTokenUsd is not > 0 && m.PromptUsd is > 0 && m.Output.Contains("text")))
+            prices[m.Id] = new ModelPricing(m.PromptUsd!.Value * 1_000_000m, null, null, ModelPricing.TokenUnit, null, null,
+                                            m.CompletionUsd * 1_000_000m);
         try
         {
             foreach (var v in await GetVideoCatalogAsync(ct))
@@ -303,6 +308,15 @@ public sealed class OpenRouterProvider : IAiProvider
         return cents.Count > 0 ? cents.Min() / 100m : null;
     }
 
+    // Cena tokena (USD) z pricing.<name>; katalog podaje ją jako tekst
+    private static decimal? PricingUsd(JsonElement model, string name) =>
+        model.TryGetProperty("pricing", out var pricing)
+        && pricing.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+        && decimal.TryParse(value.GetString(), System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out var usd)
+            ? usd
+            : null;
+
     private static decimal? ImageTokenUsd(JsonElement model) =>
         model.TryGetProperty("pricing", out var pricing)
         && pricing.TryGetProperty("image_output", out var value) && value.ValueKind == JsonValueKind.String
@@ -326,7 +340,7 @@ public sealed class OpenRouterProvider : IAiProvider
                 Strings(m, "architecture", "output_modalities"),
                 Strings(m, "supported_parameters"),
                 m.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null,
-                ImageTokenUsd(m)))
+                ImageTokenUsd(m), PricingUsd(m, "prompt"), PricingUsd(m, "completion")))
             .ToList();
     }
 

@@ -88,8 +88,12 @@ public sealed record ModelPricing(
     decimal? DiscountPct,
     string? Unit,
     decimal? MarketOffers,
-    decimal? Requests24h)
+    decimal? Requests24h,
+    decimal? OutputPrice = null,
+    decimal? CachePrice = null)
 {
+    // Modele tekstowe: PriceNow to cena wejścia za 1M tokenów (Unit = TokenUnit), OutputPrice cena wyjścia,
+    // CachePrice cena odczytu z cache; null = dostawca nie podaje
     // OpenRouter podaje cenę tokenów obrazu (za 1M tok), nie cenę za obraz
     public const string TokenUnit = "1M tok";
 

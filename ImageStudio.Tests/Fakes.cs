@@ -52,7 +52,9 @@ internal sealed class FakeProvider : IAiProvider
         VideoCatalog is { } catalog ? Task.FromResult(catalog) : throw new NotSupportedException();
     public Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) =>
         ChatCatalog is { } catalog ? Task.FromResult(catalog) : throw new NotSupportedException();
-    public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) => throw new NotSupportedException();
+    public IReadOnlyDictionary<string, ModelPricing>? PricingCatalog { get; set; }
+    public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
+        PricingCatalog is { } pricing ? Task.FromResult(pricing) : throw new NotSupportedException();
 
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                 CancellationToken ct = default) => throw new NotSupportedException();

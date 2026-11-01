@@ -26,8 +26,8 @@ public sealed class MarketService : IDisposable
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    // Tylko modele z cenami za media (obrazy, wideo); klucz to id modelu
-    public async Task<IReadOnlyDictionary<string, ModelPricing>> GetMediaPricingAsync(CancellationToken ct = default)
+    // Ceny z rynku: media (obrazy, wideo: media_price_now_usd) i tekst (price_now: wejście/wyjście za 1M tokenów); klucz to id modelu
+    public async Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default)
     {
         using var response = await _http.GetAsync("/api/v1/public/market/live", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
@@ -41,7 +41,10 @@ public sealed class MarketService : IDisposable
         {
             var m = property.Value;
             if (!m.TryGetProperty("media_price_now_usd", out var price) || price.ValueKind != JsonValueKind.Number)
+            {
+                if (TokenPricing(m) is { } tokens) result[property.Name] = tokens;
                 continue;
+            }
 
             result[property.Name] = new ModelPricing(
                 PriceNow: price.GetDecimal(),
@@ -55,6 +58,17 @@ public sealed class MarketService : IDisposable
         }
 
         return result;
+    }
+
+    // Modele tekstowe: price_now to obiekt z cenami za milion tokenów (wejście, wyjście, odczyt z cache)
+    private static ModelPricing? TokenPricing(JsonElement m)
+    {
+        if (!m.TryGetProperty("price_now", out var now) || now.ValueKind != JsonValueKind.Object) return null;
+        if (Number(now, "input_usd_per_mtok") is not { } input) return null;
+
+        return new ModelPricing(input, null, Number(m, "source_discount_pct"), ModelPricing.TokenUnit,
+                                Number(m, "market_offers"), Number(m, "requests_24h"),
+                                Number(now, "output_usd_per_mtok"), Number(now, "cache_read_usd_per_mtok"));
     }
 
     public void Dispose() => _http.Dispose();

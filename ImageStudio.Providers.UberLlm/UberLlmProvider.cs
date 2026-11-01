@@ -26,7 +26,7 @@ public sealed class UberLlmProvider : IAiProvider
     public Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) => _api.GetChatModelsAsync(ct);
 
     public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
-        _market.GetMediaPricingAsync(ct);
+        _market.GetPricingAsync(ct);
 
     public async Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                       CancellationToken ct = default) =>
