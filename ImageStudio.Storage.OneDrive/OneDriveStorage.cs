@@ -33,6 +33,16 @@ public sealed class OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler?
         await EnsureOkAsync(response, ct);
     }
 
+    protected override async Task<byte[]?> DownloadRemoteAsync(string accessToken, string fileName, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Url(fileName, ":/content"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        using var response = await Http.SendAsync(request, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        await EnsureOkAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
     protected override async Task DeleteRemoteAsync(string accessToken, string fileName, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, Url(fileName, ""));

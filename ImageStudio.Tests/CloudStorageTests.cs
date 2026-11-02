@@ -136,7 +136,7 @@ public sealed class CloudStorageTests : IDisposable
         await storage.WriteAsync(MediaKind.Image, "b.png", new byte[] { 2 });
         await storage.FlushAsync();
 
-        Assert.Single(http.Calls, c => c.Url.Contains("?q="));
+        Assert.Single(http.Calls, c => c.Url.Contains("?q=") && c.Url.Contains("mimeType")); // folder szukany raz
         Assert.Single(http.Calls, c => c.Method == HttpMethod.Post && c.Body.Contains("\"mimeType\":\"application/vnd.google-apps.folder\""));
         var uploads = http.Calls.Where(c => c.Url.Contains("uploadType=multipart")).ToList();
         Assert.Equal(2, uploads.Count);
@@ -274,5 +274,44 @@ public sealed class CloudStorageTests : IDisposable
             new OAuthTokens("tok", "ref", DateTimeOffset.UtcNow.AddHours(1), "a@b.pl")) } };
         var status = Mirror(new OneDriveStorage(secrets, environment: _ => null)).Status!;
         Assert.Equal(("storage.status.signedInAs", "a@b.pl"), (status.Key, status.Detail));
+    }
+
+    [Fact]
+    public async Task GoogleDrive_updates_an_existing_file_instead_of_creating_a_duplicate()
+    {
+        var secrets = new MemorySecrets { Values = { ["storage-googledrive"] = Tokens("tok", "ref", 3600) } };
+        var http = new StubHandler(c => c.Url.Contains("mimeType") ? (HttpStatusCode.OK, """{"files":[{"id":"F1"}]}""")
+            : c.Url.Contains("?q=") ? (HttpStatusCode.OK, """{"files":[{"id":"FILE9"}]}""") : (HttpStatusCode.OK, """{"id":"FILE9"}"""));
+        var storage = Mirror(new GoogleDriveStorage(secrets, http));
+
+        await storage.WriteAsync(MediaKind.Image, "a.png", new byte[] { 7 });
+        await storage.FlushAsync();
+
+        var update = Assert.Single(http.Calls, c => c.Method.Method == "PATCH");
+        Assert.Contains("/files/FILE9?uploadType=media", update.Url);
+        Assert.DoesNotContain(http.Calls, c => c.Url.Contains("uploadType=multipart"));
+    }
+
+    [Fact]
+    public async Task Missing_local_file_is_read_back_from_the_cloud_and_cached_at_the_same_path()
+    {
+        var secrets = new MemorySecrets { Values = { ["storage-onedrive"] = Tokens("tok", "ref", 3600) } };
+        var http = new StubHandler(c => c.Method == HttpMethod.Get ? (HttpStatusCode.OK, "z chmury") : (HttpStatusCode.OK, "{}"));
+        var storage = Mirror(new OneDriveStorage(secrets, http));
+        var path = Path.Combine(_dir, "Image", "gone.png");
+
+        Assert.Equal("z chmury", Encoding.UTF8.GetString(await storage.ReadAsync(path)));
+        Assert.Equal(path, await storage.GetLocalPathAsync(path));
+        Assert.True(File.Exists(path));
+        Assert.Single(http.Calls, c => c.Method == HttpMethod.Get); // drugi odczyt jest już lokalny
+    }
+
+    [Fact]
+    public async Task Missing_file_everywhere_is_reported()
+    {
+        var secrets = new MemorySecrets { Values = { ["storage-onedrive"] = Tokens("tok", "ref", 3600) } };
+        var storage = Mirror(new OneDriveStorage(secrets, new StubHandler(_ => (HttpStatusCode.NotFound, "{}"))));
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() => storage.ReadAsync(Path.Combine(_dir, "Image", "nie-ma.png")));
     }
 }

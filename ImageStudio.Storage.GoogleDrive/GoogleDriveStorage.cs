@@ -59,9 +59,25 @@ public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandl
         return _folderId = id;
     }
 
+    // Id pliku o tej nazwie w folderze aplikacji; "" = brak
+    private async Task<string> FileIdAsync(string token, string folder, string fileName, CancellationToken ct)
+    {
+        var q = Uri.EscapeDataString($"name='{fileName.Replace("'", "\\'")}' and '{folder}' in parents and trashed=false");
+        return FirstId(await JsonAsync(Request(HttpMethod.Get, $"{Api}?q={q}&fields=files(id)", token), ct));
+    }
+
+    // Drive pozwala na wiele plików o tej samej nazwie, więc przy ponownym zapisie aktualizujemy istniejący (bez duplikatów)
     protected override async Task UploadAsync(string accessToken, string fileName, byte[] data, CancellationToken ct)
     {
         var folder = await FolderIdAsync(accessToken, ct);
+        var existing = await FileIdAsync(accessToken, folder, fileName, ct);
+        if (existing != "")
+        {
+            await JsonAsync(Request(new HttpMethod("PATCH"), $"https://www.googleapis.com/upload/drive/v3/files/{existing}?uploadType=media",
+                                    accessToken, new ByteArrayContent(data)), ct);
+            return;
+        }
+
         var metadata = JsonSerializer.Serialize(new { name = fileName, parents = new[] { folder } });
         var content = new MultipartContent("related")
         {
@@ -71,11 +87,19 @@ public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandl
         await JsonAsync(Request(HttpMethod.Post, "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", accessToken, content), ct);
     }
 
+    protected override async Task<byte[]?> DownloadRemoteAsync(string accessToken, string fileName, CancellationToken ct)
+    {
+        var id = await FileIdAsync(accessToken, await FolderIdAsync(accessToken, ct), fileName, ct);
+        if (id == "") return null;
+
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, $"{Api}/{id}?alt=media", accessToken), ct);
+        await EnsureOkAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
     protected override async Task DeleteRemoteAsync(string accessToken, string fileName, CancellationToken ct)
     {
-        var folder = await FolderIdAsync(accessToken, ct);
-        var q = Uri.EscapeDataString($"name='{fileName.Replace("'", "\\'")}' and '{folder}' in parents and trashed=false");
-        var id = FirstId(await JsonAsync(Request(HttpMethod.Get, $"{Api}?q={q}&fields=files(id)", accessToken), ct));
+        var id = await FileIdAsync(accessToken, await FolderIdAsync(accessToken, ct), fileName, ct);
         if (id == "") return;
 
         using var response = await Http.SendAsync(Request(HttpMethod.Delete, $"{Api}/{id}", accessToken), ct);

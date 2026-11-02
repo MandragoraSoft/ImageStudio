@@ -41,6 +41,9 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     protected abstract Task UploadAsync(string accessToken, string fileName, byte[] data, CancellationToken ct);
     protected abstract Task DeleteRemoteAsync(string accessToken, string fileName, CancellationToken ct);
 
+    // Zawartość pliku z chmury po nazwie; null, gdy go tam nie ma
+    protected abstract Task<byte[]?> DownloadRemoteAsync(string accessToken, string fileName, CancellationToken ct);
+
     protected IStorageSecrets Secrets { get; }
     protected HttpClient Http { get; }
 
@@ -180,9 +183,30 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
         }
     }));
 
-    public Task<byte[]> ReadAsync(string location, CancellationToken ct = default) => Cache.ReadAsync(location, ct);
+    // Plik z chmury po nazwie (null: brak pliku albo niezalogowany); używane też do sprawdzenia, co faktycznie wysłano
+    public async Task<byte[]?> ReadRemoteAsync(string fileName, CancellationToken ct = default) =>
+        await AccessTokenAsync(ct) is { } token ? await DownloadRemoteAsync(token, fileName, ct) : null;
+
+    // Najpierw kopia lokalna; gdy jej nie ma (np. inny komputer, skasowany folder), plik jest pobierany z chmury
+    // i odkładany pod tą samą ścieżką lokalną
+    public async Task<byte[]> ReadAsync(string location, CancellationToken ct = default)
+    {
+        if (await Cache.ExistsAsync(location, ct)) return await Cache.ReadAsync(location, ct);
+
+        var bytes = await ReadRemoteAsync(Path.GetFileName(location), ct) ?? throw new FileNotFoundException("Brak pliku lokalnie i w chmurze.", location);
+        Directory.CreateDirectory(Path.GetDirectoryName(location)!);
+        await File.WriteAllBytesAsync(location, bytes, ct);
+        return bytes;
+    }
+
+    // Tylko lokalnie: sprawdzenie w chmurze wymagałoby pobrania pliku
     public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => Cache.ExistsAsync(location, ct);
-    public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => Cache.GetLocalPathAsync(location, ct);
+
+    public async Task<string> GetLocalPathAsync(string location, CancellationToken ct = default)
+    {
+        if (!await Cache.ExistsAsync(location, ct)) await ReadAsync(location, ct);
+        return location;
+    }
 
     protected static async Task EnsureOkAsync(HttpResponseMessage response, CancellationToken ct)
     {

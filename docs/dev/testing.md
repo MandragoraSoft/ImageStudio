@@ -12,3 +12,8 @@ Projekt `ImageStudio.Tests` testuje ViewModele na tym samym kontenerze co aplika
 - `RelayCommand.Execute` nie sprawdza `CanExecute`: ochronę (np. przed kasowaniem cudzego pliku) testuj wywołaniem `Execute`, nie tylko `CanExecute`.
 - Testy z prawdziwym serwerem lokalnym biorą wolny port przez `TestPorts.Free()` (losowe porty bywały flaky).
 - Gdy aplikacja jest uruchomiona, `bin` jest zablokowany: buduj do osobnego katalogu (`-p:BaseOutputPath=<katalog>`).
+
+## Testy na żywo (chmury)
+
+`CloudLiveTests` (atrybut `LiveCloudFact`) robi CRUD na prawdziwych kontach OneDrive i Google Drive przykładowymi plikami (PNG, MP3, MP4: zapis, odczyt po skasowaniu kopii lokalnej, aktualizacja tej samej nazwy, usunięcie) i sprząta po sobie. Biorą sekrety z prawdziwego katalogu użytkownika, więc najpierw zaloguj się w Ustawieniach → Zapis. W zwykłym przebiegu są pominięte; uruchomienie: `$env:IMAGESTUDIO_LIVE_CLOUD = "1"; dotnet test ImageStudio.Tests --filter "FullyQualifiedName~CloudLiveTests"`. Atrapy HTTP dla tych samych wtyczek: `CloudStorageTests`.
+
