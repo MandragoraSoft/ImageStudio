@@ -18,10 +18,11 @@ public sealed class AppControlTools
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    private const string KindEnum = """["generate","edit","video"]""";
     private static readonly string[] Kinds = ["generate", "edit", "video"];
     private static readonly string[] Tabs = ["generate", "edit", "video", "chat", "voice"];
 
-    private sealed record Tool(string Name, string Description, string Schema, bool Costly, Func<JsonElement, Task<string>> Run);
+    private sealed record Tool(string Name, string Description, string Schema, bool Costly, Func<JsonElement, Task<string>> Run, string[]? Needs = null);
 
     private readonly IAppControl _app;
     private readonly Func<ToolCall, bool> _confirmCostly;
@@ -34,8 +35,24 @@ public sealed class AppControlTools
         _tools = Build().ToDictionary(t => t.Name);
     }
 
-    public IReadOnlyList<ToolDefinition> Definitions =>
+    // Narzędzia widoczne dla modelu: te, których rodzaj ma modele u aktywnego dostawcy (np. OpenCode Go nie ma żadnych graficznych);
+    // enum "kind" zawęża się do dostępnych rodzajów. Liczone przy każdym wywołaniu, bo dostawca i katalog modeli się zmieniają.
+    public IReadOnlyList<ToolDefinition> Definitions
+    {
+        get
+        {
+            var kinds = _app.AvailableKinds();
+            var enumText = $"[{string.Join(",", kinds.Select(k => $"\"{k}\""))}]";
+            return _tools.Values.Where(t => IsAvailable(t, kinds))
+                .Select(t => new ToolDefinition(t.Name, t.Description, t.Schema.Replace(KindEnum, enumText))).ToList();
+        }
+    }
+
+    // Wszystkie narzędzia niezależnie od dostawcy (lista w ustawieniach czatu)
+    public IReadOnlyList<ToolDefinition> AllDefinitions =>
         _tools.Values.Select(t => new ToolDefinition(t.Name, t.Description, t.Schema)).ToList();
+
+    private static bool IsAvailable(Tool tool, IReadOnlyList<string> kinds) => tool.Needs is null || tool.Needs.Any(kinds.Contains);
 
     public bool IsCostly(string name) => _tools.TryGetValue(name, out var tool) && tool.Costly;
 
@@ -43,6 +60,8 @@ public sealed class AppControlTools
     public async Task<string> CallAsync(string name, string argumentsJson, bool alreadyApproved)
     {
         if (!_tools.TryGetValue(name, out var tool)) throw new ArgumentException($"Nieznane narzędzie: {name}");
+        if (!IsAvailable(tool, _app.AvailableKinds()))
+            throw new ArgumentException($"Narzędzie {name} jest niedostępne: aktywny dostawca nie ma modeli tego rodzaju.");
 
         if (tool.Costly && !alreadyApproved && !_confirmCostly(new ToolCall("", name, argumentsJson)))
             return "Użytkownik odrzucił uruchomienie (generowanie kosztuje).";
@@ -63,7 +82,7 @@ public sealed class AppControlTools
                    ("query", """{"type":"string","description":"Fragment nazwy modelu"}""", false),
                    ("limit", """{"type":"integer","minimum":1,"maximum":100,"description":"Maksymalna liczba wyników (domyślnie 30)"}""", false)),
             false, args => Task.FromResult(Serialize(_app.ListModels(Kind(args), OptString(args, "query"),
-                                                                     Math.Clamp(OptInt(args, "limit") ?? 30, 1, 100)))));
+                                                                     Math.Clamp(OptInt(args, "limit") ?? 30, 1, 100)))), Needs: Kinds);
 
         yield return new Tool("select_model", "Wybiera model dla danego rodzaju (id z list_models).",
             Schema(("kind", KindProp("Rodzaj modelu"), true), ("id", """{"type":"string","description":"Id modelu"}""", true)),
@@ -71,7 +90,7 @@ public sealed class AppControlTools
             {
                 _app.SelectModel(Kind(args), RequiredString(args, "id"));
                 return Task.FromResult("Wybrano model.");
-            });
+            }, Needs: Kinds);
 
         yield return new Tool("set_prompt",
             "Ustawia prompt (i opcjonalnie część systemową) dla danego rodzaju. Dla wideo system_prompt jest ignorowany.",
@@ -82,7 +101,7 @@ public sealed class AppControlTools
             {
                 _app.SetPrompt(Kind(args), RequiredString(args, "prompt"), OptString(args, "system_prompt"));
                 return Task.FromResult("Ustawiono prompt.");
-            });
+            }, Needs: Kinds);
 
         yield return new Tool("set_size", "Ustawia rozmiar wyniku generowania i edycji w pikselach.",
             Schema(("width", """{"type":"integer","minimum":64,"maximum":4096}""", true),
@@ -95,7 +114,7 @@ public sealed class AppControlTools
                     throw new ArgumentException("Rozmiar musi mieścić się w zakresie 64-4096 px.");
                 _app.SetSize(width, height);
                 return Task.FromResult($"Ustawiono rozmiar {width}x{height}.");
-            });
+            }, Needs: ["generate", "edit"]);
 
         yield return new Tool("set_video_options", "Ustawia czas trwania (sekundy) i proporcje wideo; pominięte pola zostają bez zmian.",
             Schema(("duration", """{"type":"integer","minimum":1,"maximum":60}""", false),
@@ -104,7 +123,7 @@ public sealed class AppControlTools
             {
                 _app.SetVideoOptions(OptInt(args, "duration"), OptString(args, "aspect_ratio"));
                 return Task.FromResult("Ustawiono opcje wideo.");
-            });
+            }, Needs: ["video"]);
 
         yield return new Tool("switch_tab",
             "Przełącza zakładkę aplikacji. Wynik generowania widać w zakładce odpowiedniej dla rodzaju (generate, edit, video).",
@@ -126,19 +145,19 @@ public sealed class AppControlTools
                 if (!File.Exists(path)) throw new ArgumentException($"Plik nie istnieje: {path}");
                 _app.AddReference(path);
                 return Task.FromResult("Dodano referencję.");
-            });
+            }, Needs: ["generate", "edit"]);
 
         yield return new Tool("clear_references", "Usuwa wszystkie referencje edycji.", Schema(), false, _ =>
         {
             _app.ClearReferences();
             return Task.FromResult("Wyczyszczono referencje.");
-        });
+        }, Needs: ["generate", "edit"]);
 
         yield return new Tool("generate",
             "Uruchamia generowanie (generate), edycję z referencjami (edit) albo wideo (video) z bieżącymi ustawieniami. "
             + "KOSZTUJE pieniądze i wymaga zgody użytkownika. Zwraca ścieżkę zapisanego pliku.",
             Schema(("kind", KindProp("Co uruchomić"), true)),
-            true, args => _app.GenerateAsync(Kind(args)));
+            true, args => _app.GenerateAsync(Kind(args)), Needs: Kinds);
 
         yield return new Tool("list_gallery", "Ostatnie wyniki z galerii (najnowsze pierwsze): rodzaj, model, prompt, plik, koszt.",
             Schema(("limit", """{"type":"integer","minimum":1,"maximum":50,"description":"Domyślnie 10"}""", false)),
@@ -158,10 +177,13 @@ public sealed class AppControlTools
 
     private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Json);
 
-    private static string Kind(JsonElement args)
+    private string Kind(JsonElement args)
     {
         var kind = RequiredString(args, "kind");
         if (!Kinds.Contains(kind)) throw new ArgumentException($"Nieznany rodzaj: {kind}. Dozwolone: {string.Join(", ", Kinds)}.");
+        var available = _app.AvailableKinds();
+        if (!available.Contains(kind))
+            throw new ArgumentException($"Aktywny dostawca nie ma modeli rodzaju {kind}. Dostępne: {(available.Count == 0 ? "brak" : string.Join(", ", available))}.");
         return kind;
     }
 

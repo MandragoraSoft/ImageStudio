@@ -243,7 +243,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
             : _builtin.Definitions.Select(d => d with { Name = BuiltinTools.ChatPrefix + d.Name }).Where(d => !_disabled.Contains(d.Name));
 
     private IEnumerable<string> AppToolNames() =>
-        _appTools?.Definitions.Select(d => AppControlTools.ChatPrefix + d.Name) ?? [];
+        _appTools?.AllDefinitions.Select(d => AppControlTools.ChatPrefix + d.Name) ?? [];
 
     private IEnumerable<string> BuiltinToolNames() =>
         _builtin?.Definitions.Select(d => BuiltinTools.ChatPrefix + d.Name) ?? [];
@@ -310,7 +310,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 
         if (_appTools is not null)
             ToolGroups.Add(Group(Loc.T("tools.group.app"), Loc.T("tools.control.tip"),
-                                 _appTools.Definitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
+                                 _appTools.AllDefinitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
 
         foreach (var (server, definitions) in _host.ServerTools.OrderBy(s => s.Key, StringComparer.OrdinalIgnoreCase))
             ToolGroups.Add(Group(server, Loc.T("tools.group.mcp"),

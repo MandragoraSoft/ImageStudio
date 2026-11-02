@@ -14,6 +14,9 @@ public sealed record GalleryItem(string Kind, string Model, string Prompt, strin
 public interface IAppControl
 {
     AppState GetState();
+
+    // Rodzaje ("generate", "edit", "video"), dla których aktywny dostawca ma jakiekolwiek modele; narzędzia bez modeli są ukrywane
+    IReadOnlyList<string> AvailableKinds();
     IReadOnlyList<ModelSummary> ListModels(string kind, string? query, int limit);
     void SelectModel(string kind, string id);
     void SetPrompt(string kind, string prompt, string? systemPrompt);

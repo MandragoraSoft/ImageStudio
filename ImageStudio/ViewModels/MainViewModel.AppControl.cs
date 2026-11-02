@@ -31,6 +31,9 @@ public sealed partial class MainViewModel : IAppControl
         SelectedModel?.Id, SelectedEditModel?.Id, SelectedVideoModel?.Id,
         GeneratePrompt, EditPrompt, VideoPrompt, Size, References.Count, IsBusy, Status);
 
+    IReadOnlyList<string> IAppControl.AvailableKinds() =>
+        new[] { "generate", "edit", "video" }.Where(kind => ModelsFor(kind).Count > 0).ToList();
+
     IReadOnlyList<ModelSummary> IAppControl.ListModels(string kind, string? query, int limit)
     {
         var preferred = _prefs.For(_provider.Id).Preferred;

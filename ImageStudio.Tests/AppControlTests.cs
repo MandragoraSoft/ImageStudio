@@ -12,9 +12,12 @@ namespace ImageStudio.Tests;
 internal sealed class FakeAppControl : IAppControl
 {
     public List<string> Calls { get; } = [];
+    public string[] Kinds { get; set; } = ["generate", "edit", "video"];
     public Func<string, Task<string>> OnGenerate { get; set; } = kind => Task.FromResult($"Gotowe: C:\\wyniki\\{kind}.png");
 
     public AppState GetState() => new("generate", "Fake", "model-a", null, null, "kot", "", "", "1024x1024", 0, false, "Gotowy");
+
+    public IReadOnlyList<string> AvailableKinds() => Kinds;
 
     public IReadOnlyList<ModelSummary> ListModels(string kind, string? query, int limit)
     {
@@ -96,6 +99,30 @@ public sealed class AppControlToolsTests : IDisposable
         Assert.Equal("generate", json.RootElement.GetProperty("Tab").GetString());
         Assert.Equal("model-a", json.RootElement.GetProperty("GenerationModel").GetString());
         Assert.False(json.RootElement.TryGetProperty("EditModel", out _)); // null pomijane
+    }
+
+    [Fact]
+    public async Task Provider_without_models_hides_image_tools_and_rejects_calls()
+    {
+        _app.Kinds = [];
+        var tools = Tools();
+
+        Assert.Equal(["get_state", "list_gallery", "switch_tab"], tools.Definitions.Select(d => d.Name).Order());
+        Assert.Equal(11, tools.AllDefinitions.Count);
+        await Assert.ThrowsAsync<ArgumentException>(() => tools.CallAsync("generate", """{"kind":"generate"}""", true));
+    }
+
+    [Fact]
+    public async Task Kinds_narrow_to_what_the_provider_offers()
+    {
+        _app.Kinds = ["generate"];
+        var tools = Tools();
+        var names = tools.Definitions.Select(d => d.Name).ToList();
+
+        Assert.Contains("set_size", names);
+        Assert.DoesNotContain("set_video_options", names);
+        Assert.Contains("""["generate"]""", tools.Definitions.Single(d => d.Name == "generate").ParametersJson);
+        await Assert.ThrowsAsync<ArgumentException>(() => tools.CallAsync("list_models", """{"kind":"video"}""", false));
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 
@@ -22,6 +23,8 @@ public sealed partial class ChatViewModel : ObservableObject
     // Tyle razy model może z rzędu poprosić o narzędzia w jednej odpowiedzi, zanim przerwiemy pętlę
     private const int MaxToolRounds = 8;
     private const int DefaultMaxSide = 1536;
+
+    private static readonly ILogger Log = AppLog.For<ChatViewModel>();
 
     private readonly Func<IAiProvider> _provider;
     private readonly Action<string, bool> _report;
@@ -159,9 +162,12 @@ public sealed partial class ChatViewModel : ObservableObject
         ChatMessage? live = null;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+        var provider = _provider();
         try
         {
             var definitions = Tools?.Tools ?? [];
+            Log.LogInformation("Czat: wysyłam do {Provider}/{Model} (historia {History}, obrazów {Images}, narzędzi {Tools}, strumień {Stream})",
+                provider.Id, SelectedModel, Messages.Count, images.Count, definitions.Count, _useStreaming?.Invoke() == true);
             for (var round = 0; ; round++)
             {
                 var history = BuildHistory();
@@ -185,6 +191,9 @@ public sealed partial class ChatViewModel : ObservableObject
                     reply = await _provider().ChatAsync(SelectedModel!, history, tools, ct, BuildOptions());
                 }
 
+                Log.LogInformation("Czat: odpowiedź rundy {Round}: tekst {Chars} zn., rozumowanie {Reasoning} zn., wywołania narzędzi [{Calls}], tokeny {Usage}",
+                    round, reply.Content.Length, reply.Reasoning?.Length ?? 0, string.Join(", ", reply.ToolCalls.Select(c => c.Name)), reply.Usage);
+
                 if (reply.ToolCalls.Count == 0)
                 {
                     Complete(live, new ChatMessage("assistant", reply.Content), reply);
@@ -194,6 +203,7 @@ public sealed partial class ChatViewModel : ObservableObject
                 // Wywołania ponad limit odrzucamy w całości: wiadomość z tool_calls bez wyników zepsułaby historię
                 if (round >= MaxToolRounds)
                 {
+                    Log.LogWarning("Czat: przekroczono limit {Max} rund narzędzi, odrzucam wywołania", MaxToolRounds);
                     if (live is not null) Messages.Remove(live);
                     Messages.Add(new ChatMessage("assistant", Loc.T("chat.msg.toolLoop")));
                     break;
@@ -210,6 +220,8 @@ public sealed partial class ChatViewModel : ObservableObject
         catch (Exception ex)
         {
             var stopped = ex is OperationCanceledException;
+            if (stopped) Log.LogInformation("Czat: przerwano przez użytkownika ({Provider}/{Model})", provider.Id, SelectedModel);
+            else Log.LogError(ex, "Czat: błąd przy {Provider}/{Model} (wiadomości w rozmowie {Count})", provider.Id, SelectedModel, Messages.Count);
 
             // Pusta wiadomość ze strumienia, który nic nie dostarczył, nie zostaje w rozmowie
             if (live is not null && live.Content.Length == 0 && !live.HasToolCalls) Messages.Remove(live);
@@ -264,17 +276,24 @@ public sealed partial class ChatViewModel : ObservableObject
     private async Task<string> RunToolAsync(ToolCall call, CancellationToken ct)
     {
         if (Tools is null) return Loc.T("chat.msg.toolsOff");
-        if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false)) return Loc.T("chat.msg.toolRejected");
+        if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false))
+        {
+            Log.LogInformation("Czat: użytkownik odrzucił narzędzie {Tool}", call.Name);
+            return Loc.T("chat.msg.toolRejected");
+        }
 
         _report(Loc.T("chat.msg.tool", call.Name), false);
         try
         {
             // Wywołanie narzędzia (serwer MCP) to też operacja sieciowa: spinner w stopce
             using var _ = _activity?.Begin(Loc.T("chat.msg.toolActivity", call.Name));
-            return await Tools.CallAsync(call, ct);
+            var result = await Tools.CallAsync(call, ct);
+            Log.LogInformation("Czat: narzędzie {Tool} zwróciło {Chars} zn.", call.Name, result.Length);
+            return result;
         }
         catch (Exception ex)
         {
+            Log.LogError(ex, "Czat: narzędzie {Tool} zgłosiło błąd (argumenty: {Args})", call.Name, call.ArgumentsJson);
             return Loc.T("chat.msg.toolError", ex.Message);
         }
     }
