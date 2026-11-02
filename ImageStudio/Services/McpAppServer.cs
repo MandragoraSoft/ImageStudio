@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,8 +7,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 
 namespace ImageStudio.Services;
 
@@ -16,12 +19,14 @@ namespace ImageStudio.Services;
 // więc strona w przeglądarce nie może sterować aplikacją. Kosztowne narzędzia pytają o zgodę w oknie aplikacji.
 public sealed class McpAppServer : IAsyncDisposable
 {
-    private readonly AppControlTools _tools;
+    private static readonly ILogger Log = AppLog.For<McpAppServer>();
+
+    private readonly IMcpToolSet _tools;
     private readonly Func<Func<Task<string>>, Task<string>> _runOnUi;
     private WebApplication? _app;
 
     // runOnUi wykonuje akcję w wątku interfejsu (narzędzia dotykają widoków); w testach może wywołać ją wprost
-    public McpAppServer(AppControlTools tools, Func<Func<Task<string>>, Task<string>> runOnUi)
+    public McpAppServer(IMcpToolSet tools, Func<Func<Task<string>>, Task<string>> runOnUi)
     {
         _tools = tools;
         _runOnUi = runOnUi;
@@ -39,34 +44,7 @@ public sealed class McpAppServer : IAsyncDisposable
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, port));
         builder.Logging.ClearProviders();
 
-        builder.Services.AddMcpServer(options =>
-            {
-                options.ServerInfo = new Implementation { Name = "ImageStudio", Version = "1.0" };
-            })
-            .WithHttpTransport(options => options.Stateless = true)
-            .WithListToolsHandler((_, _) => ValueTask.FromResult(new ListToolsResult
-            {
-                Tools = _tools.Definitions.Select(d => new Tool
-                {
-                    Name = d.Name,
-                    Description = d.Description,
-                    InputSchema = JsonSerializer.Deserialize<JsonElement>(d.ParametersJson),
-                }).ToList(),
-            }))
-            .WithCallToolHandler(async (context, _) =>
-            {
-                var request = context.Params ?? throw new InvalidOperationException("Brak parametrów wywołania.");
-                var arguments = request.Arguments is null ? "{}" : JsonSerializer.Serialize(request.Arguments);
-                try
-                {
-                    var text = await _runOnUi(() => _tools.CallAsync(request.Name, arguments, alreadyApproved: false));
-                    return new CallToolResult { Content = [new TextContentBlock { Text = text }] };
-                }
-                catch (Exception ex)
-                {
-                    return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = ex.Message }] };
-                }
-            });
+        Configure(builder.Services.AddMcpServer().WithHttpTransport(options => options.Stateless = true));
 
         var app = builder.Build();
         app.Use(async (context, next) =>
@@ -90,6 +68,54 @@ public sealed class McpAppServer : IAsyncDisposable
         await app.StartAsync();
         _app = app;
     }
+
+    // Ten sam serwer na stdio (klient uruchamia proces i rozmawia przez standardowe wejście i wyjście). Na stdout trafia wyłącznie
+    // protokół, więc dziennik (AppLog) idzie na stderr. Kończy się, gdy klient zamknie wejście albo anulowano ct.
+    public async Task RunStdioAsync(CancellationToken ct)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
+        Configure(builder.Services.AddMcpServer().WithStdioServerTransport());
+        await builder.Build().RunAsync(ct);
+    }
+
+    // Wspólne dla HTTP i stdio: informacje o serwerze oraz obsługa listy i wywołań narzędzi (z dziennikiem akcji)
+    private void Configure(IMcpServerBuilder builder) => builder
+        .WithListToolsHandler((_, _) =>
+        {
+            var definitions = _tools.Definitions;
+            Log.LogInformation("MCP odebrano: tools/list; wysłano {Count} narzędzi: {Names}", definitions.Count,
+                               string.Join(", ", definitions.Select(d => d.Name)));
+            return ValueTask.FromResult(new ListToolsResult
+            {
+                Tools = definitions.Select(d => new Tool
+                {
+                    Name = d.Name,
+                    Description = d.Description,
+                    InputSchema = JsonSerializer.Deserialize<JsonElement>(d.ParametersJson),
+                }).ToList(),
+            });
+        })
+        .WithCallToolHandler(async (context, _) =>
+        {
+            var request = context.Params ?? throw new InvalidOperationException("Brak parametrów wywołania.");
+            var arguments = request.Arguments is null ? "{}" : JsonSerializer.Serialize(request.Arguments);
+            Log.LogInformation("MCP odebrano: tools/call {Tool} (argumenty: {Args})", request.Name, AppLog.Preview(arguments));
+            var clock = Stopwatch.StartNew();
+            try
+            {
+                var text = await _runOnUi(() => _tools.CallAsync(request.Name, arguments, alreadyApproved: false));
+                Log.LogInformation("MCP wysłano: {Tool} w {Ms} ms, wynik ({Chars} zn.): {Result}", request.Name, clock.ElapsedMilliseconds,
+                                   text.Length, AppLog.Preview(text));
+                return new CallToolResult { Content = [new TextContentBlock { Text = text }] };
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning("MCP wysłano: {Tool} w {Ms} ms, błąd: {Error}", request.Name, clock.ElapsedMilliseconds, AppLog.Preview(ex.Message));
+                return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = ex.Message }] };
+            }
+        })
+        .Services.Configure<McpServerOptions>(options => options.ServerInfo = new Implementation { Name = "ImageStudio", Version = "1.0" });
 
     public async Task StopAsync()
     {

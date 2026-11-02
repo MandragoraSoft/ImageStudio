@@ -39,10 +39,21 @@ internal sealed class FakeAppControl : IAppControl
         return OnGenerate(kind);
     }
 
-    public IReadOnlyList<GalleryItem> ListGallery(int limit)
+    public Task AddReferenceFromUrlAsync(string url)
     {
-        Calls.Add($"list_gallery:{limit}");
-        return [new GalleryItem("generate", "model-a", "kot", "C:\\wyniki\\1.png", "$0,04", new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc))];
+        Calls.Add($"add_reference_url:{url}");
+        return Task.CompletedTask;
+    }
+
+    public void RemoveReference(int index) => Calls.Add($"remove_reference:{index}");
+    public void AddVideoAttachment(string path) => Calls.Add($"add_video_attachment:{Path.GetFileName(path)}");
+    public void ClearVideoAttachments() => Calls.Add("clear_video_attachments");
+    public void SetAspect(string ratio) => Calls.Add($"set_aspect:{ratio}");
+
+    public Task ReloadModelsAsync()
+    {
+        Calls.Add("reload_models");
+        return Task.CompletedTask;
     }
 }
 
@@ -69,8 +80,9 @@ public sealed class AppControlToolsTests : IDisposable
         var definitions = Tools().Definitions;
 
         Assert.Equal(
-            ["add_reference", "clear_references", "generate", "get_state", "list_gallery", "list_models", "select_model",
-             "set_prompt", "set_size", "set_video_options", "switch_tab"],
+            ["add_reference", "add_video_attachment", "clear_references", "clear_video_attachments", "generate", "get_state",
+             "list_models", "reload_models", "remove_reference", "select_model", "set_aspect", "set_prompt", "set_size",
+             "set_video_options", "switch_tab"],
             definitions.Select(d => d.Name).Order());
         foreach (var definition in definitions)
         {
@@ -107,8 +119,8 @@ public sealed class AppControlToolsTests : IDisposable
         _app.Kinds = [];
         var tools = Tools();
 
-        Assert.Equal(["get_state", "list_gallery", "switch_tab"], tools.Definitions.Select(d => d.Name).Order());
-        Assert.Equal(11, tools.AllDefinitions.Count);
+        Assert.Equal(["get_state", "reload_models", "switch_tab"], tools.Definitions.Select(d => d.Name).Order());
+        Assert.Equal(15, tools.AllDefinitions.Count);
         await Assert.ThrowsAsync<ArgumentException>(() => tools.CallAsync("generate", """{"kind":"generate"}""", true));
     }
 
@@ -158,11 +170,18 @@ public sealed class AppControlToolsTests : IDisposable
         await tools.CallAsync("switch_tab", """{"tab":"video"}""", false);
         await tools.CallAsync("add_reference", JsonSerializer.Serialize(new { path = reference }), false);
         await tools.CallAsync("clear_references", "{}", false);
-        await tools.CallAsync("list_gallery", """{"limit":3}""", false);
+        await tools.CallAsync("add_reference", """{"url":"https://x.test/a.png"}""", false);
+        await tools.CallAsync("remove_reference", """{"index":1}""", false);
+        await tools.CallAsync("add_video_attachment", JsonSerializer.Serialize(new { path = reference }), false);
+        await tools.CallAsync("clear_video_attachments", "{}", false);
+        await tools.CallAsync("set_aspect", """{"ratio":"source"}""", false);
+        await tools.CallAsync("reload_models", "{}", false);
 
         Assert.Equal(
             ["select_model:edit:qwen/edit", "set_prompt:generate:kot:realizm", "set_prompt:video:fala:", "set_size:768x512",
-             "set_video_options:8:9:16", "switch_tab:video", "add_reference:ref.png", "clear_references", "list_gallery:3"],
+             "set_video_options:8:9:16", "switch_tab:video", "add_reference:ref.png", "clear_references",
+             "add_reference_url:https://x.test/a.png", "remove_reference:1", "add_video_attachment:ref.png", "clear_video_attachments",
+             "set_aspect:source", "reload_models"],
             _app.Calls);
     }
 

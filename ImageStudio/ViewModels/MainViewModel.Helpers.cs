@@ -55,13 +55,6 @@ public sealed partial class MainViewModel
         foreach (var item in items) target.Add(item);
     }
 
-    // Automatyczny zapis w magazynie wyników (kopia bezpieczeństwa; "Zapisz jako" zapisuje w wybranym miejscu)
-    private Task<string> SaveImageAsync(byte[] bytes)
-    {
-        var ext = bytes is [0xFF, 0xD8, ..] ? ".jpg" : ".png";
-        return _storage.WriteAsync(MediaKind.Image, $"{DateTime.Now:yyyyMMdd-HHmmss}{ext}", bytes);
-    }
-
     private static BitmapImage LoadImage(byte[] bytes)
     {
         using var stream = new MemoryStream(bytes);

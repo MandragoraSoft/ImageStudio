@@ -66,6 +66,7 @@ public sealed partial class ChatViewModel : ObservableObject
         Tools = tools;
         _confirm = confirm;
         _images = images;
+        if (tools is INotifyPropertyChanged observable) observable.PropertyChanged += (_, _) => OnPropertyChanged(nameof(ToolsWarning));
         Attachments.CollectionChanged += (_, _) =>
         {
             SendCommand.NotifyCanExecuteChanged();
@@ -101,7 +102,7 @@ public sealed partial class ChatViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
+    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(ToolsWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
     private string? _selectedModel;
 
     // Rozumowanie: sterowanie pojawia się tylko dla modeli, które je deklarują (supported_parameters z katalogu)
@@ -143,6 +144,20 @@ public sealed partial class ChatViewModel : ObservableObject
             ? Loc.T("chat.msg.noImages")
             : "";
 
+    // Ostrzeżenie, gdy narzędzia są włączone, a katalog mówi, że wybrany model ich nie obsługuje (pusta lista parametrów = katalog milczy)
+    public string ToolsWarning =>
+        Tools is { Tools.Count: > 0 } && SelectedModel is { } model && _modelInfo?.Invoke(model) is { SupportedParameters: { Count: > 0 } supported }
+        && !supported.Contains("tools")
+            ? Loc.T("chat.msg.noTools")
+            : "";
+
+    // Krótka odpowiedź obiecująca działanie ("Pozwól, że to zrobię", "Let me check"): model, który nie umie wywoływać narzędzi, kończy na obietnicy
+    private static readonly System.Text.RegularExpressions.Regex PromiseText = new(
+        @"\b(pozwól|zaraz|teraz|let me|i will|i'll|i'm going to)\b.{0,80}\b(zrobi\w*|sprawdz\w*|wykona\w*|użyj\w*|wywoła\w*|do (this|that|it)|check|call|use|run)\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+    internal static bool PromisesAction(string text) => text.Length is > 0 and < 600 && PromiseText.IsMatch(text);
+
     private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null;
 
     // Wysyła całą historię (z instrukcją systemową na początku). Gdy model prosi o narzędzia, wykonuje je (po zgodzie)
@@ -160,6 +175,7 @@ public sealed partial class ChatViewModel : ObservableObject
         IsSending = true;
         _report(Loc.T("chat.msg.answering"), false);
         ChatMessage? live = null;
+        string? announced = null;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         var provider = _provider();
@@ -197,6 +213,9 @@ public sealed partial class ChatViewModel : ObservableObject
                 if (reply.ToolCalls.Count == 0)
                 {
                     Complete(live, new ChatMessage("assistant", reply.Content), reply);
+                    announced = tools is null ? null
+                        : tools.FirstOrDefault(t => reply.Content.Contains(t.Name, StringComparison.Ordinal))?.Name
+                          ?? (PromisesAction(reply.Content) ? "" : null);
                     break;
                 }
 
@@ -215,7 +234,16 @@ public sealed partial class ChatViewModel : ObservableObject
                 _report(Loc.T("chat.msg.answering"), false);
             }
 
-            _report(Loc.T("msg.ready"), false);
+            // Model napisał, że wywoła narzędzie, ale nie wysłał wywołania (częste przy modelach bez obsługi narzędzi)
+            if (announced is not null)
+            {
+                Log.LogWarning("Czat: {Model} zapowiada działanie ({Tool}), ale nie wywołał narzędzia", SelectedModel, announced.Length > 0 ? announced : "bez nazwy");
+                _report(announced.Length > 0 ? Loc.T("chat.msg.toolNotCalled", announced) : Loc.T("chat.msg.toolPromised", Tools?.Tools.Count ?? 0), true);
+            }
+            else
+            {
+                _report(Loc.T("msg.ready"), false);
+            }
         }
         catch (Exception ex)
         {
@@ -278,22 +306,23 @@ public sealed partial class ChatViewModel : ObservableObject
         if (Tools is null) return Loc.T("chat.msg.toolsOff");
         if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false))
         {
-            Log.LogInformation("Czat: użytkownik odrzucił narzędzie {Tool}", call.Name);
+            Log.LogInformation("Czat: użytkownik odrzucił narzędzie {Tool} (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
             return Loc.T("chat.msg.toolRejected");
         }
 
         _report(Loc.T("chat.msg.tool", call.Name), false);
+        Log.LogInformation("Czat: wywołanie narzędzia {Tool} (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
         try
         {
             // Wywołanie narzędzia (serwer MCP) to też operacja sieciowa: spinner w stopce
             using var _ = _activity?.Begin(Loc.T("chat.msg.toolActivity", call.Name));
             var result = await Tools.CallAsync(call, ct);
-            Log.LogInformation("Czat: narzędzie {Tool} zwróciło {Chars} zn.", call.Name, result.Length);
+            Log.LogInformation("Czat: wyniki narzędzia {Tool} ({Chars} zn.): {Result}", call.Name, result.Length, AppLog.Preview(result));
             return result;
         }
         catch (Exception ex)
         {
-            Log.LogError(ex, "Czat: narzędzie {Tool} zgłosiło błąd (argumenty: {Args})", call.Name, call.ArgumentsJson);
+            Log.LogError(ex, "Czat: narzędzie {Tool} zgłosiło błąd (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
             return Loc.T("chat.msg.toolError", ex.Message);
         }
     }

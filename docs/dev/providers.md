@@ -23,3 +23,7 @@ Błędy HTTP rzucaj przez `ApiErrors.Failure(status, body)`: wyciąga `message` 
 ## Ceny UberLLM: rynek i katalog
 
 `UberLlmProvider.GetPricingAsync` składa ceny z dwóch źródeł. Rynek (`/api/v1/public/market/live`: `media_price_now_usd`, `price_now`) ma pierwszeństwo, bo niesie ceny na żywo, oferty i rabat. Modele, których rynek nie wycenia (np. bez aktywnych ofert: `qwen/venice-qwen-image-2-1-turbo` ma tylko `media_list_usd`), dostają cenę z katalogu modeli: pole `pricing` w `/v1/models?type=image|video|chat` (`usd` albo `list_usd` za `unit`: `image`, `second`; tekst: `input_usd`/`output_usd`/`cache_read_usd` za `1M tokens`), czyli `ImageGenerationService.GetCatalogPricingAsync`. Awaria katalogu nie psuje cen z rynku.
+
+## Proporcje wyniku edycji
+
+Endpoint edycji komponuje kadr sam, więc samo przycięcie wyniku (środek) ucinało boki. `IAiProvider.EditImageAsync(..., ImageEditOptions? options, ct)` (metoda domyślna, jawnie przekazywana w `ActivityAiProvider`) niesie prośbę o proporcje (`Aspect` = szerokość/wysokość). UberLLM czyta schemat modelu (`GET /v1/models/<id>`, `ImageGenerationService.PickShape`) i wysyła najbliższe dozwolone `aspect_ratio` (a gdy go nie ma, `size`); odrzucone pole jest pomijane i zapamiętywane jak przy wideo. Inni dostawcy ignorują opcję. `StudioApi.EditImageAsync` zawsze prosi o proporcje źródła (albo podanych wymiarów), a potem dopasowuje wynik lokalnie (`ImageFitter.FitTo`) jako zabezpieczenie, więc kształt jest właściwy także u dostawców bez tej możliwości.

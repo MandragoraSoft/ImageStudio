@@ -1,6 +1,5 @@
 using System.IO;
 using System.Reflection;
-using System.Runtime.Loader;
 using System.Windows;
 using ImageStudio.Composition;
 using ImageStudio.Configuration;
@@ -16,22 +15,7 @@ public partial class App : Application
 {
     private IServiceProvider? _services;
 
-    // Biblioteki dostawców, zakładek i grup narzędzi czatu leżą w podfolderach providers\, tabs\, tools\ i storage\ (patrz ImageStudio.csproj);
-    // domyślny kontekst ich nie widzi sam
-    static App()
-    {
-        string[] pluginDirs = [Path.Combine(AppContext.BaseDirectory, "providers"), Path.Combine(AppContext.BaseDirectory, "tabs"),
-                               Path.Combine(AppContext.BaseDirectory, "tools"), Path.Combine(AppContext.BaseDirectory, "storage")];
-        AssemblyLoadContext.Default.Resolving += (context, name) =>
-        {
-            foreach (var dir in pluginDirs)
-            {
-                var path = Path.Combine(dir, name.Name + ".dll");
-                if (File.Exists(path)) return context.LoadFromAssemblyPath(path);
-            }
-            return null;
-        };
-    }
+    static App() => PluginResolver.Register();
 
     // Zapis wyborów modeli i parametrów przy zamykaniu. Kontener nie jest zwalniany jawnie: proces się kończy,
     // a McpToolHost zamyka MainViewModel.Shutdown (kontener zgłasza błąd przy synchronicznym Dispose usług IAsyncDisposable)

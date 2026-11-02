@@ -1,22 +1,15 @@
 using System.IO;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using static ImageStudio.Services.ToolArgs;
 
 namespace ImageStudio.Services;
 
 // Narzędzia sterujące aplikacją (modele, prompty, rozmiar, generowanie) dla modelu w czacie i dla klientów MCP.
 // Nazwy surowe (np. "generate"); w czacie dostają przedrostek ChatPrefix, żeby nie zderzały się z narzędziami MCP.
 // Kosztowne narzędzia (generowanie) wymagają zgody użytkownika w aplikacji, o ile nie dał jej już czat.
-public sealed class AppControlTools
+public sealed class AppControlTools : IMcpToolSet
 {
     public const string ChatPrefix = "imagestudio__";
-
-    private static readonly JsonSerializerOptions Json = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
 
     private const string KindEnum = """["generate","edit","video"]""";
     private static readonly string[] Kinds = ["generate", "edit", "video"];
@@ -137,14 +130,21 @@ public sealed class AppControlTools
             });
 
         yield return new Tool("add_reference",
-            "Dodaje plik obrazu (pełna ścieżka na tym komputerze) jako referencję do edycji.",
-            Schema(("path", """{"type":"string","description":"Ścieżka do pliku png, jpg, jpeg lub webp"}""", true)),
-            false, args =>
+            "Dodaje obraz jako referencję do edycji: plik (pełna ścieżka na tym komputerze) albo adres http(s) do pobrania.",
+            Schema(("path", """{"type":"string","description":"Ścieżka do pliku png, jpg, jpeg lub webp"}""", false),
+                   ("url", """{"type":"string","description":"Adres http(s) obrazu"}""", false)),
+            false, async args =>
             {
+                if (OptString(args, "url") is { Length: > 0 } url)
+                {
+                    await _app.AddReferenceFromUrlAsync(url);
+                    return "Dodano referencję z adresu.";
+                }
+
                 var path = RequiredString(args, "path");
                 if (!File.Exists(path)) throw new ArgumentException($"Plik nie istnieje: {path}");
                 _app.AddReference(path);
-                return Task.FromResult("Dodano referencję.");
+                return "Dodano referencję.";
             }, Needs: ["generate", "edit"]);
 
         yield return new Tool("clear_references", "Usuwa wszystkie referencje edycji.", Schema(), false, _ =>
@@ -159,23 +159,50 @@ public sealed class AppControlTools
             Schema(("kind", KindProp("Co uruchomić"), true)),
             true, args => _app.GenerateAsync(Kind(args)), Needs: Kinds);
 
-        yield return new Tool("list_gallery", "Ostatnie wyniki z galerii (najnowsze pierwsze): rodzaj, model, prompt, plik, koszt.",
-            Schema(("limit", """{"type":"integer","minimum":1,"maximum":50,"description":"Domyślnie 10"}""", false)),
-            false, args => Task.FromResult(Serialize(_app.ListGallery(Math.Clamp(OptInt(args, "limit") ?? 10, 1, 50)))));
+        yield return new Tool("remove_reference", "Usuwa jedną referencję edycji (indeks od 0, kolejność jak w get_state).",
+            Schema(("index", """{"type":"integer","minimum":0}""", true)),
+            false, args =>
+            {
+                _app.RemoveReference(RequiredInt(args, "index"));
+                return Task.FromResult("Usunięto referencję.");
+            }, Needs: ["generate", "edit"]);
+
+        yield return new Tool("add_video_attachment",
+            "Dodaje plik obrazu (pełna ścieżka) jako załącznik promptu wideo (obraz wejściowy).",
+            Schema(("path", """{"type":"string","description":"Ścieżka do pliku png, jpg, jpeg lub webp"}""", true)),
+            false, args =>
+            {
+                var path = RequiredString(args, "path");
+                if (!File.Exists(path)) throw new ArgumentException($"Plik nie istnieje: {path}");
+                _app.AddVideoAttachment(path);
+                return Task.FromResult("Dodano załącznik wideo.");
+            }, Needs: ["video"]);
+
+        yield return new Tool("clear_video_attachments", "Usuwa wszystkie załączniki promptu wideo.", Schema(), false, _ =>
+        {
+            _app.ClearVideoAttachments();
+            return Task.FromResult("Wyczyszczono załączniki wideo.");
+        }, Needs: ["video"]);
+
+        yield return new Tool("set_aspect",
+            "Ustawia proporcje obrazu (zachowując pole): 1:1, 4:3, 3:2, 16:9, 9:16 albo \"source\" (jak pierwsza referencja).",
+            Schema(("ratio", """{"type":"string","description":"Np. 16:9 albo source"}""", true)),
+            false, args =>
+            {
+                var ratio = RequiredString(args, "ratio");
+                _app.SetAspect(ratio);
+                return Task.FromResult($"Proporcje: {ratio}.");
+            }, Needs: ["generate", "edit"]);
+
+        yield return new Tool("reload_models", "Ponownie pobiera listy modeli i ceny aktywnego dostawcy.", Schema(), false, async _ =>
+        {
+            await _app.ReloadModelsAsync();
+            return "Przeładowano modele.";
+        });
     }
 
     private static string KindProp(string description) =>
         $$"""{"type":"string","enum":["generate","edit","video"],"description":"{{description}}: generate, edit lub video"}""";
-
-    // Schemat obiektu z listą (nazwa, schemat właściwości, wymagana)
-    private static string Schema(params (string Name, string Property, bool Required)[] properties)
-    {
-        var props = string.Join(",", properties.Select(p => $"\"{p.Name}\":{p.Property}"));
-        var required = string.Join(",", properties.Where(p => p.Required).Select(p => $"\"{p.Name}\""));
-        return $$"""{"type":"object","properties":{{{props}}},"required":[{{required}}]}""";
-    }
-
-    private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Json);
 
     private string Kind(JsonElement args)
     {
@@ -186,20 +213,4 @@ public sealed class AppControlTools
             throw new ArgumentException($"Aktywny dostawca nie ma modeli rodzaju {kind}. Dostępne: {(available.Count == 0 ? "brak" : string.Join(", ", available))}.");
         return kind;
     }
-
-    private static string RequiredString(JsonElement args, string name) =>
-        OptString(args, name) is { Length: > 0 } value ? value : throw new ArgumentException($"Brak parametru \"{name}\".");
-
-    private static string? OptString(JsonElement args, string name) =>
-        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    private static int? OptInt(JsonElement args, string name) =>
-        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.TryGetInt32(out var number)
-            ? number
-            : null;
-
-    private static int RequiredInt(JsonElement args, string name) =>
-        OptInt(args, name) ?? throw new ArgumentException($"Brak parametru \"{name}\" (liczba całkowita).");
 }

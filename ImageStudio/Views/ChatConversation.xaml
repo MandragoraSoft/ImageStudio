@@ -131,6 +131,7 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
             <TextBlock Text="{Binding ImageWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
+            <TextBlock Text="{Binding ToolsWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
             <Grid>
                 <Grid.ColumnDefinitions>

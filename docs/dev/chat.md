@@ -20,7 +20,7 @@ Każda rozmowa to sesja zapisywana po każdej odpowiedzi przez `IChatSessionStor
 
 ## Czat i narzędzia MCP
 
-`ChatViewModel` + `ToolsViewModel` jako klient narzędzi MCP (`McpToolHost`, konfiguracja w `McpConfig`). Osobno `McpAppServer` (lokalny serwer MCP) wystawia sterowanie aplikacją przez `IAppControl` / `AppControlTools`, implementowane przez `MainViewModel.AppControl`.
+`ChatViewModel` + `ToolsViewModel` jako klient narzędzi MCP (`McpToolHost`, konfiguracja w `McpConfig`). Osobno `McpAppServer` (lokalny serwer MCP) wystawia sterowanie aplikacją: stan okna przez `IAppControl` / `AppControlTools` (`MainViewModel.AppControl`) i operacje bez okna przez `StudioApi` / `StudioTools`; oba zestawy łączy `CompositeToolSet`. Pokrycie funkcji i droga do CLI: [app-control-coverage.md](app-control-coverage.md).
 
 ## Markdown w odpowiedziach
 

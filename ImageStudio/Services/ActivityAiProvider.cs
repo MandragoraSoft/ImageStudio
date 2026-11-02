@@ -38,6 +38,10 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
                                             CancellationToken ct = default) =>
         Track(Loc.T("activity.editImage"), () => inner.EditImageAsync(model, prompt, imagePaths, ct));
 
+    public Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
+                                            CancellationToken ct = default) =>
+        Track(Loc.T("activity.editImage"), () => inner.EditImageAsync(model, prompt, imagePaths, options, ct));
+
     public Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                 IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                                 Action<string>? progress = null, CancellationToken ct = default) =>

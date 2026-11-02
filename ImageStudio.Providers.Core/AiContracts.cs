@@ -163,6 +163,10 @@ public sealed class ChatMessage : System.ComponentModel.INotifyPropertyChanged
 // Wynik generowania/edycji: bajty obrazu i koszt z API (null, gdy API go nie zwróciło)
 public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
 
+// Prośba o kształt wyniku edycji: proporcje szerokość/wysokość (np. 0.75 dla 3:4). Dostawca przekazuje je modelowi, jeśli ten
+// przyjmuje proporcje (wybiera najbliższą dozwoloną wartość), a inaczej ignoruje; null = bez prośby
+public sealed record ImageEditOptions(double? Aspect);
+
 // Opcjonalne parametry generowania; null = nie wysyłamy (API odrzuca nieznane klucze)
 public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality);
 

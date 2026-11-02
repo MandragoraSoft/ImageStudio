@@ -199,24 +199,84 @@ public sealed class ImageGenerationService : IDisposable
         return await ReadImageAsync(response, ct);
     }
 
-    // Edycja / generowanie z referencjami (multipart/form-data). Wiele obrazów: pole "image[]" (sprawdzone na API)
-    public async Task<ImageResult> EditAsync(string model, string prompt, IReadOnlyList<string> imagePaths, CancellationToken ct = default)
-    {
-        using var content = new MultipartFormDataContent
-        {
-            { new StringContent(model), "model" },
-            { new StringContent(prompt), "prompt" },
-        };
+    public Task<ImageResult> EditAsync(string model, string prompt, IReadOnlyList<string> imagePaths, CancellationToken ct = default) =>
+        EditAsync(model, prompt, imagePaths, null, ct);
 
-        foreach (var path in imagePaths)
+    // Pola formularza odrzucone wcześniej przez dany model edycji w tej sesji (id modelu -> nazwy)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string[]> _rejectedEditParameters = new();
+
+    // Edycja / generowanie z referencjami (multipart/form-data). Wiele obrazów: pole "image[]" (sprawdzone na API).
+    // Z options.Aspect model dostaje aspect_ratio (albo size), jeśli jego schemat z GET /v1/models/<id> je oferuje: najbliższa dozwolona
+    // wartość. Gdy API mimo to odrzuci pole, ponawiamy bez niego i zapamiętujemy do końca sesji.
+    public async Task<ImageResult> EditAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
+                                             CancellationToken ct = default)
+    {
+        var shape = new Dictionary<string, string>();
+        if (options?.Aspect is { } aspect && PickShape(await GetModelSchemaAsync(model, ct), aspect) is { } picked)
+            shape[picked.Field] = picked.Value;
+        foreach (var skipped in _rejectedEditParameters.GetValueOrDefault(model) ?? []) shape.Remove(skipped);
+
+        while (true)
         {
-            var image = new ByteArrayContent(await File.ReadAllBytesAsync(path, ct));
-            image.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeOf(path));
-            content.Add(image, "image[]", Path.GetFileName(path));
+            using var content = new MultipartFormDataContent
+            {
+                { new StringContent(model), "model" },
+                { new StringContent(prompt), "prompt" },
+            };
+            foreach (var (field, value) in shape) content.Add(new StringContent(value), field);
+
+            foreach (var path in imagePaths)
+            {
+                var image = new ByteArrayContent(await File.ReadAllBytesAsync(path, ct));
+                image.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeOf(path));
+                content.Add(image, "image[]", Path.GetFileName(path));
+            }
+
+            using var response = await _http.PostAsync(EditPath, content, ct);
+            if (response.IsSuccessStatusCode) return await ReadImageAsync(response, ct);
+
+            var text = await response.Content.ReadAsStringAsync(ct);
+            if (ApiErrors.RejectedParameter(text) is { } rejected && shape.Remove(rejected))
+            {
+                _rejectedEditParameters.AddOrUpdate(model, _ => [rejected], (_, known) => [.. known, rejected]);
+                continue;
+            }
+
+            throw ApiErrors.Failure(response.StatusCode, text);
+        }
+    }
+
+    // Pole proporcji z schematu modelu (aspect_ratio z listy "W:H", a gdy go nie ma, size "WxH") o proporcji najbliższej żądanej;
+    // null, gdy model nie ma żadnego z nich. "auto" jest pomijane (nie niesie proporcji).
+    public static (string Field, string Value)? PickShape(JsonElement? schema, double aspect)
+    {
+        if (schema is not { } parameters || aspect <= 0 || !parameters.TryGetProperty("properties", out var props)) return null;
+
+        (string Field, char Separator)[] candidates = [("aspect_ratio", ':'), ("size", 'x')];
+        foreach (var (field, separator) in candidates)
+        {
+            if (!props.TryGetProperty(field, out var spec) || !spec.TryGetProperty("enum", out var values)) continue;
+
+            var best = values.EnumerateArray().Select(v => v.GetString())
+                .Select(v => (Value: v, Ratio: Ratio(v, separator)))
+                .Where(x => x.Value is not null && x.Ratio is not null)
+                .OrderBy(x => Math.Abs(Math.Log(x.Ratio!.Value / aspect)))
+                .FirstOrDefault();
+            if (best.Value is not null) return (field, best.Value);
         }
 
-        using var response = await _http.PostAsync(EditPath, content, ct);
-        return await ReadImageAsync(response, ct);
+        return null;
+    }
+
+    private static double? Ratio(string? text, char separator)
+    {
+        var parts = text?.Split(separator);
+        return parts is { Length: 2 }
+               && double.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w)
+               && double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var h)
+               && w > 0 && h > 0
+            ? w / h
+            : null;
     }
 
     // Modele wideo (endpoint /v1/video/generations); te same atrybuty co modele obrazów
@@ -249,7 +309,7 @@ public sealed class ImageGenerationService : IDisposable
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, JsonElement> _videoSchemas = new();
 
     // Pole parameters z opisu modelu (JSON Schema żądania); null, gdy nie da się go pobrać (wtedy zadziała ponawianie bez odrzuconych pól)
-    private async Task<JsonElement?> GetVideoSchemaAsync(string model, CancellationToken ct)
+    private async Task<JsonElement?> GetModelSchemaAsync(string model, CancellationToken ct)
     {
         if (_videoSchemas.TryGetValue(model, out var cached)) return cached;
 
@@ -278,7 +338,7 @@ public sealed class ImageGenerationService : IDisposable
     {
         // Schemat żądania tego modelu (dozwolone pola, czasy i proporcje) z GET /v1/models/<id>; bez niego idą nazwy z dokumentacji
         var notes = new List<string>();
-        var body = VideoRequest.Build(await GetVideoSchemaAsync(model, ct), model, prompt, duration, aspectRatio, attachments, notes);
+        var body = VideoRequest.Build(await GetModelSchemaAsync(model, ct), model, prompt, duration, aspectRatio, attachments, notes);
         foreach (var note in notes) progress?.Invoke(note);
 
         // Parametry odrzucone wcześniej przez ten model (np. aspect_ratio dla modeli image-to-video) pomijamy od razu

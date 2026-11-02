@@ -22,7 +22,7 @@ public sealed partial class MainViewModel
 
     // Lista modeli wideo z tymi samymi filtrami co modele obrazów
     public ICollectionView VideoModelsView { get; }
-    public IReadOnlyList<string> VideoAspects { get; } = ["16:9", "9:16", "1:1", "4:3"];
+    public IReadOnlyList<string> VideoAspects { get; } = StudioDefaults.VideoAspects;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateVideoCommand))]
@@ -43,6 +43,9 @@ public sealed partial class MainViewModel
 
     // Załączniki do promptu wideo (obrazy wejściowe); wiele = pole input_images
     public ObservableCollection<ReferenceItem> VideoAttachments { get; } = [];
+
+    // Wybór modelu wideo trafia do state.json (jak modele obrazów), żeby narzędzia bez okna znały ten sam domyślny model
+    partial void OnSelectedVideoModelChanged(ModelOption? value) => SaveState();
 
     public string VideoHint
     {
@@ -93,13 +96,6 @@ public sealed partial class MainViewModel
         Status = Loc.T("video.msg.attachments", VideoAttachments.Count);
     }
 
-    private static string MimeOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
-    {
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".webp" => "image/webp",
-        _ => "image/png",
-    };
-
     // Wynik: wideo zamiast obrazu w podglądzie
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowImage))]
@@ -124,35 +120,20 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanGenerateVideo))]
     private async Task GenerateVideoAsync()
     {
-        var model = SelectedVideoModel!;
-        var estimate = model.Pricing?.PriceNow * VideoDuration;
         IsBusy = true;
         Status = Loc.T("video.msg.sending");
         try
         {
-            var attachments = VideoAttachments
-                .Select(a => (Bytes: File.ReadAllBytes(a.Path), Mime: MimeOf(a.Path)))
-                .ToList();
-
-            var result = await _provider.GenerateVideoAsync(model.Id, VideoPrompt, VideoDuration, VideoAspect,
-                                                           attachments, s => Status = Loc.T("video.msg.progress", s));
-
-            var path = await _storage.WriteAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes);
+            var attachments = VideoAttachments.Select(a => a.Path).ToList();
+            var entry = (await Studio.GenerateVideoAsync(new VideoGenerationRequest(VideoPrompt, SelectedVideoModel!.Id, VideoDuration, VideoAspect, attachments,
+                                                                          s => Status = Loc.T("video.msg.progress", s), Publish: false))).Entry;
 
             ShowVideo = true;
-            VideoSource = new Uri(path);
-            AddToGallery(new GalleryEntry
-            {
-                Prompt = VideoPrompt,
-                Model = model.Id,
-                Kind = "video",
-                Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? Loc.T("video.sizeAttachments", attachments.Count) : ""),
-                FilePath = path,
-                Thumbnail = GalleryStore.Thumbnail(path),
-                CostUsd = result.CostUsd ?? estimate,
-                CostEstimated = result.CostUsd is null && estimate is not null,
-            });
-            Status = Loc.T("video.msg.saved", path);
+            VideoSource = new Uri(entry.FilePath);
+            entry.Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? Loc.T("video.sizeAttachments", attachments.Count) : "");
+            entry.Thumbnail = GalleryStore.Thumbnail(entry.FilePath);
+            AddToGallery(entry);
+            Status = Loc.T("video.msg.saved", entry.FilePath);
         }
         catch (Exception ex)
         {

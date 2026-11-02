@@ -70,6 +70,11 @@ public interface IAiProvider : IDisposable
                                          CancellationToken ct = default);
     Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths,
                                      CancellationToken ct = default);
+    // Edycja z prośbą o kształt wyniku (proporcje). Dostawca bez takiej możliwości nie nadpisuje: edycja idzie bez opcji
+    Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
+                                     CancellationToken ct = default) =>
+        EditImageAsync(model, prompt, imagePaths, ct);
+
     Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                          IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                          Action<string>? progress = null, CancellationToken ct = default);

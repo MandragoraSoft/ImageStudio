@@ -17,9 +17,7 @@ namespace ImageStudio.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     public const string AllProviders = ModelOption.AllOwners;
-    public const string DefaultInstruction =
-        "You improve image generation prompts. Make the concept vivid and detailed, " +
-        "keep the same language, subject and intent.";
+    public const string DefaultInstruction = StudioDefaults.PromptInstruction;
 
     private const string DefaultGeneration = "venice/z-image-turbo";
     private const string DefaultEdit = "venice/grok-imagine-edit";
@@ -169,7 +167,10 @@ public sealed partial class MainViewModel : ObservableObject
         SeedText = _state.SeedText ?? "";
         NegativePrompt = _state.NegativePrompt ?? "";
         SelectedQuality = _state.Quality ?? "auto";
-        var appTools = new AppControlTools(this, _dialogs.ConfirmToolCall);
+        Studio = new StudioApi(() => _provider, _storage, this, _presetStore, _downloads, Activity, new WindowDefaults(this),
+                               () => _prefs.For(_provider.Id).Preferred);
+        var appTools = new CompositeToolSet(new AppControlTools(this, _dialogs.ConfirmToolCall),
+                                            new StudioTools(Studio, _dialogs.ConfirmToolCall));
         var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
                                             _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
         var builtin = BuiltinToolRegistry.Create(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
@@ -192,7 +193,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
-                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery, storage);
+                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery, Studio);
         SyncVoiceFolder();
         Voice.PropertyChanged += (_, e) =>
         {
@@ -248,6 +249,9 @@ public sealed partial class MainViewModel : ObservableObject
             else OnPropertyChanged();
         }
     }
+
+    // Operacje bez okna (narzędzia MCP): jawne parametry, wynik w galerii, bez zakładek i podglądu
+    public StudioApi Studio { get; }
 
     // Aktywny dostawca AI; odświeżane w SwitchProviderAsync
     public string ProviderId => _provider.Id;
@@ -397,6 +401,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ApplyCatalog(ProviderCatalog catalog, string? keepVideo)
     {
+        Studio.Catalog = catalog;
         var pricing = catalog.Pricing;
         if (catalog.Image is { } models)
         {
@@ -414,6 +419,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Replace(VideoModels, video, pricing);
             SelectedVideoModel = VideoModels.FirstOrDefault(m => m.Id == keepVideo)
+                                 ?? VideoModels.FirstOrDefault(m => m.Id == _state.VideoModel)
                                  ?? VideoModels.FirstOrDefault(m => m.Pricing is not null)
                                  ?? VideoModels.FirstOrDefault();
         }
@@ -488,6 +494,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.EditSystemPrompt = EditSystemPrompt;
         _state.GenerationModel = SelectedModel?.Id ?? _state.GenerationModel;
         _state.EditModel = SelectedEditModel?.Id ?? _state.EditModel;
+        _state.VideoModel = SelectedVideoModel?.Id ?? _state.VideoModel;
         _state.EnhancerModel = SelectedEnhancerModel ?? _state.EnhancerModel;
         _state.ChatModel = Chat.SelectedModel ?? _state.ChatModel;
         _state.ChatSystemPrompt = Chat.SystemPrompt;

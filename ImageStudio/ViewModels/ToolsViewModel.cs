@@ -149,7 +149,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private McpConfig _config = new();
     private bool _initialized;
 
-    private readonly AppControlTools? _appTools;
+    private readonly IMcpToolSet? _appTools;
     private readonly BuiltinTools? _builtin;
     private readonly IMemoryStore? _memory;
 
@@ -159,7 +159,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // disabledTools null = pierwsze uruchomienie po wprowadzeniu listy: stan wynika z dawnych przełączników grup
     // (sterowanie aplikacją było domyślnie wyłączone, wbudowane domyślnie włączone)
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
-                          string? configPath = null, AppControlTools? appTools = null, bool appControlEnabled = false,
+                          string? configPath = null, IMcpToolSet? appTools = null, bool appControlEnabled = false,
                           AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
                           IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null)
     {

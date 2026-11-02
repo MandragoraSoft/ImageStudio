@@ -19,6 +19,7 @@ public sealed class UserState
     public string? EditSystemPrompt { get; set; }
     public string? GenerationModel { get; set; }
     public string? EditModel { get; set; }
+    public string? VideoModel { get; set; }
     public string? EnhancerModel { get; set; }
     public string? ChatModel { get; set; }
     public string? ChatSystemPrompt { get; set; }

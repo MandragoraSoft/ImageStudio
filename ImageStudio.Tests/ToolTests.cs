@@ -33,6 +33,90 @@ public class ChatToolLoopTests
             : new ChatReply("", firstCalls);
 
     [Fact]
+    public async Task A_reply_that_names_a_tool_without_calling_it_is_reported()
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new FakeProvider { OnReply = _ => new ChatReply("Wywołam `fs__read`, zaraz to zrobię.", []) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        vm.Input = "przeczytaj plik";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.Equal(["user", "assistant"], vm.Messages.Select(m => m.Role));
+        Assert.Contains("fs__read", reports[^1].Text);
+        Assert.True(reports[^1].Error);
+    }
+
+    [Theory]
+    [InlineData("Aby zmienić włosy modelki na ciemny kolor, muszę użyć narzędzia do edycji zdjęć. Pozwól, że to zrobię.")]
+    [InlineData("Aby ustalić, jaki model jest aktywny, muszę sprawdzić stan aplikacji. Pozwól, że to zrobię.")]
+    [InlineData("Let me check the app state for you.")]
+    [InlineData("Zaraz sprawdzę, jaki model jest aktywny.")]
+    public async Task A_promise_without_a_tool_call_is_reported_even_without_a_tool_name(string answer)
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new FakeProvider { OnReply = _ => new ChatReply(answer, []) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        vm.Input = "zrób to";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.True(reports[^1].Error);
+        Assert.Contains("nie wywołał żadnego narzędzia", reports[^1].Text);
+    }
+
+    [Theory]
+    [InlineData("Jestem asystentem AI. W czym mogę pomóc?")]
+    [InlineData("Stolicą Polski jest Warszawa.")]
+    [InlineData("Teraz jest ciemno, bo zapadł zmierzch.")]
+    public async Task Ordinary_answers_are_not_mistaken_for_promises(string answer)
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new FakeProvider { OnReply = _ => new ChatReply(answer, []) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        vm.Input = "pytanie";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.False(reports[^1].Error);
+    }
+
+    [Fact]
+    public async Task A_plain_answer_is_not_reported_even_when_tools_are_on()
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new FakeProvider { OnReply = _ => new ChatReply("Cześć!", []) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        vm.Input = "hej";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.False(reports[^1].Error);
+    }
+
+    [Fact]
+    public void Warning_appears_only_when_tools_are_on_and_the_catalog_says_the_model_has_no_tools()
+    {
+        var host = new FakeToolHost();
+        var supported = new Dictionary<string, string[]> { ["m1"] = ["temperature"], ["m2"] = ["tools"], ["m3"] = [] };
+        var vm = new ChatViewModel(() => new FakeProvider(), ["m1", "m2", "m3"], (_, _) => { }, "", host,
+                                   modelInfo: id => new ChatModelInfo(id, supported[id]));
+
+        vm.SelectedModel = "m1";
+        Assert.Contains("narzędzi", vm.ToolsWarning);
+
+        vm.SelectedModel = "m2";
+        Assert.Equal("", vm.ToolsWarning);
+
+        vm.SelectedModel = "m3";
+        Assert.Equal("", vm.ToolsWarning);
+
+        vm.SelectedModel = "m1";
+        host.Tools = [];
+        Assert.Equal("", vm.ToolsWarning);
+    }
+
+    [Fact]
     public async Task Tool_call_is_executed_and_result_is_sent_back()
     {
         var (vm, provider, host, _) = Create();

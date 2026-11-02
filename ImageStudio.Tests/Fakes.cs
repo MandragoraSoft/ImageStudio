@@ -60,16 +60,45 @@ internal class FakeProvider : IAiProvider
     public Task<IReadOnlyDictionary<string, ModelPricing>> GetPricingAsync(CancellationToken ct = default) =>
         PricingCatalog is { } pricing ? Task.FromResult(pricing) : throw new NotSupportedException();
 
+    // Obraz i wideo: wywołania zapamiętane, wyniki zadane przez test; bez hooka dostawca "nie umie"
+    public Func<string, string, string, ImageOptions?, ImageResult>? OnGenerateImage { get; set; }
+    public Func<string, string, IReadOnlyList<string>, ImageResult>? OnEditImage { get; set; }
+    public Func<string, string, int, string, int, ImageResult>? OnGenerateVideo { get; set; }
+    public (string Model, string Prompt, string Size, ImageOptions? Options)? LastImage { get; private set; }
+    public (string Model, string Prompt, IReadOnlyList<string> Paths)? LastEdit { get; private set; }
+    public (string Model, string Prompt, int Duration, string Aspect, int Attachments)? LastVideo { get; private set; }
+
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
-                                                CancellationToken ct = default) => throw new NotSupportedException();
+                                                CancellationToken ct = default)
+    {
+        LastImage = (model, prompt, size, options);
+        return OnGenerateImage is { } run ? Task.FromResult(run(model, prompt, size, options)) : throw new NotSupportedException();
+    }
 
     public Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths,
-                                            CancellationToken ct = default) => throw new NotSupportedException();
+                                            CancellationToken ct = default)
+    {
+        LastEdit = (model, prompt, imagePaths);
+        return OnEditImage is { } run ? Task.FromResult(run(model, prompt, imagePaths)) : throw new NotSupportedException();
+    }
+
+    // Edycja z opcjami (kształt wyniku): zapamiętuje opcje i działa jak zwykła edycja
+    public ImageEditOptions? LastEditOptions { get; private set; }
+
+    Task<ImageResult> IAiProvider.EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
+                                                 CancellationToken ct)
+    {
+        LastEditOptions = options;
+        return EditImageAsync(model, prompt, imagePaths, ct);
+    }
 
     public Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                 IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
-                                                Action<string>? progress = null, CancellationToken ct = default) =>
-        throw new NotSupportedException();
+                                                Action<string>? progress = null, CancellationToken ct = default)
+    {
+        LastVideo = (model, prompt, duration, aspectRatio, attachments.Count);
+        return OnGenerateVideo is { } run ? Task.FromResult(run(model, prompt, duration, aspectRatio, attachments.Count)) : throw new NotSupportedException();
+    }
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,

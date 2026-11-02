@@ -41,6 +41,10 @@ public sealed class UberLlmProvider : IAiProvider
                                                   CancellationToken ct = default) =>
         await _api.EditAsync(model, prompt, imagePaths, ct);
 
+    public async Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
+                                                  CancellationToken ct = default) =>
+        await _api.EditAsync(model, prompt, imagePaths, options, ct);
+
     public async Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                       IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                                       Action<string>? progress = null, CancellationToken ct = default) =>

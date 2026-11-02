@@ -3,6 +3,7 @@
   <PropertyGroup>
     <!-- Debug: okno konsoli z logami (ILogger); Release: bez konsoli -->
     <OutputType>WinExe</OutputType>
+    <StartupObject>ImageStudio.Program</StartupObject>
     <OutputType Condition="'$(Configuration)' == 'Debug'">Exe</OutputType>
     <RootNamespace>ImageStudio</RootNamespace>
     <AssemblyName>ImageStudio</AssemblyName>

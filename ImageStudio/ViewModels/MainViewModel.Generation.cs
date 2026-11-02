@@ -112,22 +112,7 @@ public sealed partial class MainViewModel
         var paths = tabImages.Count > 0 ? tabImages.Select(i => i.Path).ToList() : _dialogs.PickImageFiles()?.ToList();
         if (paths is not { Count: > 0 }) return "";
 
-        var images = paths.Select(path =>
-        {
-            var (bytes, mime) = ImageFitter.Downscale(File.ReadAllBytes(path), _settings.MaxSide);
-            return new ChatImage(bytes, mime);
-        }).ToList();
-
-        var messages = new List<ChatMessage>
-        {
-            new("system", "You are a precise image analyst. Describe exactly what is visible: subjects and their count, pose and " +
-                          "expression, clothing, objects, setting, composition and camera angle, lighting, colours, style and any " +
-                          "visible text. If there are several images, describe each one in turn (\"Image 1:\", \"Image 2:\") and note " +
-                          "how they relate. Be factual, do not guess what is not visible. Reply in Polish, as plain text without markdown."),
-            new("user", images.Count == 1 ? "Describe this image in detail." : $"Describe these {images.Count} images in detail.", Images: images),
-        };
-        var reply = await _provider.ChatAsync(model, messages);
-        return reply.Content.Trim();
+        return await Studio.DescribeImagesAsync(new DescribeRequest(paths, model, _settings.MaxSide));
     }
 
     // Przebudowa z okna edytora: bieżące pola i prompt techniczny z okna, bez zmiany stanu aplikacji (zapis dopiero po Zastosuj)
@@ -135,8 +120,8 @@ public sealed partial class MainViewModel
     {
         var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model ulepszania w „Ustawieniach ulepszania AI”.");
         var instruction = string.IsNullOrWhiteSpace(current.Instruction) ? DefaultInstruction : current.Instruction;
-        var parts = await _provider.EnhancePromptAsync(model, instruction, current.System ?? "", current.Prompt, EnhancerParameterValues(),
-                                                       current.History);
+        var parts = await Studio.RebuildPromptAsync(new PromptRebuildRequest(current.Prompt, current.System, instruction, model,
+                                                                              EnhancerParameterValues(), current.History));
         var step = new PromptRevision(current.System ?? "", current.Prompt, parts.System, parts.Concept, instruction, parts.Changes);
         var history = (current.History ?? []).Append(step).TakeLast(OpenAiCompat.MaxHistory).ToList();
         return current with { System = parts.System, Prompt = parts.Concept, History = history };
@@ -188,34 +173,22 @@ public sealed partial class MainViewModel
     public ChatViewModel Chat { get; }
     public VoiceViewModel Voice { get; }
 
-    // --- Ulepszanie promptu ---
-
-    // Prompt wysyłany do modelu: najpierw konfiguracja, potem koncept
-    private static string Compose(string system, string concept) =>
-        string.IsNullOrWhiteSpace(system) ? concept.Trim() : $"{system.Trim()}\n\n{concept.Trim()}";
-
     // --- Komendy generowania / zapisu ---
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
     private Task GenerateAsync()
     {
         SaveState();
-        var prompt = Compose(GenerateSystemPrompt, GeneratePrompt);
-        return RunAsync(() => _provider.GenerateImageAsync(SelectedModel!.Id, prompt, Size, CurrentImageOptions()),
-                        prompt, SelectedModel!.Id, "generate", Size, SelectedModel!.Pricing?.PerResult);
+        return RunAsync(() => Studio.GenerateImageAsync(new ImageRequest(GeneratePrompt, GenerateSystemPrompt, SelectedModel!.Id,
+                                                                         Width, Height, CurrentImageOptions(), Publish: false)));
     }
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
     private Task EditAsync()
     {
         SaveState();
-        return RunAsync(async () =>
-        {
-            var edited = await _provider.EditImageAsync(SelectedEditModel!.Id, Compose(EditSystemPrompt, EditPrompt),
-                                                  References.Select(r => r.Path).ToList());
-            // Endpoint edycji nie respektuje rozmiaru, więc wynik dopasowujemy do wybranych proporcji lokalnie
-            return edited with { Bytes = ImageFitter.FitTo(edited.Bytes, Width, Height) };
-        }, Compose(EditSystemPrompt, EditPrompt), SelectedEditModel!.Id, "edit", Size, SelectedEditModel!.Pricing?.PerResult);
+        return RunAsync(() => Studio.EditImageAsync(new EditRequest(EditPrompt, EditSystemPrompt, References.Select(r => r.Path).ToList(),
+                                                                    SelectedEditModel!.Id, Width, Height, Publish: false)));
     }
 
     // Ctrl+Enter w głównym oknie: akcja aktywnej zakładki. Wideo celowo pomijamy (każde wywołanie to płatne zadanie)
@@ -298,33 +271,23 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void FitImage() => FitToWindow = true;
 
-    // Każdy wynik trafia do galerii razem z promptem i kosztem; estymata z cennika, gdy API nie zwróci kosztu
-    private async Task RunAsync(Func<Task<ImageResult>> produce, string prompt, string model, string kind,
-                                string size, decimal? estimate)
+    // Każdy wynik trafia do galerii razem z promptem i kosztem (StudioApi liczy estymatę z cennika, gdy API nie zwróci kosztu)
+    private async Task RunAsync(Func<Task<StudioResult>> produce)
     {
         IsBusy = true;
         Status = Loc.T("gen.msg.processing");
         try
         {
             var result = await produce();
-            var path = await SaveImageAsync(result.Bytes);
+            var entry = result.Entry;
             _imageBytes = result.Bytes;
-            Image = LoadImage(result.Bytes);
+            Image = LoadImage(result.Bytes!);
             FitToWindow = true; // nowy wynik od razu mieści się w oknie
             ShowVideo = false;
 
-            AddToGallery(new GalleryEntry
-            {
-                Prompt = prompt,
-                Model = model,
-                Kind = kind,
-                Size = size,
-                FilePath = path,
-                CostUsd = result.CostUsd ?? estimate,
-                CostEstimated = result.CostUsd is null && estimate is not null,
-                Thumbnail = GalleryStore.Thumbnail(path),
-            });
-            Status = Loc.T("gen.msg.saved", path);
+            entry.Thumbnail = GalleryStore.Thumbnail(entry.FilePath);
+            AddToGallery(entry);
+            Status = Loc.T("gen.msg.saved", entry.FilePath);
         }
         catch (Exception ex)
         {
