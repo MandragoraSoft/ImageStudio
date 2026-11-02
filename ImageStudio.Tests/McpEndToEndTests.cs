@@ -49,7 +49,7 @@ public sealed class McpEndToEndTests
         var result = await tools.CallAsync(new ToolCall("1", "imagestudio__list_models", """{"kind":"edit"}"""));
 
         Assert.Equal(["edit/a", "edit/b"], Ids(result).Order());
-        Assert.Contains("$0,05/image", result);
+        Assert.Matches(@"\$0[.,]05/image", result);
         Assert.DoesNotContain("gen/a", result);
     }
 

@@ -124,7 +124,7 @@ public sealed class McpCliTests : IDisposable
 
         Assert.Equal(0, code);
         Assert.Contains("edit/a", output);
-        Assert.Contains("$0,02/image", output);
+        Assert.Matches(@"\$0[.,]02/image", output);
         Assert.Equal("", error);
     }
 
