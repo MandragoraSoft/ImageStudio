@@ -259,3 +259,83 @@ public sealed class ChatApprovalTests
         });
     }
 }
+
+// Obrazy w historii rozmowy i otwieranie obrazu z czatu
+public sealed class ChatImageContextTests
+{
+    private static (ChatViewModel Vm, FakeProvider Provider, FakeDialogs Dialogs) Create()
+    {
+        var provider = new FakeProvider { OnChat = (_, _) => "ok" };
+        var dialogs = new FakeDialogs();
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", null, null, new ChatImageSupport(dialogs, _ => null, () => 1536))
+        {
+            SelectedModel = "m1",
+        };
+        return (vm, provider, dialogs);
+    }
+
+    private static async Task Send(ChatViewModel vm, string text, params byte[][] images)
+    {
+        foreach (var bytes in images) vm.Attachments.Add(new ChatImage(bytes, "image/png"));
+        vm.Input = text;
+        await vm.SendCommand.ExecuteAsync(null);
+    }
+
+    [Fact]
+    public async Task Only_the_images_of_the_latest_user_message_are_sent_to_the_model()
+    {
+        var (vm, provider, _) = Create();
+        await Send(vm, "pierwszy", TestImages.Png(8, 8), TestImages.Png(9, 9));
+        Assert.Equal(2, provider.LastMessages.Single(m => m.Role == "user").Images!.Count);
+
+        await Send(vm, "drugi");
+
+        var users = provider.LastMessages.Where(m => m.Role == "user").ToList();
+        Assert.Null(users[0].Images);
+        Assert.Contains("pierwszy", users[0].Content);
+        Assert.Contains("(2)", users[0].Content);
+        // okno rozmowy dalej pokazuje obrazy z pierwszej wiadomości
+        Assert.Equal(2, vm.Messages.First(m => m.Role == "user").Images!.Count);
+
+        await Send(vm, "trzeci", TestImages.Png(10, 10));
+        users = provider.LastMessages.Where(m => m.Role == "user").ToList();
+        Assert.Null(users[0].Images);
+        Assert.Single(users[2].Images!);
+    }
+
+    [Fact]
+    public async Task Opening_an_attached_image_saves_it_once_and_opens_the_file()
+    {
+        var (vm, _, dialogs) = Create();
+        await Send(vm, "obraz", TestImages.Png(8, 8));
+        var image = vm.Messages.First(m => m.Role == "user").Images![0];
+
+        vm.OpenImageCommand.Execute(image);
+        vm.OpenImageCommand.Execute(image);
+
+        var path = Assert.Single(dialogs.Opened.Distinct());
+        Assert.True(File.Exists(path));
+        Assert.Equal(image.Bytes, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void Opening_a_tool_image_opens_the_original_file_and_a_failure_is_reported()
+    {
+        var (vm, _, dialogs) = Create();
+        var file = Path.Combine(Path.GetTempPath(), $"open-{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(file, TestImages.Png(8, 8));
+        try
+        {
+            vm.OpenImageCommand.Execute(new ChatImage(File.ReadAllBytes(file), "image/png") { SourcePath = file });
+            Assert.Equal([file], dialogs.Opened);
+
+            dialogs.OpenError = new InvalidOperationException("brak programu");
+            vm.OpenImageCommand.Execute(new ChatImage(File.ReadAllBytes(file), "image/png") { SourcePath = file });
+            Assert.Single(dialogs.Opened);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+}

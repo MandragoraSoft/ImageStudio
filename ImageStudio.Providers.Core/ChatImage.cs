@@ -18,6 +18,9 @@ public sealed class ChatImage
     }
 
     public byte[] Bytes { get; }
+
+    // Plik, z którego pochodzi obraz (wynik narzędzia z galerii); "Otwórz" używa go zamiast zapisywać kopię
+    public string? SourcePath { get; init; }
     public string Mime { get; }
 
     // Format wysyłany do API: data URI w polu image_url

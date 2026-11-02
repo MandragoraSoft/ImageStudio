@@ -30,7 +30,13 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Image Source="{Binding Preview}" MaxWidth="260" MaxHeight="200" Stretch="Uniform"
-                                       Margin="0,2,6,4"/>
+                                       Margin="0,2,6,4" Cursor="Hand" ToolTip="{loc:T chat.image.open}">
+                                    <Image.InputBindings>
+                                        <MouseBinding MouseAction="LeftClick"
+                                                      Command="{Binding DataContext.OpenImageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}"/>
+                                    </Image.InputBindings>
+                                </Image>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

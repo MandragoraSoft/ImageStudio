@@ -392,9 +392,37 @@ public sealed partial class ChatViewModel : ObservableObject
         var history = new List<ChatMessage>();
         var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), Tools?.SystemNote, AttachmentNote() }.Where(s => !string.IsNullOrWhiteSpace(s)));
         if (system.Length > 0) history.Add(new ChatMessage("system", system));
-        history.AddRange(Messages);
+        // Obrazy z wcześniejszych wiadomości nie wracają do modelu w każdym zapytaniu (base64 w całej historii szybko przekracza limit
+        // rozmiaru żądania): zostają obrazy ostatniej wiadomości użytkownika, a starsze są zastąpione notatką. Ścieżki plików są w instrukcji systemowej
+        var lastUser = Messages.LastOrDefault(m => m.Role == "user");
+        foreach (var message in Messages)
+        {
+            history.Add(message.Role == "user" && message.HasImages && !ReferenceEquals(message, lastUser)
+                ? new ChatMessage("user", message.Content + "\n" + Loc.T("chat.history.imagesOmitted", message.Images!.Count))
+                : message);
+        }
+
         return history;
     }
+
+    [RelayCommand(CanExecute = nameof(CanOpenImage))]
+    private void OpenImage(ChatImage? image)
+    {
+        if (image is null) return;
+
+        try
+        {
+            var path = image.SourcePath is { } source && File.Exists(source) ? source : SaveForTools(image);
+            _images!.Dialogs.OpenFile(path);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Czat: nie udało się otworzyć obrazu");
+            _report(Loc.T("chat.err.openImage", ex.Message), true);
+        }
+    }
+
+    private bool CanOpenImage => _images is not null;
 
     // Wynik zawsze wraca do modelu jako tekst: odmowa i błąd narzędzia też, żeby mógł zareagować
     // Zgoda na wywołanie: najpierw zapamiętane zgody, potem pytanie w oknie czatu (albo wywołanie zwrotne). Stop przerywa czekanie
@@ -666,7 +694,7 @@ public sealed partial class ChatViewModel : ObservableObject
             {
                 if (row.ValueKind != System.Text.Json.JsonValueKind.Object || !row.TryGetProperty("Path", out var path) || path.GetString() is not { } file) continue;
                 var mime = Path.GetExtension(file).ToLowerInvariant() switch { ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".webp" => "image/webp", ".gif" => "image/gif", _ => null };
-                if (mime is not null && File.Exists(file)) images.Add(new ChatImage(File.ReadAllBytes(file), mime));
+                if (mime is not null && File.Exists(file)) images.Add(new ChatImage(File.ReadAllBytes(file), mime) { SourcePath = file });
             }
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
