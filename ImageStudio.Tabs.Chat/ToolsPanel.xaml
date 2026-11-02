@@ -63,6 +63,7 @@
             </ItemsControl>
 
             <TextBlock Text="{Binding Summary}" Style="{StaticResource MutedTextBlock}" Margin="0,2,0,0"/>
+            <TextBlock Text="{Binding LimitWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
             <TextBlock Text="{Binding Info}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

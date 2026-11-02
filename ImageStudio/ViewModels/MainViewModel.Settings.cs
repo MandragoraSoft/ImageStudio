@@ -48,15 +48,17 @@ public sealed partial class MainViewModel
                                          Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name, _settings.Language,
                                          _secrets.Load("mistral") ?? "", _secrets.Load("kilo") ?? "", _secrets.Load("opencodego") ?? "",
                                          _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "",
-                                         _storage.Active.Id);
+                                         _storage.Active.Id, null, Limits.MaxTools, Limits.ListLimit, Limits.MaxListLimit);
         Voice.RefreshDevices();
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
                                                      new StorageSettingsTab(current, _storage),
+                                                     new McpSettingsTab(current),
                                                      new ProviderSettingsTab(current, LoadTextModelsAsync, SignInToChatGptAsync)]);
         if (result is null) return;
 
         Voice.ApplyDevices(result.Microphone, result.Speaker);
+        Limits.Set(result.McpMaxTools, result.McpListLimit, result.McpMaxListLimit);
 
         _storage.Apply(result.StorageId, result.StorageConfig);
         _state.StorageId = _storage.Active.Id;

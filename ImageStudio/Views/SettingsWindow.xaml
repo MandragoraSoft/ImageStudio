@@ -19,6 +19,9 @@
         <DataTemplate DataType="{x:Type vm:StorageSettingsTab}">
             <views:StorageSettingsTabView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:McpSettingsTab}">
+            <views:McpSettingsTabView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ProviderSettingsTab}">
             <views:ProviderSettingsTabView/>
         </DataTemplate>

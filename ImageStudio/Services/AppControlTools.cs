@@ -1,6 +1,6 @@
 using System.IO;
 using System.Text.Json;
-using static ImageStudio.Services.ToolArgs;
+using static ImageStudio.Services.McpToolArgs;
 
 namespace ImageStudio.Services;
 
@@ -21,9 +21,12 @@ public sealed class AppControlTools : IMcpToolSet
     private readonly Func<ToolCall, bool> _confirmCostly;
     private readonly Dictionary<string, Tool> _tools;
 
-    public AppControlTools(IAppControl app, Func<ToolCall, bool> confirmCostly)
+    private readonly McpLimits _limits;
+
+    public AppControlTools(IAppControl app, Func<ToolCall, bool> confirmCostly, McpLimits? limits = null)
     {
         _app = app;
+        _limits = limits ?? new McpLimits();
         _confirmCostly = confirmCostly;
         _tools = Build().ToDictionary(t => t.Name);
     }
@@ -73,9 +76,12 @@ public sealed class AppControlTools : IMcpToolSet
             "Lista modeli aktywnego dostawcy dla danego rodzaju (preferowane na początku) z ceną i informacją o wejściu obrazowym.",
             Schema(("kind", KindProp("Rodzaj modeli"), true),
                    ("query", """{"type":"string","description":"Fragment nazwy modelu"}""", false),
-                   ("limit", """{"type":"integer","minimum":1,"maximum":100,"description":"Maksymalna liczba wyników (domyślnie 30)"}""", false)),
-            false, args => Task.FromResult(Serialize(_app.ListModels(Kind(args), OptString(args, "query"),
-                                                                     Math.Clamp(OptInt(args, "limit") ?? 30, 1, 100)))), Needs: Kinds);
+                   ("limit", """{"type":"integer","minimum":1,"description":"Maksymalna liczba wyników (domyślnie i maksimum z Ustawień, zakładka MCP)"}""", false)),
+            false, args =>
+            {
+                var limit = _limits.ListSize(OptInt(args, "limit"));
+                return Task.FromResult(Paged(_app.ListModels(Kind(args), OptString(args, "query"), limit + 1), limit, _limits.MaxListLimit));
+            }, Needs: Kinds);
 
         yield return new Tool("select_model", "Wybiera model dla danego rodzaju (id z list_models).",
             Schema(("kind", KindProp("Rodzaj modelu"), true), ("id", """{"type":"string","description":"Id modelu"}""", true)),

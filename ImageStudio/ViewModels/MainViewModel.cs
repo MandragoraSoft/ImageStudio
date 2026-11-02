@@ -67,7 +67,7 @@ public sealed partial class MainViewModel : ObservableObject
                                 nameof(CopyImageCommand), nameof(SaveImageAsCommand), nameof(OpenSettingsCommand),
                                 nameof(AddReferenceFromUrlCommand), nameof(OpenPresetsCommand), nameof(SavePresetCommand), nameof(OpenModelBrowserCommand),
                                 nameof(GenerateVideoCommand), nameof(AddVideoAttachmentsCommand), nameof(PasteReferenceCommand),
-                                nameof(PasteVideoAttachmentCommand))]
+                                nameof(PasteVideoAttachmentCommand), nameof(RepeatGalleryEntryCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -169,15 +169,16 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedQuality = _state.Quality ?? "auto";
         Studio = new StudioApi(() => _provider, _storage, this, _presetStore, _downloads, Activity, new WindowDefaults(this),
                                () => _prefs.For(_provider.Id).Preferred);
-        var appTools = new CompositeToolSet(new AppControlTools(this, _dialogs.ConfirmToolCall),
-                                            new StudioTools(Studio, _dialogs.ConfirmToolCall));
-        var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi), _dialogs, _state.McpServerEnabled,
+        Limits = McpLimits.From(_state);
+        var appTools = new CompositeToolSet(new AppControlTools(this, _dialogs.ConfirmToolCall, Limits),
+                                            new StudioTools(Studio, _dialogs.ConfirmToolCall, Limits));
+        var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi, Limits), _dialogs, _state.McpServerEnabled,
                                             _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
         var builtin = BuiltinToolRegistry.Create(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
                                                  _dialogs.ConfirmToolCall);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
                                    _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
-                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools);
+                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools, Limits);
         Tools.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) SaveState();
@@ -252,6 +253,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Operacje bez okna (narzędzia MCP): jawne parametry, wynik w galerii, bez zakładek i podglądu
     public StudioApi Studio { get; }
+
+    // Limity narzędzi MCP z Ustawień (zakładka MCP)
+    public McpLimits Limits { get; }
 
     // Aktywny dostawca AI; odświeżane w SwitchProviderAsync
     public string ProviderId => _provider.Id;
@@ -494,6 +498,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.EditSystemPrompt = EditSystemPrompt;
         _state.GenerationModel = SelectedModel?.Id ?? _state.GenerationModel;
         _state.EditModel = SelectedEditModel?.Id ?? _state.EditModel;
+        Limits.Capture(_state);
         _state.VideoModel = SelectedVideoModel?.Id ?? _state.VideoModel;
         _state.EnhancerModel = SelectedEnhancerModel ?? _state.EnhancerModel;
         _state.ChatModel = Chat.SelectedModel ?? _state.ChatModel;

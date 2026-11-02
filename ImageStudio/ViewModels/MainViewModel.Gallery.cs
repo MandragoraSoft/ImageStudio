@@ -79,6 +79,43 @@ public sealed partial class MainViewModel
 
     // --- Menu kontekstowe miniatury (prawy przycisk) ---
 
+    // Powtarza operację z wpisu (ten sam prompt, referencje i parametry; kosztuje jak pierwotna) i pokazuje nowy wynik jak zwykły.
+    // Wpis starszy niż zapis wejść (edycja bez zapisanych referencji) kończy się komunikatem w stopce
+    [RelayCommand(CanExecute = nameof(CanRepeatGalleryEntry))]
+    private async Task RepeatGalleryEntryAsync(GalleryEntry? entry)
+    {
+        if (entry is null) return;
+
+        if (entry.Kind != "video")
+        {
+            await RunAsync(() => Studio.RepeatAsync(new RepeatRequest(entry.Id, Publish: false)));
+            return;
+        }
+
+        IsBusy = true;
+        Status = Loc.T("video.msg.sending");
+        try
+        {
+            var repeated = (await Studio.RepeatAsync(new RepeatRequest(entry.Id, Progress: s => Status = Loc.T("video.msg.progress", s), Publish: false))).Entry;
+            ShowVideo = true;
+            VideoSource = new Uri(repeated.FilePath);
+            repeated.Thumbnail = GalleryStore.Thumbnail(repeated.FilePath);
+            AddToGallery(repeated);
+            Status = Loc.T("video.msg.saved", repeated.FilePath);
+        }
+        catch (Exception ex)
+        {
+            Status = Loc.T("video.msg.error", ex.Message);
+            Log.LogError("{Message}", Status);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanRepeatGalleryEntry => !IsBusy;
+
     // Usuwa wpis z galerii; plik zostaje w folderze zapisów (jak przy "Wyczyść galerię")
     [RelayCommand]
     private void RemoveGalleryEntry(GalleryEntry? entry)

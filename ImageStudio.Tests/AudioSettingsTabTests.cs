@@ -61,7 +61,7 @@ public sealed class AudioSettingsTabTests
         await app.Vm.OpenSettingsCommand.ExecuteAsync(null);
 
         Assert.Contains(dialogs.LastSettingsTabs!, t => t is AudioSettingsTab);
-        Assert.Equal(["Aplikacja", "Dźwięk", "Zapis", "Dostawca AI"], dialogs.LastSettingsTabs!.OrderBy(t => t.Order).Select(t => t.Title));
+        Assert.Equal(["Aplikacja", "Dźwięk", "MCP", "Zapis", "Dostawca AI"], dialogs.LastSettingsTabs!.OrderBy(t => t.Order).Select(t => t.Title));
         Assert.Equal("Słuchawki", app.Vm.Voice.SelectedSpeaker!.Name);
         Assert.Equal(1, app.Get<FakeAudioPlayer>().OutputDevice);
         Assert.Equal("Mikrofon testowy", app.Vm.Voice.SelectedMicrophone!.Name);

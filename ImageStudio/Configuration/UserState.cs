@@ -45,6 +45,11 @@ public sealed class UserState
     public List<string>? DisabledTools { get; set; }
     public bool McpServerEnabled { get; set; }
     public int? McpServerPort { get; set; }
+
+    // Limity narzędzi MCP (Ustawienia, zakładka MCP): ostrzeżenie o liczbie narzędzi, domyślna i największa liczba wyników list
+    public int? McpMaxTools { get; set; }
+    public int? McpListLimit { get; set; }
+    public int? McpMaxListLimit { get; set; }
     public string? EnhancerInstruction { get; set; }
     // Kolejność zakładek lewego panelu po przeciągnięciu (nazwy typów zakładek); null = domyślna
     public List<string>? TabOrder { get; set; }

@@ -77,6 +77,10 @@ public interface IStudioDefaults
 
 public sealed record DefaultsInfo(string Provider, string ProviderName, IReadOnlyDictionary<string, string?> Models);
 
+// Powtórzenie operacji z wpisu galerii (te same prompt, wejścia i parametry); Model != null zmienia model.
+// Progress dostaje komunikaty wideo
+public sealed record RepeatRequest(string Id, string? Model = null, Action<string>? Progress = null, bool Publish = true);
+
 // Entry: opis wyniku (plik w magazynie, model, koszt); Bytes: bajty obrazu (tylko dla obrazów, null dla wideo i dźwięku)
 public sealed record StudioResult(GalleryEntry Entry, byte[]? Bytes = null);
 
@@ -121,6 +125,10 @@ public interface IStudioApi
 
     Task<IReadOnlyList<AudioModelSummary>> AudioModelsAsync(string kind, string? query, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<string>> VoicesAsync(string model, CancellationToken ct = default);
+
+    // Powtarza operację z wpisu galerii (obraz, edycja, wideo, mowa, rozpoznawanie) z tymi samymi danymi; kosztuje jak pierwotna.
+    // Starszy wpis bez zapisanych wejść (edycja, wideo z załącznikami) nie da się powtórzyć: ArgumentException
+    Task<StudioResult> RepeatAsync(RepeatRequest request, CancellationToken ct = default);
 
     // Przebudowa promptu i opis obrazów: nic nie zmieniają w aplikacji
     Task<PromptParts> RebuildPromptAsync(PromptRebuildRequest request, CancellationToken ct = default);

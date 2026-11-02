@@ -48,6 +48,10 @@
                             Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
                         <Border.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="{loc:T gallery.repeat}"
+                                          Command="{Binding PlacementTarget.Tag.RepeatCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                <Separator/>
                                 <MenuItem Header="{loc:T gallery.remove}"
                                           Command="{Binding PlacementTarget.Tag.RemoveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>

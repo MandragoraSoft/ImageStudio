@@ -32,6 +32,9 @@ public static class McpCliHost
         return studio;
     }
 
+    // Limity MCP z state.json (te same, które zmienia okno w Ustawieniach, zakładka MCP)
+    public static McpLimits LoadLimits() => McpLimits.From(new FileUserStateStore().Load());
+
     // Aplikacja okienkowa (WinExe) nie ma konsoli: dołączamy do konsoli rodzica, żeby wyniki było widać w terminalu.
     // Gdy stdout jest przekierowany (potok, plik) albo to build Debug z konsolą, nic nie robimy.
     public static void EnsureConsole()

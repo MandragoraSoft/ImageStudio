@@ -23,7 +23,7 @@ public static class Program
                 e.Cancel = true;
                 cts.Cancel();
             };
-            return McpCli.RunAsync(args, Console.Out, Console.Error, McpCliHost.CreateStudioAsync, cts.Token).GetAwaiter().GetResult();
+            return McpCli.RunAsync(args, Console.Out, Console.Error, McpCliHost.CreateStudioAsync, cts.Token, limits: McpCliHost.LoadLimits()).GetAwaiter().GetResult();
         }
 
         var app = new App();

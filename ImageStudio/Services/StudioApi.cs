@@ -106,6 +106,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var entry = new GalleryEntry
         {
             Kind = "speech", Prompt = text, Model = id, Size = note ?? "", FilePath = path, CostUsd = result.CostUsd ?? estimate,
+            Params = Params(("voice", request.Voice), ("speed", speed), ("format", request.Format)),
             CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (request.Publish) library.AddVoice(entry);
@@ -123,6 +124,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var entry = new GalleryEntry
         {
             Kind = "transcript", Prompt = result.Text.Trim(), Model = id, FilePath = request.Path, CostUsd = result.CostUsd,
+            Params = Params(("language", request.Language), ("hint", request.Hint)),
         };
         if (request.Publish) library.AddVoice(entry);
         return new StudioResult(entry);
@@ -150,7 +152,10 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var size = $"{request.Width}x{request.Height}";
         using var _ = activity?.Begin("Generowanie obrazu");
         var result = await provider().GenerateImageAsync(id, composed, size, request.Options, ct);
-        return await SaveImageAsync("generate", id, composed, size, result, request.Publish, ct);
+        var options = request.Options;
+        var parameters = Params(("width", request.Width), ("height", request.Height), ("seed", options?.Seed), ("negative", options?.NegativePrompt),
+                                ("quality", options?.Quality));
+        return await SaveImageAsync("generate", id, composed, size, result, request.Publish, null, parameters, ct);
     }
 
     public async Task<StudioResult> EditImageAsync(EditRequest request, CancellationToken ct = default)
@@ -172,7 +177,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         edited = edited with { Bytes = ImageFitter.FitTo(edited.Bytes, width, height) };
         var size = $"{width}x{height}";
 
-        return await SaveImageAsync("edit", id, composed, size, edited, request.Publish, ct);
+        return await SaveImageAsync("edit", id, composed, size, edited, request.Publish, request.References.ToList(), null, ct);
     }
 
     public async Task<StudioResult> GenerateVideoAsync(VideoGenerationRequest request, CancellationToken ct = default)
@@ -194,6 +199,8 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         {
             Kind = "video", Prompt = request.Prompt, Model = id, FilePath = path,
             Size = $"{request.AspectRatio} · {request.Duration} s" + (files.Count > 0 ? $" · {files.Count} zał." : ""),
+            Inputs = request.Attachments is { Count: > 0 } attachments ? attachments.ToList() : null,
+            Params = Params(("duration", request.Duration), ("aspect", request.AspectRatio)),
             CostUsd = result.CostUsd ?? estimate, CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (request.Publish) library.AddMedia(entry);
@@ -201,18 +208,85 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
     }
 
     private async Task<StudioResult> SaveImageAsync(string kind, string model, string prompt, string size, ImageResult result,
-                                                    bool publish, CancellationToken ct)
+                                                    bool publish, List<string>? inputs, Dictionary<string, string>? parameters, CancellationToken ct)
     {
         var ext = result.Bytes is [0xFF, 0xD8, ..] ? "jpg" : "png";
         var path = await storage.WriteAsync(MediaKind.Image, $"{DateTime.Now:yyyyMMdd-HHmmss}.{ext}", result.Bytes, ct);
         var estimate = Catalog?.Pricing.GetValueOrDefault(model)?.PerResult;
         var entry = new GalleryEntry
         {
-            Kind = kind, Prompt = prompt, Model = model, Size = size, FilePath = path,
+            Kind = kind, Prompt = prompt, Model = model, Size = size, FilePath = path, Inputs = inputs, Params = parameters,
             CostUsd = result.CostUsd ?? estimate, CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (publish) library.AddMedia(entry);
         return new StudioResult(entry, result.Bytes);
+    }
+
+    // --- Powtórzenie ---
+
+    public Task<StudioResult> RepeatAsync(RepeatRequest request, CancellationToken ct = default)
+    {
+        var entry = Find(request.Id);
+        string? P(string key) => entry.Params?.GetValueOrDefault(key);
+        var model = request.Model ?? entry.Model;
+
+        switch (entry.Kind)
+        {
+            case "generate":
+            {
+                var (width, height) = SizeOf(entry) ?? (1024, 1024);
+                var options = new ImageOptions(int.TryParse(P("seed"), out var seed) ? seed : null, P("negative"), P("quality"));
+                return GenerateImageAsync(new ImageRequest(entry.Prompt, null, model, width, height, options, request.Publish), ct);
+            }
+
+            case "edit":
+            {
+                if (entry.Inputs is not { Count: > 0 } references)
+                    throw new ArgumentException("Wpis edycji nie ma zapisanych referencji (starszy wpis): użyj edit_image z references.");
+                var size = SizeOf(entry);
+                return EditImageAsync(new EditRequest(entry.Prompt, null, references, model, size?.Width, size?.Height, request.Publish), ct);
+            }
+
+            case "video":
+            {
+                var (duration, aspect) = VideoOf(entry);
+                return GenerateVideoAsync(new VideoGenerationRequest(entry.Prompt, model, duration, aspect, entry.Inputs ?? [], request.Progress, request.Publish), ct);
+            }
+
+            case "speech":
+                return SpeakAsync(new SpeechRequest(entry.Prompt, model, P("voice"), double.TryParse(P("speed"), System.Globalization.CultureInfo.InvariantCulture, out var speed) ? speed : null,
+                                                    P("format") ?? "mp3", Publish: request.Publish), ct);
+
+            case "transcript":
+                return TranscribeAsync(new TranscriptionRequest(entry.FilePath, model, P("language"), P("hint"), request.Publish), ct);
+
+            default:
+                throw new ArgumentException($"Nie da się powtórzyć wpisu rodzaju {entry.Kind}.");
+        }
+    }
+
+    // Rozmiar obrazu z pola Size ("1024x768"); null, gdy wpis go nie ma
+    private static (int Width, int Height)? SizeOf(GalleryEntry entry)
+    {
+        var parts = entry.Size.Split('x');
+        return parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h) && w > 0 && h > 0 ? (w, h) : null;
+    }
+
+    // Czas i proporcje wideo z parametrów, a w starszych wpisach z opisu "16:9 · 5 s · 2 zał."
+    private static (int Duration, string Aspect) VideoOf(GalleryEntry entry)
+    {
+        if (int.TryParse(entry.Params?.GetValueOrDefault("duration"), out var duration) && entry.Params?.GetValueOrDefault("aspect") is { } aspect)
+            return (duration, aspect);
+
+        var match = System.Text.RegularExpressions.Regex.Match(entry.Size, @"^(?<a>\d+:\d+) · (?<d>\d+) s");
+        return match.Success ? (int.Parse(match.Groups["d"].Value), match.Groups["a"].Value) : (5, "16:9");
+    }
+
+    private static Dictionary<string, string>? Params(params (string Key, object? Value)[] values)
+    {
+        var map = values.Where(v => v.Value is not null and not "")
+            .ToDictionary(v => v.Key, v => Convert.ToString(v.Value, System.Globalization.CultureInfo.InvariantCulture)!);
+        return map.Count > 0 ? map : null;
     }
 
     // --- Prompty i opis obrazów ---

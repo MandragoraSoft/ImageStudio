@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace ImageStudio.Services;
 
 // Wspólne dla zestawów narzędzi MCP: schemat JSON, czytanie argumentów i serializacja wyników
-internal static class ToolArgs
+internal static class McpToolArgs
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -22,6 +22,18 @@ internal static class ToolArgs
     }
 
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Json);
+
+    // Wynik listy z ostrzeżeniem o ucięciu: źródło dostało limit + 1, więc nadmiar oznacza, że są kolejne wyniki.
+    // Bez ucięcia zwracamy zwykłą tablicę, z ucięciem obiekt {items, truncated, warning}
+    public static string Paged<T>(IReadOnlyList<T> fetched, int limit, int max) =>
+        fetched.Count <= limit
+            ? Serialize(fetched)
+            : Serialize(new
+            {
+                items = fetched.Take(limit),
+                truncated = true,
+                warning = $"Pokazano {limit} wyników, są kolejne. Zawęź query albo zwiększ limit (maks. {max}; zmiana w Ustawieniach, zakładka MCP).",
+            });
 
     public static string RequiredString(JsonElement args, string name) =>
         OptString(args, name) is { Length: > 0 } value ? value : throw new ArgumentException($"Brak parametru \"{name}\".");

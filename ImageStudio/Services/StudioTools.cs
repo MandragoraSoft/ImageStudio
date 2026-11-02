@@ -1,6 +1,6 @@
 using System.Text.Json;
 using ImageStudio.Configuration;
-using static ImageStudio.Services.ToolArgs;
+using static ImageStudio.Services.McpToolArgs;
 
 namespace ImageStudio.Services;
 
@@ -16,11 +16,13 @@ public sealed class StudioTools : IMcpToolSet
 
     private readonly IStudioApi _studio;
     private readonly Func<ToolCall, bool> _confirm;
+    private readonly McpLimits _limits;
     private readonly Dictionary<string, Tool> _tools;
 
-    public StudioTools(IStudioApi studio, Func<ToolCall, bool> confirm)
+    public StudioTools(IStudioApi studio, Func<ToolCall, bool> confirm, McpLimits? limits = null)
     {
         _studio = studio;
+        _limits = limits ?? new McpLimits();
         _confirm = confirm;
         _tools = Build().ToDictionary(t => t.Name);
     }
@@ -107,21 +109,24 @@ public sealed class StudioTools : IMcpToolSet
             "Lista modeli aktywnego dostawcy dla rodzaju generate, edit albo video (preferowane na początku) z ceną i informacją o wejściu obrazowym.",
             Schema(("kind", """{"type":"string","enum":["generate","edit","video"],"description":"Rodzaj modeli"}""", true),
                    ("query", """{"type":"string","description":"Fragment nazwy modelu"}""", false),
-                   ("limit", """{"type":"integer","minimum":1,"maximum":100,"description":"Domyślnie 30"}""", false)),
-            false, async args => Serialize(await _studio.ModelsAsync(RequiredString(args, "kind"), OptString(args, "query"),
-                                                                    Math.Clamp(OptInt(args, "limit") ?? 30, 1, 100))),
-            Needs: ["generate", "edit", "video"]);
+                   ("limit", """{"type":"integer","minimum":1,"description":"Domyślnie i maksimum z Ustawień (zakładka MCP)"}""", false)),
+            false, async args =>
+            {
+                var limit = _limits.ListSize(OptInt(args, "limit"));
+                return Paged(await _studio.ModelsAsync(RequiredString(args, "kind"), OptString(args, "query"), limit + 1), limit, _limits.MaxListLimit);
+            }, Needs: ["generate", "edit", "video"]);
 
         yield return new Tool("list_audio_models",
             "Lista modeli mowy (speech) albo rozpoznawania mowy (transcription) aktywnego dostawcy z ceną.",
             Schema(("kind", """{"type":"string","enum":["speech","transcription"]}""", true),
                    ("query", """{"type":"string","description":"Fragment nazwy modelu"}""", false),
-                   ("limit", """{"type":"integer","minimum":1,"maximum":100,"description":"Domyślnie 30"}""", false)),
+                   ("limit", """{"type":"integer","minimum":1,"description":"Domyślnie i maksimum z Ustawień (zakładka MCP)"}""", false)),
             false, async args =>
             {
                 var kind = RequiredString(args, "kind");
                 if (kind is not ("speech" or "transcription")) throw new ArgumentException("Rodzaj: speech albo transcription.");
-                return Serialize(await _studio.AudioModelsAsync(kind, OptString(args, "query"), Math.Clamp(OptInt(args, "limit") ?? 30, 1, 100)));
+                var limit = _limits.ListSize(OptInt(args, "limit"));
+                return Paged(await _studio.AudioModelsAsync(kind, OptString(args, "query"), limit + 1), limit, _limits.MaxListLimit);
             }, Needs: ["speech", "transcription"]);
 
         yield return new Tool("list_voices", "Lista głosów modelu mowy (pusta = model ma tylko głos domyślny).",
@@ -253,9 +258,21 @@ public sealed class StudioTools : IMcpToolSet
         yield return new Tool("list_gallery",
             "Wyniki z galerii obrazów, wideo i głosu (najnowsze pierwsze): id, rodzaj, model, prompt (dla transkrypcji tekst), plik, koszt.",
             Schema(("kind", """{"type":"string","enum":["generate","edit","video","speech","transcript","media","voice"],"description":"Pominięty = wszystko; media = obrazy i wideo, voice = mowa i transkrypcje"}""", false),
-                   ("limit", """{"type":"integer","minimum":1,"maximum":50,"description":"Domyślnie 10"}""", false)),
-            false, args => Task.FromResult(Serialize(_studio.List(OptString(args, "kind"), Math.Clamp(OptInt(args, "limit") ?? 10, 1, 50))
-                .Select(e => new GalleryItem(e.Id, e.Kind, e.Model, e.Prompt, e.FilePath, e.CostLabel, e.CreatedUtc)))));
+                   ("limit", """{"type":"integer","minimum":1,"description":"Domyślnie i maksimum z Ustawień (zakładka MCP)"}""", false)),
+            false, args =>
+            {
+                var limit = _limits.ListSize(OptInt(args, "limit"));
+                var items = _studio.List(OptString(args, "kind"), limit + 1)
+                    .Select(e => new GalleryItem(e.Id, e.Kind, e.Model, e.Prompt, e.FilePath, e.CostLabel, e.CreatedUtc)).ToList();
+                return Task.FromResult(Paged(items, limit, _limits.MaxListLimit));
+            });
+
+        yield return new Tool("repeat_gallery_entry",
+            "Powtarza operację z wpisu galerii (obraz, edycja, wideo, mowa, rozpoznawanie) z tym samym promptem, wejściami i parametrami; "
+            + "opcjonalnie innym modelem. KOSZTUJE pieniądze i wymaga zgody. Zwraca nowy wpis (id, ścieżka pliku).",
+            Schema(("id", """{"type":"string","description":"Id z list_gallery"}""", true),
+                   ("model", """{"type":"string","description":"Inny model tego samego rodzaju (pominięty = ten sam co we wpisie)"}""", false)),
+            true, async args => Serialize(Describe(await _studio.RepeatAsync(new RepeatRequest(RequiredString(args, "id"), OptString(args, "model"))))));
 
         yield return new Tool("remove_gallery_entry", "Usuwa wpis z galerii; plik zostaje na dysku.",
             Schema(("id", """{"type":"string","description":"Id z list_gallery"}""", true)),

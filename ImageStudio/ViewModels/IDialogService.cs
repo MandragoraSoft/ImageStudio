@@ -19,7 +19,9 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    string MistralKey = "", string KiloKey = "", string OpenCodeGoKey = "",
                                    string ChatGptSession = "",
                                    string? StorageId = null,
-                                   IReadOnlyDictionary<string, Dictionary<string, string>>? StorageConfig = null);
+                                   IReadOnlyDictionary<string, Dictionary<string, string>>? StorageConfig = null,
+                                   int McpMaxTools = McpLimits.DefaultMaxTools, int McpListLimit = McpLimits.DefaultListLimit,
+                                   int McpMaxListLimit = McpLimits.DefaultMaxListLimit);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);

@@ -81,7 +81,7 @@ public static class McpCli
 
     // studio tworzy rdzeń aplikacji (w produkcji McpCliHost.CreateStudioAsync, w testach atrapę); kod wyjścia 0 = sukces
     public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, Func<Task<IStudioApi>> studio,
-                                           CancellationToken ct = default, Func<string>? newToken = null)
+                                           CancellationToken ct = default, Func<string>? newToken = null, McpLimits? limits = null)
     {
         var options = Parse(args);
         if (options.Command == "help")
@@ -107,11 +107,13 @@ public static class McpCli
                 return false;
             }
 
-            var tools = new StudioTools(api, Confirm);
+            var tools = new StudioTools(api, Confirm, limits);
             switch (options.Command)
             {
                 case "tools":
                     foreach (var d in tools.Definitions) await output.WriteLineAsync($"{d.Name} - {d.Description}");
+                    if (limits?.ExceedsTools(tools.Definitions.Count) == true)
+                        await error.WriteLineAsync($"Uwaga: {tools.Definitions.Count} narzędzi przekracza limit {limits.MaxTools} (Ustawienia, zakładka MCP): słabsze modele mogą się gubić.");
                     return 0;
 
                 case "call":
@@ -120,7 +122,7 @@ public static class McpCli
                     return result.StartsWith("Użytkownik odrzucił", StringComparison.Ordinal) ? 3 : 0;
 
                 default:
-                    await using (var server = new McpAppServer(tools, action => action()))
+                    await using (var server = new McpAppServer(tools, action => action(), limits))
                     {
                         if (options.Transport == "stdio")
                         {

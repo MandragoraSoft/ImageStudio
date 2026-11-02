@@ -20,6 +20,11 @@ public sealed class GalleryEntry
     public bool CostEstimated { get; set; }
     public string FilePath { get; set; } = "";
 
+    // Wejścia operacji (referencje, załączniki wideo: ścieżki albo adresy) i parametry potrzebne do jej powtórzenia
+    // (width, height, seed, negative, quality, duration, aspect, voice, speed, format, language, hint); null w starszych wpisach
+    public List<string>? Inputs { get; set; }
+    public Dictionary<string, string>? Params { get; set; }
+
     [JsonIgnore]
     public BitmapSource? Thumbnail { get; set; }
 

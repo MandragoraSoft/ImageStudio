@@ -143,7 +143,7 @@ public sealed class AppControlToolsTests : IDisposable
         await Tools().CallAsync("list_models", """{"kind":"edit","query":"flux","limit":500}""", false);
         await Tools().CallAsync("list_models", """{"kind":"video"}""", false);
 
-        Assert.Equal(["list_models:edit:flux:100", "list_models:video::30"], _app.Calls);
+        Assert.Equal(["list_models:edit:flux:101", "list_models:video::31"], _app.Calls);
     }
 
     [Fact]

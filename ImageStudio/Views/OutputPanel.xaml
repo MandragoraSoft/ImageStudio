@@ -101,6 +101,10 @@
                                 </StackPanel.ToolTip>
                                 <StackPanel.ContextMenu>
                                     <ContextMenu>
+                                        <MenuItem Header="{loc:T gallery.repeat}"
+                                                  Command="{Binding PlacementTarget.Tag.RepeatGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
                                         <MenuItem Header="{loc:T gallery.remove}"
                                                   Command="{Binding PlacementTarget.Tag.RemoveGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>

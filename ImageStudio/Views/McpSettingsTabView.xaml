@@ -1,0 +1,22 @@
+<UserControl x:Class="ImageStudio.Views.McpSettingsTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,8,8,0">
+            <TextBlock Text="{loc:T mcp.maxTools}" Style="{StaticResource SectionHeader}"/>
+            <TextBox Text="{Binding MaxTools, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"
+                     ToolTip="{loc:T mcp.maxTools.tip}"/>
+            <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Text="{loc:T mcp.maxTools.note}"/>
+
+            <TextBlock Text="{loc:T mcp.listLimit}" Style="{StaticResource SectionHeader}"/>
+            <TextBox Text="{Binding ListLimit, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"
+                     ToolTip="{loc:T mcp.listLimit.tip}"/>
+
+            <TextBlock Text="{loc:T mcp.maxListLimit}" Style="{StaticResource SectionHeader}"/>
+            <TextBox Text="{Binding MaxListLimit, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"
+                     ToolTip="{loc:T mcp.maxListLimit.tip}"/>
+
+            <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,12,0,0" Text="{loc:T mcp.note}"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -40,6 +40,9 @@ public sealed partial class VoiceItem : ObservableObject
     public decimal? CostUsd { get; }
     public string Id { get; }
     public DateTime Created { get; }
+
+    // Parametry operacji (głos, tempo, format, język), potrzebne do jej powtórzenia
+    public Dictionary<string, string>? Params { get; set; }
     public bool HasAudio => Path is not null && File.Exists(Path);
     public string Kind => Loc.T(IsSpeech ? "voice.kind.speech" : "voice.kind.transcript");
     public string Footer => $"{Created:HH:mm:ss} · {Model}" + (CostUsd is { } c ? $" · ${c:0.####}" : "") + (Note is null ? "" : $" · {Note}");
@@ -57,11 +60,12 @@ public sealed partial class VoiceItem : ObservableObject
         Size = Note ?? "",
         CostUsd = CostUsd,
         FilePath = Path ?? "",
+        Params = Params,
     };
 
     public static VoiceItem FromEntry(GalleryEntry entry) =>
         new(entry.Kind == "speech", Shorten(entry.Prompt), entry.Prompt, entry.FilePath.Length > 0 ? entry.FilePath : null, entry.Model,
-            entry.CostUsd, entry.Size.Length > 0 ? entry.Size : null, entry.Id, entry.CreatedUtc.ToLocalTime());
+            entry.CostUsd, entry.Size.Length > 0 ? entry.Size : null, entry.Id, entry.CreatedUtc.ToLocalTime()) { Params = entry.Params };
 
     public static string Shorten(string text) => text.Length > 60 ? text[..60] + "..." : text;
 }
@@ -299,7 +303,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     public ObservableCollection<VoiceItem> Items { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SynthesizeCommand), nameof(TranscribeCommand), nameof(CancelCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SynthesizeCommand), nameof(TranscribeCommand), nameof(CancelCommand), nameof(RepeatCommand))]
     private bool _isBusy;
 
     private void Post(Action action)
@@ -395,7 +399,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             var entry = (await _studio.SpeakAsync(new SpeechRequest(text, model.Id, SelectedVoice, Speed, Format, Publish: false), cts.Token)).Entry;
 
             var item = new VoiceItem(true, VoiceItem.Shorten(text), text, entry.FilePath, model.Id, entry.CostUsd,
-                                language is null ? null : Loc.T("voice.note.translated", language.Name));
+                                language is null ? null : Loc.T("voice.note.translated", language.Name)) { Params = entry.Params };
             AddToGallery(item);
             Report(Loc.T("voice.status.saved", entry.FilePath));
             Play(item);
@@ -504,7 +508,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             Report(Loc.T("voice.status.transcribing"));
             var entry = (await _studio.TranscribeAsync(new TranscriptionRequest(path, model.Id, Language, TranscriptionHint, Publish: false), cts.Token)).Entry;
             AddToGallery(new VoiceItem(false, Path.GetFileName(path), entry.Prompt.Length == 0 ? Loc.T("voice.transcript.empty") : entry.Prompt,
-                                       path, model.Id, entry.CostUsd));
+                                       path, model.Id, entry.CostUsd) { Params = entry.Params });
             Report(Loc.T("voice.status.transcribed"));
         }
         catch (OperationCanceledException)
@@ -520,6 +524,41 @@ public sealed partial class VoiceViewModel : ObservableObject
             End();
         }
     }
+
+    // Powtarza wybrany wynik (mowę albo rozpoznawanie) z tymi samymi danymi i parametrami; nowy wynik trafia na górę listy
+    [RelayCommand(CanExecute = nameof(CanRepeat))]
+    private async Task RepeatAsync(VoiceItem? item)
+    {
+        if (item is null) return;
+
+        using var cts = Begin();
+        try
+        {
+            Report(Loc.T(item.IsSpeech ? "voice.status.synth" : "voice.status.transcribing"));
+            var entry = (await _studio.RepeatAsync(new RepeatRequest(item.Id, Publish: false), cts.Token)).Entry;
+            var created = item.IsSpeech
+                ? new VoiceItem(true, VoiceItem.Shorten(entry.Prompt), entry.Prompt, entry.FilePath, entry.Model, entry.CostUsd, item.Note) { Params = entry.Params }
+                : new VoiceItem(false, Path.GetFileName(entry.FilePath), entry.Prompt.Length == 0 ? Loc.T("voice.transcript.empty") : entry.Prompt,
+                                entry.FilePath, entry.Model, entry.CostUsd) { Params = entry.Params };
+            AddToGallery(created);
+            Report(Loc.T(item.IsSpeech ? "voice.status.saved" : "voice.status.transcribed", entry.FilePath));
+            if (item.IsSpeech) Play(created);
+        }
+        catch (OperationCanceledException)
+        {
+            Report(Loc.T("voice.status.cancelled"));
+        }
+        catch (Exception ex)
+        {
+            Report(Loc.T(item.IsSpeech ? "voice.err.synth" : "voice.err.transcribe", ex.Message), true);
+        }
+        finally
+        {
+            End();
+        }
+    }
+
+    private bool CanRepeat => !IsBusy && !IsRecording;
 
     private CancellationTokenSource Begin()
     {

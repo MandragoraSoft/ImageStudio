@@ -150,6 +150,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private bool _initialized;
 
     private readonly IMcpToolSet? _appTools;
+    private readonly McpLimits _limits;
     private readonly BuiltinTools? _builtin;
     private readonly IMemoryStore? _memory;
 
@@ -161,8 +162,13 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
                           string? configPath = null, IMcpToolSet? appTools = null, bool appControlEnabled = false,
                           AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
-                          IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null)
+                          IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null, McpLimits? limits = null)
     {
+        _limits = limits ?? new McpLimits();
+        _limits.Changed += () =>
+        {
+            OnPropertyChanged(nameof(LimitWarning));
+        };
         _builtin = builtin;
         _memory = memory;
         _host = host;
@@ -230,6 +236,9 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // Zapamiętane informacje trafiają do instrukcji systemowej, gdy któreś narzędzie ich grupy jest włączone
     public string? SystemNote => UseTools ? _builtin?.SystemNoteFor(name => !_disabled.Contains(name)) : null;
 
+    // Ostrzeżenie, gdy modelowi wystawiamy więcej narzędzi niż limit z Ustawień (zakładka MCP)
+    public string LimitWarning => UseTools && _limits.ExceedsTools(Tools.Count) ? Loc.T("tools.warn.limit", Tools.Count, _limits.MaxTools) : "";
+
     public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
 
     private IEnumerable<ToolDefinition> AppToolDefinitions() =>
@@ -285,6 +294,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     {
         OnPropertyChanged(nameof(Tools));
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(LimitWarning));
         OnPropertyChanged(nameof(SystemNote));
         OnPropertyChanged(nameof(AppControlEnabled));
         OnPropertyChanged(nameof(BuiltinEnabled));

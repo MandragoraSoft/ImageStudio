@@ -22,13 +22,15 @@ public sealed class McpAppServer : IAsyncDisposable
     private static readonly ILogger Log = AppLog.For<McpAppServer>();
 
     private readonly IMcpToolSet _tools;
+    private readonly McpLimits? _limits;
     private readonly Func<Func<Task<string>>, Task<string>> _runOnUi;
     private WebApplication? _app;
 
     // runOnUi wykonuje akcję w wątku interfejsu (narzędzia dotykają widoków); w testach może wywołać ją wprost
-    public McpAppServer(IMcpToolSet tools, Func<Func<Task<string>>, Task<string>> runOnUi)
+    public McpAppServer(IMcpToolSet tools, Func<Func<Task<string>>, Task<string>> runOnUi, McpLimits? limits = null)
     {
         _tools = tools;
+        _limits = limits;
         _runOnUi = runOnUi;
     }
 
@@ -84,6 +86,9 @@ public sealed class McpAppServer : IAsyncDisposable
         .WithListToolsHandler((_, _) =>
         {
             var definitions = _tools.Definitions;
+            if (_limits?.ExceedsTools(definitions.Count) == true)
+                Log.LogWarning("MCP: wystawiono {Count} narzędzi, powyżej limitu {Max} (Ustawienia, zakładka MCP): słabsze modele i klienci mogą się gubić",
+                               definitions.Count, _limits.MaxTools);
             Log.LogInformation("MCP odebrano: tools/list; wysłano {Count} narzędzi: {Names}", definitions.Count,
                                string.Join(", ", definitions.Select(d => d.Name)));
             return ValueTask.FromResult(new ListToolsResult
