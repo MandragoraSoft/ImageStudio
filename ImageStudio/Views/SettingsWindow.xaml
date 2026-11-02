@@ -16,6 +16,9 @@
         <DataTemplate DataType="{x:Type vm:AudioSettingsTab}">
             <views:AudioSettingsTabView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:StorageSettingsTab}">
+            <views:StorageSettingsTabView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ProviderSettingsTab}">
             <views:ProviderSettingsTabView/>
         </DataTemplate>

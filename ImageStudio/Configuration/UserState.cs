@@ -47,6 +47,9 @@ public sealed class UserState
     public string? EnhancerInstruction { get; set; }
     // Kolejność zakładek lewego panelu po przeciągnięciu (nazwy typów zakładek); null = domyślna
     public List<string>? TabOrder { get; set; }
+    // Magazyn wyników (wtyczka IMediaStoragePlugin): wybrana wtyczka i jej ustawienia po Id wtyczki; null = domyślna
+    public string? StorageId { get; set; }
+    public Dictionary<string, Dictionary<string, string>> StorageConfig { get; set; } = [];
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
     public string? Quality { get; set; }

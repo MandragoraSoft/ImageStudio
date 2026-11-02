@@ -17,7 +17,9 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    string? Microphone = null, string? Speaker = null,
                                    string Language = "system",
                                    string MistralKey = "", string KiloKey = "", string OpenCodeGoKey = "",
-                                   string ChatGptSession = "");
+                                   string ChatGptSession = "",
+                                   string? StorageId = null,
+                                   IReadOnlyDictionary<string, Dictionary<string, string>>? StorageConfig = null);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);

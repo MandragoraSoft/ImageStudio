@@ -26,6 +26,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<McpToolHost>();
         services.AddSingleton<LegacyPromptImporter>();
         services.AddSingleton<IProviderFactory, ProviderFactory>();
+        // Wtyczki magazynu wyników; pierwsza jest domyślna, MediaStorageHost wybiera aktywną wg ustawień
+        services.AddSingleton<LocalMediaStorage>();
+        services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<LocalMediaStorage>());
+        services.AddSingleton<MediaStorageHost>();
         services.TryAddSingleton(new McpOptions());
 
         services.AddSingleton<MainViewModel>();
@@ -62,7 +66,6 @@ public static class ServiceCollectionExtensions
             return sp.GetRequiredService<IProviderFactory>().Create(settings.ProviderId, settings);
         });
 
-        services.AddSingleton<IMediaStorage, LocalMediaStorage>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<IThemeService, WpfThemeService>();
         services.AddSingleton<IAudioPlayer, NAudioPlayer>();

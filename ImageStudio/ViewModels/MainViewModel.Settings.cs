@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 using ImageStudio.Localization;
 
@@ -46,14 +47,22 @@ public sealed partial class MainViewModel
                                          EnhancerModels.ToList(), _settings.UseStreaming,
                                          Voice.SelectedMicrophone?.Name, Voice.SelectedSpeaker?.Name, _settings.Language,
                                          _secrets.Load("mistral") ?? "", _secrets.Load("kilo") ?? "", _secrets.Load("opencodego") ?? "",
-                                         _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "");
+                                         _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "",
+                                         _storage.Active.Id);
         Voice.RefreshDevices();
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
+                                                     new StorageSettingsTab(current, _storage),
                                                      new ProviderSettingsTab(current, LoadTextModelsAsync, SignInToChatGptAsync)]);
         if (result is null) return;
 
         Voice.ApplyDevices(result.Microphone, result.Speaker);
+
+        _storage.Apply(result.StorageId, result.StorageConfig);
+        _state.StorageId = _storage.Active.Id;
+        _state.StorageConfig = result.StorageConfig?.ToDictionary(p => p.Key, p => p.Value) ?? _state.StorageConfig;
+        SyncVoiceFolder();
+        SaveState();
 
         foreach (var (id, preferredOnly) in result.PreferredOnly ?? new Dictionary<string, bool>())
             _prefs.For(id).PreferredOnly = preferredOnly;
@@ -79,6 +88,12 @@ public sealed partial class MainViewModel
 
         // Nowe ustawienia (także inny provider) = nowa instancja providera
         await SwitchProviderAsync(_providers.Create(result.ProviderId, _settings));
+    }
+
+    // Nagrania i strażnik usuwania w zakładce Głos trzymają się folderu dźwięku aktywnej wtyczki (chmura = bez zmiany)
+    private void SyncVoiceFolder()
+    {
+        if (_storage.Active.LocalFolder(MediaKind.Audio) is { } folder) Voice.OutputDir = folder;
     }
 
     // Modele tekstowe dostawcy wybranego w oknie ustawień, pobrane z jeszcze niezapisanymi adresami i kluczami.

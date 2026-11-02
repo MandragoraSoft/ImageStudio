@@ -128,7 +128,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _preferredOnly;
 
-    private readonly IMediaStorage _storage;
+    private readonly MediaStorageHost _storage;
 
     // Trwające operacje sieciowe (spinner w stopce, przyciemnione okno odpowiedzi)
     public IActivityTracker Activity { get; }
@@ -139,7 +139,7 @@ public sealed partial class MainViewModel : ObservableObject
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
-                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, IMediaStorage storage)
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage)
     {
         _storage = storage;
         _provider = provider;
@@ -160,6 +160,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Ostatnio wpisane prompty i wybory wracają po uruchomieniu
         _state = _stateStore.Load();
+        _storage.Load(_state);
         GeneratePrompt = _state.GeneratePrompt ?? "";
         GenerateSystemPrompt = _state.GenerateSystemPrompt ?? "";
         EditPrompt = _state.EditPrompt ?? "";
@@ -192,6 +193,7 @@ public sealed partial class MainViewModel : ObservableObject
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
                                    () => SelectedEnhancerModel, FilterAudioModel, voiceGallery, storage);
+        SyncVoiceFolder();
         Voice.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)
