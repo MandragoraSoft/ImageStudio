@@ -37,6 +37,10 @@ public sealed class UserState
     public string? VoiceSpeechLanguage { get; set; }
     public bool UseTools { get; set; }
     public bool? RequireToolApproval { get; set; }
+    // Narzędzia, na które użytkownik zezwolił na stałe (czat nie pyta o nie o zgodę)
+    public List<string> AlwaysAllowedTools { get; set; } = [];
+    // Długie wyniki narzędzi w czacie: true = zwijaj bez pytania; null = pytaj
+    public bool? CollapseLongResults { get; set; }
     public List<string> McpEnabled { get; set; } = [];
     public bool AppControlEnabled { get; set; }
     // Wbudowane narzędzia czatu (data i czas, pamięć, pliki); null = domyślnie włączone

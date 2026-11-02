@@ -89,9 +89,28 @@ public sealed class ChatMessage : System.ComponentModel.INotifyPropertyChanged
         {
             if (_content == value) return;
             _content = value;
-            Raise(nameof(Content), nameof(DisplayText));
+            Raise(nameof(Content), nameof(DisplayText), nameof(IsLong), nameof(Length));
         }
     }
+
+    // Długi wynik narzędzia (np. JSON) można zwinąć w rozmowie; zwinięcie dotyczy tylko widoku, do modelu idzie cała treść
+    public const int LongLength = 1200;
+
+    private bool _collapsed;
+
+    public bool Collapsed
+    {
+        get => _collapsed;
+        set
+        {
+            if (_collapsed == value) return;
+            _collapsed = value;
+            Raise(nameof(Collapsed));
+        }
+    }
+
+    public bool IsLong => Role == "tool" && _content.Length >= LongLength;
+    public int Length => _content.Length;
 
     public IReadOnlyList<ToolCall>? ToolCalls
     {

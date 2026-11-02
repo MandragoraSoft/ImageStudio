@@ -183,14 +183,22 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) SaveState();
         };
+        Tools.Permissions.Load(_state.AlwaysAllowedTools);
+        Tools.Permissions.Changed += SaveState;
+        // O zgodę na narzędzia czat pyta w swoim oknie (zamiast okna dialogowego)
         Chat = new ChatViewModel(() => _provider, EnhancerModels, ReportChat, _state.ChatSystemPrompt ?? "",
-                                 Tools, _dialogs.ConfirmToolCall,
+                                 Tools, null,
                                  new ChatImageSupport(_dialogs,
                                                       id => _chatModels.TryGetValue(id, out var info) ? info.AcceptsImage : null,
                                                       () => _settings.MaxSide),
                                  id => _chatModels.GetValueOrDefault(id),
                                  _state.ChatReasoningEnabled ?? true, _state.ChatReasoningEffort ?? ReasoningSupport.DefaultEffort,
-                                 activity, ChatModelOptions, () => _settings.UseStreaming, chatSessions);
+                                 activity, ChatModelOptions, () => _settings.UseStreaming, chatSessions)
+        {
+            Permissions = Tools.Permissions,
+            InlineApproval = true,
+            CollapseLong = _state.CollapseLongResults,
+        };
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
@@ -208,7 +216,7 @@ public sealed partial class MainViewModel : ObservableObject
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)
         Chat.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(ChatViewModel.ReasoningEnabled) or nameof(ChatViewModel.SelectedReasoningEffort)) SaveState();
+            if (e.PropertyName is nameof(ChatViewModel.ReasoningEnabled) or nameof(ChatViewModel.SelectedReasoningEffort) or nameof(ChatViewModel.CollapseLong)) SaveState();
         };
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
@@ -508,6 +516,8 @@ public sealed partial class MainViewModel : ObservableObject
         Voice.Capture(_state);
         _state.UseTools = Tools.UseTools;
         _state.RequireToolApproval = Tools.RequireApproval;
+        _state.AlwaysAllowedTools = Tools.Permissions.Always.ToList();
+        _state.CollapseLongResults = Chat.CollapseLong;
         _state.McpEnabled = Tools.EnabledServers.ToList();
         _state.AppControlEnabled = Tools.AppControlEnabled;
         _state.BuiltinToolsEnabled = Tools.BuiltinEnabled;

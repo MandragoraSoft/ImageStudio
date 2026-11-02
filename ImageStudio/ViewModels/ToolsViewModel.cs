@@ -169,6 +169,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         {
             OnPropertyChanged(nameof(LimitWarning));
         };
+        Permissions.Changed += () => OnPropertyChanged(nameof(PermissionsSummary));
         _builtin = builtin;
         _memory = memory;
         _host = host;
@@ -208,6 +209,14 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     }
 
     public bool HasBuiltin => _builtin is not null;
+
+    // Zgody na wywołania narzędzi (na sesję i na stałe); czat pyta tylko o narzędzia bez zgody
+    public ToolPermissions Permissions { get; } = new();
+
+    public string PermissionsSummary => Loc.T("tools.permissions.summary", Permissions.SessionCount, Permissions.Always.Count);
+
+    [RelayCommand]
+    private void ForgetPermissions() => Permissions.Forget();
 
     public ObservableCollection<McpServerItem> Servers { get; } = [];
 

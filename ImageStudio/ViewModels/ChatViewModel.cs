@@ -92,6 +92,47 @@ public sealed partial class ChatViewModel : ObservableObject
         }
     }
 
+    // Zgody na narzędzia (na rozmowę i na stałe); domyślnie własne, aplikacja podaje te z panelu Narzędzia
+    public ToolPermissions Permissions { get; init; } = new();
+
+    // true = o zgodę pytamy w oknie czatu (PendingApproval); false = przez wywołanie zwrotne z konstruktora
+    public bool InlineApproval { get; init; }
+
+    // Prośba o zgodę czekająca na odpowiedź użytkownika (panel nad polem wpisywania); null = nic nie czeka
+    [ObservableProperty]
+    private ToolApproval? _pendingApproval;
+
+    // Długie wyniki narzędzi: true = zwijaj bez pytania, null = pytaj (przy wyniku jest przycisk "Zwijaj zawsze")
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AskCollapse))]
+    private bool? _collapseLong;
+
+    public bool AskCollapse => CollapseLong is null;
+
+    private void ApplyCollapse(ChatMessage message)
+    {
+        if (CollapseLong == true && message.IsLong) message.Collapsed = true;
+    }
+
+    [RelayCommand]
+    private void ToggleCollapse(ChatMessage? message)
+    {
+        if (message is not null) message.Collapsed = !message.Collapsed;
+    }
+
+    [RelayCommand]
+    private void CollapseAlways()
+    {
+        CollapseLong = true;
+        foreach (var message in Messages) ApplyCollapse(message);
+    }
+
+    [RelayCommand]
+    private void AnswerApproval(string choice)
+    {
+        if (PendingApproval is { } pending && Enum.TryParse<ApprovalChoice>(choice, out var parsed)) pending.Answer.TrySetResult(parsed);
+    }
+
     // Źródło narzędzi (panel MCP wiąże się z jego właściwościami); null = czat bez narzędzi
     public IToolHost? Tools { get; }
 
@@ -241,7 +282,9 @@ public sealed partial class ChatViewModel : ObservableObject
                 foreach (var call in reply.ToolCalls)
                     {
                     var output = await RunToolAsync(call, ct);
-                    Messages.Add(new ChatMessage("tool", output, ToolCallId: call.Id, ToolName: call.Name, Images: ToolResultImages(output)));
+                    var result = new ChatMessage("tool", output, ToolCallId: call.Id, ToolName: call.Name, Images: ToolResultImages(output));
+                    ApplyCollapse(result);
+                    Messages.Add(result);
                 }
                 _report(Loc.T("chat.msg.answering"), false);
             }
@@ -354,10 +397,33 @@ public sealed partial class ChatViewModel : ObservableObject
     }
 
     // Wynik zawsze wraca do modelu jako tekst: odmowa i błąd narzędzia też, żeby mógł zareagować
+    // Zgoda na wywołanie: najpierw zapamiętane zgody, potem pytanie w oknie czatu (albo wywołanie zwrotne). Stop przerywa czekanie
+    private async Task<bool> ApproveAsync(ToolCall call, CancellationToken ct)
+    {
+        if (Permissions.IsAllowed(call.Name)) return true;
+        if (!InlineApproval) return _confirm?.Invoke(call) ?? false;
+
+        var approval = new ToolApproval(call);
+        PendingApproval = approval;
+        _report(Loc.T("chat.msg.waitingApproval", call.Name), false);
+        try
+        {
+            using var _ = ct.Register(() => approval.Answer.TrySetCanceled(ct));
+            var choice = await approval.Answer.Task;
+            Log.LogInformation("Czat: zgoda na narzędzie {Tool}: {Choice}", call.Name, choice);
+            Permissions.Allow(call.Name, choice);
+            return choice != ApprovalChoice.Deny;
+        }
+        finally
+        {
+            PendingApproval = null;
+        }
+    }
+
     private async Task<string> RunToolAsync(ToolCall call, CancellationToken ct)
     {
         if (Tools is null) return Loc.T("chat.msg.toolsOff");
-        if (Tools.RequireApproval && !(_confirm?.Invoke(call) ?? false))
+        if (Tools.RequireApproval && !await ApproveAsync(call, ct))
         {
             Log.LogInformation("Czat: użytkownik odrzucił narzędzie {Tool} (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
             return Loc.T("chat.msg.toolRejected");
@@ -493,6 +559,7 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             Messages.Clear();
             Attachments.Clear();
+            Permissions.ClearSession();
             _sessionId = Guid.NewGuid().ToString("N");
             _sessionCreated = DateTime.UtcNow;
             _sessionTitle = null;
@@ -522,7 +589,14 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             Messages.Clear();
             Attachments.Clear();
-            foreach (var message in data.Messages) Messages.Add(FromData(message));
+            Permissions.ClearSession();
+            foreach (var message in data.Messages)
+            {
+                var restored = FromData(message);
+                ApplyCollapse(restored);
+                Messages.Add(restored);
+            }
+
             _sessionId = data.Id;
             _sessionCreated = data.CreatedUtc;
             _sessionTitle = data.Title;
