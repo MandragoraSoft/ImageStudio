@@ -1,3 +1,5 @@
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
@@ -31,6 +33,7 @@ public sealed class VoiceViewModelTests : IDisposable
         state?.Invoke(memory.State);
         var app = TestApp.Create(s => s.AddSingleton<IUserStateStore>(memory), provider);
         app.Vm.Voice.OutputDir = _dir;
+        app.Get<LocalMediaStorage>().Roots[MediaKind.Audio] = _dir;
         return app;
     }
 

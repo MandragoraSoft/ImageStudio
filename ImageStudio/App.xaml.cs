@@ -16,12 +16,12 @@ public partial class App : Application
 {
     private IServiceProvider? _services;
 
-    // Biblioteki dostawców, zakładek i grup narzędzi czatu leżą w podfolderach providers\, tabs\ i tools\ (patrz ImageStudio.csproj);
+    // Biblioteki dostawców, zakładek i grup narzędzi czatu leżą w podfolderach providers\, tabs\, tools\ i storage\ (patrz ImageStudio.csproj);
     // domyślny kontekst ich nie widzi sam
     static App()
     {
         string[] pluginDirs = [Path.Combine(AppContext.BaseDirectory, "providers"), Path.Combine(AppContext.BaseDirectory, "tabs"),
-                               Path.Combine(AppContext.BaseDirectory, "tools")];
+                               Path.Combine(AppContext.BaseDirectory, "tools"), Path.Combine(AppContext.BaseDirectory, "storage")];
         AssemblyLoadContext.Default.Resolving += (context, name) =>
         {
             foreach (var dir in pluginDirs)

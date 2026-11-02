@@ -1,3 +1,5 @@
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -40,6 +42,7 @@ public sealed class VoiceGalleryTests : IDisposable
         provider.TranscriptionCatalog.Add(new AudioModelInfo("stt/a", "A"));
         var app = TestApp.Create(s => s.AddSingleton<IVoiceGalleryStore>(store), provider);
         app.Vm.Voice.OutputDir = _dir;
+        app.Get<LocalMediaStorage>().Roots[MediaKind.Audio] = _dir;
         app.Vm.InitializeAsync().GetAwaiter().GetResult();
         return app;
     }

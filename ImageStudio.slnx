@@ -14,6 +14,10 @@
     <Project Path="ImageStudio.Providers.OpenRouter/ImageStudio.Providers.OpenRouter.csproj" />
     <Project Path="ImageStudio.Providers.UberLlm/ImageStudio.Providers.UberLlm.csproj" />
   </Folder>
+  <Folder Name="/Storage/">
+    <Project Path="ImageStudio.Storage.Core/ImageStudio.Storage.Core.csproj" />
+    <Project Path="ImageStudio.Storage.Local/ImageStudio.Storage.Local.csproj" />
+  </Folder>
   <Folder Name="/Tools/">
     <Project Path="ImageStudio.Tools.Core/ImageStudio.Tools.Core.csproj" />
     <Project Path="ImageStudio.Tools.DateTime/ImageStudio.Tools.DateTime.csproj" />

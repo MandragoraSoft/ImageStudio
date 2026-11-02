@@ -7,6 +7,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using ImageStudio.Localization;
 
 namespace ImageStudio.ViewModels;
@@ -87,6 +89,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     private readonly Action _reload;
     private readonly Func<string?> _textModel;
     private readonly IVoiceGalleryStore? _gallery;
+    private readonly IMediaStorage _storage;
     private readonly SynchronizationContext? _ui = SynchronizationContext.Current;
     private readonly Stopwatch _recordingClock = new();
     private CancellationTokenSource? _cts;
@@ -95,8 +98,10 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     public VoiceViewModel(Func<IAiProvider> provider, IDialogService dialogs, IAudioPlayer player, IAudioRecorder recorder,
                           Action<string, bool> report, Action reload, string outputDir, UserState state,
-                          Func<string?>? textModel = null, Func<object, bool>? modelFilter = null, IVoiceGalleryStore? gallery = null)
+                          Func<string?>? textModel = null, Func<object, bool>? modelFilter = null, IVoiceGalleryStore? gallery = null,
+                          IMediaStorage? storage = null)
     {
+        _storage = storage ?? new LocalMediaStorage { Roots = { [MediaKind.Audio] = outputDir } };
         _gallery = gallery;
         if (gallery is not null)
             foreach (var entry in gallery.Load()) Items.Add(VoiceItem.FromEntry(entry));
@@ -404,9 +409,7 @@ public sealed partial class VoiceViewModel : ObservableObject
             Report(Loc.T("voice.status.synth"));
             var result = await _provider().SynthesizeAsync(model.Id, text, SelectedVoice, Math.Abs(Speed - 1.0) < 0.001 ? null : Speed,
                                                            Format, cts.Token);
-            Directory.CreateDirectory(OutputDir);
-            var path = Path.Combine(OutputDir, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}");
-            await File.WriteAllBytesAsync(path, result.Bytes, cts.Token);
+            var path = await _storage.WriteAsync(MediaKind.Audio, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}", result.Bytes, cts.Token);
 
             var item = new VoiceItem(true, VoiceItem.Shorten(text), text, path, model.Id, result.CostUsd ?? estimate,
                                 language is null ? null : Loc.T("voice.note.translated", language.Name));

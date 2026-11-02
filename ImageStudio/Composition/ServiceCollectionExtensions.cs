@@ -1,5 +1,7 @@
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
 using ImageStudio.Tabs.Generate;
@@ -60,6 +62,7 @@ public static class ServiceCollectionExtensions
             return sp.GetRequiredService<IProviderFactory>().Create(settings.ProviderId, settings);
         });
 
+        services.AddSingleton<IMediaStorage, LocalMediaStorage>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<IThemeService, WpfThemeService>();
         services.AddSingleton<IAudioPlayer, NAudioPlayer>();

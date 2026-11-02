@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImageStudio.Storage.Core\ImageStudio.Storage.Core.csproj" />
+  </ItemGroup>
+
+</Project>

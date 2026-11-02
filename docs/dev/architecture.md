@@ -13,3 +13,9 @@ Jedyny composition root to `Composition/ServiceCollectionExtensions`: `AddImageS
 ## Okna dialogowe przez `IDialogService`
 
 (interfejs i rekordy wyników w `ViewModels/`, implementacja `WpfDialogService` w `Views/`, `FakeDialogs` w `ImageStudio.Tests/Fakes.cs`). Zmieniając sygnaturę interfejsu, zaktualizuj fake'a. ViewModele nie wołają `MessageBox` (użyj `Confirm`) ani `Application.Current`; wątek UI przechwytuje `SynchronizationContext` w konstruktorze `MainViewModel`.
+
+## Magazyn wyników (wtyczki `ImageStudio.Storage.*`)
+
+Zapis wyników (obraz, wideo, synteza mowy) idzie przez `IMediaStorage` z `ImageStudio.Storage.Core`, nie przez `File.*` w ViewModelach. Kontrakt: `WriteAsync(kind, fileName, data)` zwraca nieprzezroczystą *lokalizację* (dla dysku ścieżka, dla chmury np. id pliku), którą aplikacja trzyma w `GalleryEntry.FilePath`; dalej `ReadAsync`, `ExistsAsync`, `DeleteAsync` i `GetLocalPathAsync` (ścieżka lokalna do odtwarzania i miniatur, wtyczka zdalna pobiera do pamięci podręcznej). Domyślna wtyczka `ImageStudio.Storage.Local` (`LocalMediaStorage`, katalogi w `Roots`) jest rejestrowana w `AddImageStudioInfrastructure`, DLL-e trafiają do `storage\` (jak `providers\`). Nowy magazyn (OneDrive, Google Drive) = osobny projekt `ImageStudio.Storage.<Nazwa>` z `IMediaStorage` + referencja w `ImageStudio.csproj` i rejestracja w DI. W testach `TestApp` podaje `LocalMediaStorage` z katalogami w temp.
+
+Jeszcze nie przez kontrakt (do zrobienia przed pierwszą wtyczką zdalną): odczyt w galerii (`GalleryStore.Load` filtruje `File.Exists`, wybór wpisu czyta `File.ReadAllBytes`, `MediaElement` bierze ścieżkę), usuwanie z dysku z galerii, strażnik usuwania w `VoiceViewModel` (`OutputDir`), "Zapisz jako", nagrania mikrofonu, wybór aktywnego magazynu w Ustawieniach.

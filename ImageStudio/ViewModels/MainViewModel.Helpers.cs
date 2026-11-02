@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -54,16 +55,11 @@ public sealed partial class MainViewModel
         foreach (var item in items) target.Add(item);
     }
 
-    // Automatyczny zapis do Obrazy\ImageStudio (kopia bezpieczeństwa; "Zapisz jako" zapisuje w wybranym miejscu)
-    private static string SaveImage(byte[] bytes)
+    // Automatyczny zapis w magazynie wyników (kopia bezpieczeństwa; "Zapisz jako" zapisuje w wybranym miejscu)
+    private Task<string> SaveImageAsync(byte[] bytes)
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "ImageStudio");
-        Directory.CreateDirectory(dir);
-
         var ext = bytes is [0xFF, 0xD8, ..] ? ".jpg" : ".png";
-        var path = Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss}{ext}");
-        File.WriteAllBytes(path, bytes);
-        return path;
+        return _storage.WriteAsync(MediaKind.Image, $"{DateTime.Now:yyyyMMdd-HHmmss}{ext}", bytes);
     }
 
     private static BitmapImage LoadImage(byte[] bytes)

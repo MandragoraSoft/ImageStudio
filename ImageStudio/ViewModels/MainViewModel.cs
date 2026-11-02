@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -127,6 +128,8 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _preferredOnly;
 
+    private readonly IMediaStorage _storage;
+
     // Trwające operacje sieciowe (spinner w stopce, przyciemnione okno odpowiedzi)
     public IActivityTracker Activity { get; }
 
@@ -136,8 +139,9 @@ public sealed partial class MainViewModel : ObservableObject
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
-                         IVoiceGalleryStore voiceGallery, IMemoryStore memory)
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, IMediaStorage storage)
     {
+        _storage = storage;
         _provider = provider;
         _providers = providers;
         _dialogs = dialogs;
@@ -187,7 +191,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
-                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery);
+                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery, storage);
         Voice.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(VoiceViewModel.SelectedSpeechModel) or nameof(VoiceViewModel.SelectedVoice)

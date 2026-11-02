@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -136,10 +137,7 @@ public sealed partial class MainViewModel
             var result = await _provider.GenerateVideoAsync(model.Id, VideoPrompt, VideoDuration, VideoAspect,
                                                            attachments, s => Status = Loc.T("video.msg.progress", s));
 
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ImageStudio");
-            Directory.CreateDirectory(dir);
-            var path = Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4");
-            await File.WriteAllBytesAsync(path, result.Bytes);
+            var path = await _storage.WriteAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes);
 
             ShowVideo = true;
             VideoSource = new Uri(path);

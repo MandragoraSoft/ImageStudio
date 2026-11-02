@@ -307,7 +307,7 @@ public sealed partial class MainViewModel
         try
         {
             var result = await produce();
-            var path = SaveImage(result.Bytes);
+            var path = await SaveImageAsync(result.Bytes);
             _imageBytes = result.Bytes;
             Image = LoadImage(result.Bytes);
             FitToWindow = true; // nowy wynik od razu mieści się w oknie

@@ -1,3 +1,5 @@
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
@@ -169,6 +171,7 @@ public sealed class LocalizationTests
         var voice = app.Vm.Voice;
         var dir = Path.Combine(Path.GetTempPath(), "is-loc-" + Guid.NewGuid().ToString("N"));
         voice.OutputDir = dir;
+        app.Get<LocalMediaStorage>().Roots[MediaKind.Audio] = dir;
         provider.OnSynthesize = (_, _, _, _, _) => new AudioResult([1], "mp3", null);
         try
         {
