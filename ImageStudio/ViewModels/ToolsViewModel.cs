@@ -331,14 +331,31 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
                 ToolGroups.Add(Group(BuiltinGroupTitle(group.Id), "",
                                      group.Tools.Select(t => Item(BuiltinTools.ChatPrefix + t.Name, t.Name, t.Description))));
 
+        // Narzędzia imagestudio__* podzielone według przeznaczenia (obrazy, wideo, głos...), każda grupa włączana osobno
         if (_appTools is not null)
-            ToolGroups.Add(Group(Loc.T("tools.group.app"), Loc.T("tools.control.tip"),
-                                 _appTools.AllDefinitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
+            foreach (var category in ToolCategories.Order)
+            {
+                var definitions = _appTools.AllDefinitions.Where(d => ToolCategories.For(d.Name) == category).ToList();
+                if (definitions.Count > 0)
+                    ToolGroups.Add(Group(AppGroupTitle(category), Loc.T("tools.control.tip"),
+                                         definitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
+            }
 
         foreach (var (server, definitions) in _host.ServerTools.OrderBy(s => s.Key, StringComparer.OrdinalIgnoreCase))
             ToolGroups.Add(Group(server, Loc.T("tools.group.mcp"),
                                  definitions.Select(d => Item(d.Name, d.Name.Contains("__") ? d.Name[(d.Name.IndexOf("__", StringComparison.Ordinal) + 2)..] : d.Name, d.Description))));
     }
+
+    private static string AppGroupTitle(string id) => id switch
+    {
+        "image" => Loc.T("tools.group.image"),
+        "video" => Loc.T("tools.group.video"),
+        "voice" => Loc.T("tools.group.voice"),
+        "prompts" => Loc.T("tools.group.prompts"),
+        "gallery" => Loc.T("tools.group.gallery"),
+        "models" => Loc.T("tools.group.models"),
+        _ => Loc.T("tools.group.app"),
+    };
 
     private static string BuiltinGroupTitle(string id) => id switch
     {

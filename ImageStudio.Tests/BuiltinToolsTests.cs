@@ -295,14 +295,16 @@ public sealed class BuiltinToolsTests : IDisposable
         using var app = TestApp.Create();
         var groups = app.Vm.Tools.ToolGroups;
 
-        Assert.Equal(["Data i czas", "Pamięć", "Pliki", "Skile", "Sterowanie aplikacją"], groups.Select(g => g.Title));
+        Assert.Equal(["Data i czas", "Pamięć", "Pliki", "Skile", "Obrazy", "Wideo", "Głos", "Prompty i zestawy", "Galeria", "Modele i domyślne", "Okno aplikacji"],
+                     groups.Select(g => g.Title));
         Assert.Equal(["get_datetime"], groups[0].Tools.Select(t => t.Title));
         Assert.Equal(["memory_save", "memory_list", "memory_delete"], groups[1].Tools.Select(t => t.Title));
         Assert.Equal("3/3", groups[1].Counter);
         Assert.True(groups[0].IsChecked);
         Assert.Equal(["skill_list", "skill_load", "skill_save", "skill_delete"], groups[3].Tools.Select(t => t.Title));
-        Assert.Equal(false, groups[4].IsChecked);  // sterowanie aplikacją jest domyślnie wyłączone
-        Assert.Equal("0/" + groups[4].Tools.Count, groups[4].Counter);
+        Assert.All(groups.Skip(4), g => Assert.Equal(false, g.IsChecked));  // sterowanie aplikacją jest domyślnie wyłączone
+        Assert.Equal("0/" + groups[6].Tools.Count, groups[6].Counter);
+        Assert.Equal(["list_audio_models", "list_voices", "speak", "transcribe"], groups[6].Tools.Select(t => t.Title));
     }
 
     [Fact]
@@ -374,7 +376,7 @@ public sealed class BuiltinToolsTests : IDisposable
         tools.AppControlEnabled = true;
         tools.BuiltinEnabled = false;
 
-        Assert.Equal(true, tools.ToolGroups[4].IsChecked);
+        Assert.All(tools.ToolGroups.Skip(4), g => Assert.Equal(true, g.IsChecked));
         Assert.Equal(false, tools.ToolGroups[0].IsChecked);
         Assert.DoesNotContain(tools.DisabledTools, n => n.StartsWith("imagestudio__"));
         Assert.Contains("builtin__get_datetime", tools.DisabledTools);
@@ -422,7 +424,7 @@ public sealed class BuiltinToolsTests : IDisposable
             }
             Walk(window);
 
-            Assert.Equal(5, groups.Count);  // wbudowane (4) i sterowanie aplikacją
+            Assert.Equal(11, groups.Count);  // wbudowane (4) i sterowanie aplikacją (7)
             window.Close();
         });
     }

@@ -213,3 +213,47 @@ public sealed class FileSkillStoreTests : IDisposable
         Assert.Empty(new FileSkillStore(_dir).List());
     }
 }
+
+// Grupy narzędzi imagestudio__* według przeznaczenia: każdą można wyłączyć osobno
+public sealed class ToolCategoryTests
+{
+    [Fact]
+    public void Every_app_tool_has_an_explicit_category_and_only_window_control_falls_into_the_window_group()
+    {
+        using var app = TestApp.Create();
+        var window = app.Vm.Tools.ToolGroups.Single(g => g.Title == "Okno aplikacji");
+
+        // nowe narzędzie bez wpisu w ToolCategories wylądowałoby tutaj: dopisz je do właściwej grupy
+        Assert.Equal(["generate", "get_state", "switch_tab"], window.Tools.Select(t => t.Title).Order());
+    }
+
+    [Fact]
+    public void Groups_partition_all_app_tools_without_gaps_or_duplicates()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        var grouped = tools.ToolGroups.Skip(4).SelectMany(g => g.Tools.Select(t => t.Name)).ToList();
+
+        Assert.Equal(grouped.Count, grouped.Distinct().Count());
+        Assert.All(grouped, n => Assert.StartsWith("imagestudio__", n));
+        Assert.Equal(11, tools.ToolGroups.Count);
+    }
+
+    [Fact]
+    public void Disabling_the_voice_group_turns_off_only_voice_tools()
+    {
+        using var app = TestApp.Create();
+        var tools = app.Vm.Tools;
+        tools.UseTools = true;
+        tools.AppControlEnabled = true;
+        Assert.Empty(tools.DisabledTools.Where(n => n.StartsWith("imagestudio__")));
+
+        tools.ToolGroups.Single(g => g.Title == "Głos").IsChecked = false;
+
+        Assert.Equal(["imagestudio__list_audio_models", "imagestudio__list_voices", "imagestudio__speak", "imagestudio__transcribe"],
+                     tools.DisabledTools.Where(n => n.StartsWith("imagestudio__")).Order());
+        Assert.Equal(true, tools.ToolGroups.Single(g => g.Title == "Obrazy").IsChecked);
+        Assert.Contains("imagestudio__get_defaults", tools.Tools.Select(t => t.Name));
+        Assert.DoesNotContain("imagestudio__speak", tools.Tools.Select(t => t.Name));
+    }
+}
