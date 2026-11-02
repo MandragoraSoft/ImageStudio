@@ -137,7 +137,7 @@ public sealed partial class MainViewModel : ObservableObject
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
-                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage)
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills)
     {
         _storage = storage;
         _provider = provider;
@@ -175,10 +175,10 @@ public sealed partial class MainViewModel : ObservableObject
         var server = new AppServerViewModel(new McpAppServer(appTools, RunOnUi, Limits), _dialogs, _state.McpServerEnabled,
                                             _state.McpServerPort ?? AppServerViewModel.DefaultPort, secrets: _secrets);
         var builtin = BuiltinToolRegistry.Create(memory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ImageStudio", "Workspace"),
-                                                 _dialogs.ConfirmToolCall);
+                                                 _dialogs.ConfirmToolCall, skills: skills);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
                                    _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
-                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools, Limits);
+                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools, Limits, skills);
         Tools.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) SaveState();

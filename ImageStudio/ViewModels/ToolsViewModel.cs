@@ -153,6 +153,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private readonly McpLimits _limits;
     private readonly BuiltinTools? _builtin;
     private readonly IMemoryStore? _memory;
+    private readonly ISkillStore? _skills;
 
     // Nazwy (widoczne dla modelu) narzędzi wyłączonych przez użytkownika; nowe narzędzia są domyślnie włączone
     private readonly HashSet<string> _disabled;
@@ -162,7 +163,8 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
                           string? configPath = null, IMcpToolSet? appTools = null, bool appControlEnabled = false,
                           AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
-                          IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null, McpLimits? limits = null)
+                          IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null, McpLimits? limits = null,
+                          ISkillStore? skills = null)
     {
         _limits = limits ?? new McpLimits();
         _limits.Changed += () =>
@@ -172,6 +174,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         Permissions.Changed += () => OnPropertyChanged(nameof(PermissionsSummary));
         _builtin = builtin;
         _memory = memory;
+        _skills = skills;
         _host = host;
         _configPath = configPath;
         _useTools = useTools;
@@ -209,6 +212,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     }
 
     public bool HasBuiltin => _builtin is not null;
+    public bool HasSkills => _skills is not null;
 
     // Zgody na wywołania narzędzi (na sesję i na stałe); czat pyta tylko o narzędzia bez zgody
     public ToolPermissions Permissions { get; } = new();
@@ -341,6 +345,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         "datetime" => Loc.T("tools.group.datetime"),
         "memory" => Loc.T("tools.group.memory"),
         "files" => Loc.T("tools.group.files"),
+        "skills" => Loc.T("tools.group.skills"),
         _ => id,
     };
 
@@ -434,6 +439,16 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // Podgląd tego, co model zapamiętał (memory.json) i folderu, w którym czyta i zapisuje pliki
     [RelayCommand]
     private void OpenMemory() => OpenPath(_memory?.FilePath, createFile: true);
+
+    // Folder ze skilami (skills\<nazwa>\SKILL.md): można je tu przeglądać i edytować ręcznie
+    [RelayCommand]
+    private void OpenSkills()
+    {
+        if (_skills?.FolderPath is not { } folder) return;
+
+        Directory.CreateDirectory(folder);
+        OpenPath(folder, createFile: false);
+    }
 
     [RelayCommand]
     private void OpenWorkspace()

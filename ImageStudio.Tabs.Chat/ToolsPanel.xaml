@@ -50,8 +50,10 @@
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}">
                 <Button Content="{loc:T tools.openMemory}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenMemoryCommand}"
                         ToolTip="{loc:T tools.openMemory.tip}"/>
-                <Button Content="{loc:T tools.openFiles}" Padding="10,4" Command="{Binding OpenWorkspaceCommand}"
+                <Button Content="{loc:T tools.openFiles}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenWorkspaceCommand}"
                         ToolTip="{loc:T tools.openFiles.tip}"/>
+                <Button Content="{loc:T tools.openSkills}" Padding="10,4" Command="{Binding OpenSkillsCommand}"
+                        ToolTip="{loc:T tools.openSkills.tip}" Visibility="{Binding HasSkills, Converter={StaticResource BoolToVis}}"/>
             </StackPanel>
 
             <TextBlock Text="{loc:T tools.servers}" Style="{StaticResource SectionHeader}"/>

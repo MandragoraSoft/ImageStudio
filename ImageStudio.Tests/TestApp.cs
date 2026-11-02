@@ -192,6 +192,7 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
         services.AddSingleton<MemoryMemoryStore>();
         services.AddSingleton<IMemoryStore>(sp => sp.GetRequiredService<MemoryMemoryStore>());
+        services.AddSingleton<ISkillStore, MemorySkillStore>();
         // Wyniki lądują w katalogu tymczasowym testu, nie w Obrazach/Wideo/Muzyce użytkownika
         services.AddSingleton(new LocalMediaStorage { Roots = { [MediaKind.Image] = Path.Combine(_dir, "img"), [MediaKind.Video] = Path.Combine(_dir, "vid"), [MediaKind.Audio] = Path.Combine(_dir, "aud") } });
         services.AddSingleton<ISecretStore, MemorySecretStore>();

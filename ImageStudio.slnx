@@ -26,6 +26,7 @@
     <Project Path="ImageStudio.Tools.DateTime/ImageStudio.Tools.DateTime.csproj" />
     <Project Path="ImageStudio.Tools.Files/ImageStudio.Tools.Files.csproj" />
     <Project Path="ImageStudio.Tools.Memory/ImageStudio.Tools.Memory.csproj" />
+    <Project Path="ImageStudio.Tools.Skills/ImageStudio.Tools.Skills.csproj" />
   </Folder>
   <Folder Name="/Tabs/">
     <Project Path="ImageStudio.Shared/ImageStudio.Shared.csproj" />
