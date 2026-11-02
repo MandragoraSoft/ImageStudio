@@ -81,6 +81,87 @@ public class ChatToolLoopTests
         Assert.False(reports[^1].Error);
     }
 
+    private static (ChatViewModel Vm, FakeProvider Provider, FakeToolHost Host) Plain(Func<IReadOnlyList<ChatMessage>, ChatReply>? reply = null)
+    {
+        var provider = new FakeProvider { OnReply = reply ?? (_ => new ChatReply("ok", [])) };
+        var host = new FakeToolHost();
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1" };
+        return (vm, provider, host);
+    }
+
+    [Fact]
+    public async Task Images_attached_in_chat_are_saved_and_their_paths_are_given_to_the_model_when_tools_are_on()
+    {
+        var (vm, provider, _) = Plain();
+        var bytes = TestImages.Png(4, 4);
+        vm.Attachments.Add(new ChatImage(bytes, "image/png"));
+        vm.Input = "zmień kolor włosów";
+
+        await vm.SendCommand.ExecuteAsync(null);
+        var system = provider.LastMessages.First(m => m.Role == "system").Content;
+
+        var path = system.Split((char)10).Last(l => l.StartsWith("1. ")).Substring(3);
+        Assert.StartsWith(Path.Combine(ImageStudio.Configuration.AppPaths.UserDataDir, "refs"), path);
+        Assert.EndsWith(".png", path);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.Contains("nie wymyślaj własnych", system);
+
+        // ten sam obraz w kolejnej wiadomości to ten sam plik, nowy obraz dostaje kolejny numer
+        vm.Attachments.Add(new ChatImage(bytes, "image/png"));
+        vm.Attachments.Add(new ChatImage(TestImages.Png(5, 5), "image/png"));
+        vm.Input = "jeszcze";
+        await vm.SendCommand.ExecuteAsync(null);
+        var lines = provider.LastMessages.First(m => m.Role == "system").Content.Split((char)10).Where(l => char.IsDigit(l[0])).ToList();
+        Assert.Equal(3, lines.Count);
+        Assert.Equal(lines[0][3..], lines[1][3..]);
+        Assert.NotEqual(lines[0][3..], lines[2][3..]);
+    }
+
+    [Fact]
+    public async Task Without_tools_or_images_there_is_no_attachment_note()
+    {
+        var (vm, provider, host) = Plain();
+        vm.Input = "tylko tekst";
+        await vm.SendCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(provider.LastMessages, m => m.Role == "system");
+
+        host.Tools = [];
+        vm.Attachments.Add(new ChatImage(TestImages.Png(4, 4), "image/png"));
+        vm.Input = "z obrazem, ale bez narzędzi";
+        await vm.SendCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(provider.LastMessages, m => m.Role == "system");
+    }
+
+    [Fact]
+    public async Task An_empty_reply_after_tool_results_leaves_no_empty_bubble_and_says_so()
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new FakeProvider { OnReply = history => history.Any(m => m.Role == "tool") ? new ChatReply("", []) : new ChatReply("", [Call()]) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        vm.Input = "zrób to";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.Equal(["user", "assistant", "tool"], vm.Messages.Select(m => m.Role));
+        Assert.True(reports[^1].Error);
+        Assert.Contains("nie zwrócił żadnej odpowiedzi", reports[^1].Text);
+    }
+
+    [Fact]
+    public async Task A_streamed_empty_reply_also_removes_the_placeholder_message()
+    {
+        var reports = new List<(string Text, bool Error)>();
+        var provider = new StreamingFakeProvider { OnReply = _ => new ChatReply("", []) };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost(),
+                                   useStreaming: () => true) { SelectedModel = "m1" };
+        vm.Input = "hej";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.Equal(["user"], vm.Messages.Select(m => m.Role));
+        Assert.True(reports[^1].Error);
+    }
+
     [Fact]
     public async Task A_plain_answer_is_not_reported_even_when_tools_are_on()
     {

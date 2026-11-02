@@ -408,7 +408,7 @@ public sealed class StudioToolsTests : IDisposable
         Assert.DoesNotContain("transcribe", visible);
         Assert.DoesNotContain("rebuild_prompt", visible);
         Assert.Contains("list_gallery", visible);
-        Assert.Equal(19, _tools.AllDefinitions.Count);
+        Assert.Equal(20, _tools.AllDefinitions.Count);
         foreach (var definition in _tools.AllDefinitions)
         {
             using var schema = JsonDocument.Parse(definition.ParametersJson);
@@ -555,6 +555,12 @@ internal sealed class RecordingStudio : IStudioApi
         throw new NotSupportedException();
 
     public Task<IReadOnlyList<string>> VoicesAsync(string model, CancellationToken ct = default) => throw new NotSupportedException();
+
+    public Task<StudioResult> RepeatAsync(RepeatRequest request, CancellationToken ct = default)
+    {
+        Requests.Add(request);
+        return Task.FromResult(new StudioResult(Entry("generate")));
+    }
 
     public Task<PromptParts> RebuildPromptAsync(PromptRebuildRequest request, CancellationToken ct = default)
     {

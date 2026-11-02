@@ -176,6 +176,7 @@ public sealed partial class ChatViewModel : ObservableObject
         _report(Loc.T("chat.msg.answering"), false);
         ChatMessage? live = null;
         string? announced = null;
+        var emptyReply = false;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         var provider = _provider();
@@ -212,6 +213,14 @@ public sealed partial class ChatViewModel : ObservableObject
 
                 if (reply.ToolCalls.Count == 0)
                 {
+                    // Pusta odpowiedź (model nie napisał nic po wynikach narzędzi): nie zostawiamy pustej bańki w rozmowie
+                    if (string.IsNullOrWhiteSpace(reply.Content) && string.IsNullOrWhiteSpace(reply.Reasoning))
+                    {
+                        if (live is not null) Messages.Remove(live);
+                        emptyReply = true;
+                        break;
+                    }
+
                     Complete(live, new ChatMessage("assistant", reply.Content), reply);
                     announced = tools is null ? null
                         : tools.FirstOrDefault(t => reply.Content.Contains(t.Name, StringComparison.Ordinal))?.Name
@@ -234,8 +243,13 @@ public sealed partial class ChatViewModel : ObservableObject
                 _report(Loc.T("chat.msg.answering"), false);
             }
 
+            if (emptyReply)
+            {
+                Log.LogWarning("Czat: {Model} zwrócił pustą odpowiedź (rund: {Rounds})", SelectedModel, Messages.Count(m => m.Role == "tool"));
+                _report(Loc.T("chat.msg.emptyReply"), true);
+            }
             // Model napisał, że wywoła narzędzie, ale nie wysłał wywołania (częste przy modelach bez obsługi narzędzi)
-            if (announced is not null)
+            else if (announced is not null)
             {
                 Log.LogWarning("Czat: {Model} zapowiada działanie ({Tool}), ale nie wywołał narzędzia", SelectedModel, announced.Length > 0 ? announced : "bez nazwy");
                 _report(announced.Length > 0 ? Loc.T("chat.msg.toolNotCalled", announced) : Loc.T("chat.msg.toolPromised", Tools?.Tools.Count ?? 0), true);
@@ -291,10 +305,46 @@ public sealed partial class ChatViewModel : ObservableObject
         MessageUpdated?.Invoke();
     }
 
+    // Narzędzia czytają pliki z dysku, więc obrazy załączone w rozmowie zapisujemy w folderze refs i podajemy modelowi ich ścieżki
+    // (bez tego model zgaduje ścieżki typu /mnt/data/image.png). Nazwa pliku to skrót zawartości: ten sam obraz = ten sam plik.
+    private string? AttachmentNote()
+    {
+        if (Tools is not { Tools.Count: > 0 }) return null;
+
+        var paths = new List<string>();
+        foreach (var image in Messages.Where(m => m.Role == "user").SelectMany(m => m.Images ?? []))
+        {
+            try
+            {
+                paths.Add(SaveForTools(image));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Log.LogWarning("Czat: nie zapisano obrazu dla narzędzi: {Message}", ex.Message);
+            }
+        }
+
+        return paths.Count == 0
+            ? null
+            : "Obrazy załączone przez użytkownika są zapisane na dysku Windows. Gdy narzędzie potrzebuje pliku obrazu (referencje, załączniki), "
+              + "użyj dokładnie tych ścieżek i nie wymyślaj własnych:\n" + string.Join("\n", paths.Select((p, i) => $"{i + 1}. {p}"));
+    }
+
+    private static string SaveForTools(ChatImage image)
+    {
+        var extension = image.Mime switch { "image/jpeg" => ".jpg", "image/webp" => ".webp", "image/gif" => ".gif", _ => ".png" };
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image.Bytes))[..16].ToLowerInvariant();
+        var directory = Path.Combine(AppPaths.UserDataDir, "refs");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"chat-{hash}{extension}");
+        if (!File.Exists(path)) File.WriteAllBytes(path, image.Bytes);
+        return path;
+    }
+
     private List<ChatMessage> BuildHistory()
     {
         var history = new List<ChatMessage>();
-        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), Tools?.SystemNote }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), Tools?.SystemNote, AttachmentNote() }.Where(s => !string.IsNullOrWhiteSpace(s)));
         if (system.Length > 0) history.Add(new ChatMessage("system", system));
         history.AddRange(Messages);
         return history;

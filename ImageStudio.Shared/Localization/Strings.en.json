@@ -38,6 +38,7 @@
   "chat.level": "Level:",
   "chat.level.tip": "low, medium or high; sent only to models that support a level",
   "chat.msg.answering": "The model is answering...",
+  "chat.msg.emptyReply": "The model returned no answer (after the tool results). Send the message again or choose another model.",
   "chat.msg.error": "Chat error: {0}",
   "chat.msg.noImages": "This model does not accept images: the message may be rejected. Choose a model with image support.",
   "chat.msg.noTools": "This model does not declare tool support: it may not call them. Choose another model or turn tools off.",

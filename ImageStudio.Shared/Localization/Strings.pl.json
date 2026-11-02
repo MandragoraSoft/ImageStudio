@@ -38,6 +38,7 @@
   "chat.level": "Poziom:",
   "chat.level.tip": "low, medium lub high; wysyłane tylko modelom, które obsługują poziom",
   "chat.msg.answering": "Model odpowiada...",
+  "chat.msg.emptyReply": "Model nie zwrócił żadnej odpowiedzi (po wynikach narzędzi). Wyślij wiadomość ponownie albo wybierz inny model.",
   "chat.msg.error": "Błąd czatu: {0}",
   "chat.msg.noImages": "Ten model nie przyjmuje obrazów: wiadomość może zostać odrzucona. Wybierz model z obsługą obrazu.",
   "chat.msg.noTools": "Ten model nie deklaruje obsługi narzędzi: może ich nie wywoływać. Wybierz inny model albo wyłącz narzędzia.",

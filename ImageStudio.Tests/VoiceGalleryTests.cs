@@ -285,7 +285,7 @@ public sealed class VoiceGalleryTests : IDisposable
             Assert.Contains(FindAll<Button>(results), b => b.Content as string == "Wyczyść galerię" && b.IsVisible);
 
             var card = FindAll<Border>(results).Single(b => b.ContextMenu is not null);
-            Assert.Equal(["Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj tekst"],
+            Assert.Equal(["Powtórz", null, "Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj tekst"],
                          card.ContextMenu!.Items.Cast<object>().Select(i => (i as MenuItem)?.Header as string));
             Assert.Same(app.Vm.Voice, card.Tag);
             window.Close();

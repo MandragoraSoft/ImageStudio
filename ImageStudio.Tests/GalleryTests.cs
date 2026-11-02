@@ -211,7 +211,7 @@ public sealed class GalleryTests : IDisposable
             Flush(window.Dispatcher);
 
             var tile = FindAll<StackPanel>(panel).Single(p => p.ContextMenu is not null);
-            Assert.Equal(["Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj prompt"],
+            Assert.Equal(["Powtórz", null, "Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj prompt"],
                          tile.ContextMenu!.Items.Cast<object>().Select(i => (i as MenuItem)?.Header as string));
             var tip = (StackPanel)tile.ToolTip;
             Assert.Contains("Prompt", tip.Children.OfType<TextBlock>().Select(t => System.Windows.Data.BindingOperations.GetBinding(t, TextBlock.TextProperty)?.Path.Path).ToList());

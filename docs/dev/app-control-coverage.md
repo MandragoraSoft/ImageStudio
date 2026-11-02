@@ -42,6 +42,20 @@ Dodając narzędzie do `StudioTools`: metoda w `IStudioApi`/`StudioApi` + żąda
 - Wywołanie bez parametru `model` używa modelu z pliku; gdy zniknął z katalogu, `StudioApi` bierze pierwszy z listy.
 - Okno zapisuje plik przy zmianie wyboru i zamknięciu, więc zmiana przez CLI przy otwartym oknie bywa nadpisana jego stanem w pamięci: używaj jednego naraz.
 
+## Limity MCP i ostrzeżenia
+
+`McpLimits` (Ustawienia, zakładka MCP; zapis w `state.json`, czyta je też CLI): `MaxTools` (domyślnie 30), `ListLimit` (30), `MaxListLimit` (100).
+- **Liczba narzędzi:** powyżej `MaxTools` ostrzegają panel Narzędzia w czacie (`ToolsViewModel.LimitWarning`), dziennik serwera MCP (`tools/list`) i `mcp tools` (stderr). Słabsze modele i klienci gubią się przy wielu narzędziach.
+- **Listy:** `list_models`, `list_audio_models` i `list_gallery` biorą domyślny limit z ustawień i przycinają `limit` do `MaxListLimit`. Źródło dostaje `limit + 1`; gdy nadmiar istnieje, wynik to obiekt `{items, truncated, warning}`, a bez ucięcia zwykła tablica (`McpToolArgs.Paged`).
+
+## Powtórzenie operacji
+
+`repeat_gallery_entry(id, model?)` (kosztuje, wymaga zgody) i `IStudioApi.RepeatAsync(RepeatRequest)` powtarzają wpis galerii: obraz, edycję, wideo, mowę, rozpoznawanie. Wpis niesie wejścia i parametry (`GalleryEntry.Inputs`: referencje i załączniki, `Params`: rozmiar, seed, czas wideo, głos itd.); starsze wpisy mają fallback z pola `Size`, a edycja bez zapisanych referencji nie da się powtórzyć (czytelny błąd). W oknie: menu kontekstowe miniatury („Powtórz”, `RepeatGalleryEntryCommand`) i wyniku w galerii głosu (`VoiceViewModel.RepeatCommand`).
+
+## Obrazy z czatu
+
+Narzędzia czytają pliki z dysku, więc obrazy załączone w czacie są zapisywane w `refs\` (nazwa = skrót zawartości), a ścieżki trafiają do instrukcji systemowej, gdy narzędzia są włączone (`ChatViewModel.AttachmentNote`). Bez tego model zgaduje ścieżki typu `/mnt/data/image.png`. Pusta odpowiedź modelu po wynikach narzędzi nie zostawia pustej bańki, tylko komunikat w stopce.
+
 ## Świadomie poza zasięgiem MCP
 
 Funkcje, które istnieją tylko po to, by coś pokazać w oknie. Zamiast nich model dostaje ścieżkę pliku:

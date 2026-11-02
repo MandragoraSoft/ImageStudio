@@ -27,6 +27,9 @@ internal static class WpfHost
         return dispatcher!;
     }
 
+    // Asynchroniczny test na wątku UI: kontynuacje wracają na ten sam wątek, więc ViewModel i widoki (ICollectionView) żyją na jednym
+    public static Task RunAsync(Func<Task> action) => Ui.Value.InvokeAsync(action).Task.Unwrap();
+
     public static void Run(Action action)
     {
         Exception? error = null;
