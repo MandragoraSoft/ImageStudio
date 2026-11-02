@@ -15,6 +15,7 @@ public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandl
     public const string FolderName = "ImageStudio";
     private const string Api = "https://www.googleapis.com/drive/v3/files";
 
+    private readonly SemaphoreSlim _folderLock = new(1, 1);
     private string? _folderId;
 
     public override string Id => "googledrive";
@@ -47,6 +48,21 @@ public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandl
     {
         if (_folderId is not null) return _folderId;
 
+        // Wysyłki idą w tle równolegle: bez blokady każda utworzyłaby własny folder
+        await _folderLock.WaitAsync(ct);
+        try
+        {
+            return _folderId ??= await FindOrCreateFolderAsync(token, ct);
+        }
+        finally
+        {
+            _folderLock.Release();
+        }
+    }
+
+    private async Task<string> FindOrCreateFolderAsync(string token, CancellationToken ct)
+    {
+
         var q = Uri.EscapeDataString($"name='{FolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false");
         var id = FirstId(await JsonAsync(Request(HttpMethod.Get, $"{Api}?q={q}&fields=files(id)", token), ct));
         if (id == "")
@@ -56,7 +72,7 @@ public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandl
             id = created.GetProperty("id").GetString()!;
         }
 
-        return _folderId = id;
+        return id;
     }
 
     // Id pliku o tej nazwie w folderze aplikacji; "" = brak

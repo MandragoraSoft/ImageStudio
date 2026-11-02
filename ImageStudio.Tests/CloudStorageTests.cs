@@ -314,4 +314,22 @@ public sealed class CloudStorageTests : IDisposable
 
         await Assert.ThrowsAsync<FileNotFoundException>(() => storage.ReadAsync(Path.Combine(_dir, "Image", "nie-ma.png")));
     }
+
+    [Fact]
+    public async Task GoogleDrive_parallel_uploads_share_one_folder()
+    {
+        var secrets = new MemorySecrets { Values = { ["storage-googledrive"] = Tokens("tok", "ref", 3600) } };
+        var http = new StubHandler(c =>
+        {
+            Thread.Sleep(30); // wyłączenie szczęśliwego trafu: równoległe wysyłki zdążą się nałożyć
+            return c.Url.Contains("?q=") ? (HttpStatusCode.OK, """{"files":[]}""")
+                : c.Body.Contains("google-apps.folder") ? (HttpStatusCode.OK, """{"id":"F1"}""") : (HttpStatusCode.OK, """{"id":"X"}""");
+        });
+        var storage = Mirror(new GoogleDriveStorage(secrets, http));
+
+        await Task.WhenAll(Enumerable.Range(0, 4).Select(i => storage.WriteAsync(MediaKind.Image, $"{i}.png", new byte[] { 1 })));
+        await storage.FlushAsync();
+
+        Assert.Single(http.Calls, c => c.Method == HttpMethod.Post && c.Body.Contains("google-apps.folder"));
+    }
 }
