@@ -60,7 +60,7 @@ public sealed partial class MainViewModel
 
         _storage.Apply(result.StorageId, result.StorageConfig);
         _state.StorageId = _storage.Active.Id;
-        _state.StorageConfig = result.StorageConfig?.ToDictionary(p => p.Key, p => p.Value) ?? _state.StorageConfig;
+        _state.StorageConfig = result.StorageConfig is { } config ? _storage.WithoutSecrets(config) : _state.StorageConfig;
         SyncVoiceFolder();
         SaveState();
 

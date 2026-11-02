@@ -1,7 +1,9 @@
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.Storage;
+using ImageStudio.Storage.GoogleDrive;
 using ImageStudio.Storage.Local;
+using ImageStudio.Storage.OneDrive;
 using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
 using ImageStudio.Tabs.Generate;
@@ -29,6 +31,11 @@ public static class ServiceCollectionExtensions
         // Wtyczki magazynu wyników; pierwsza jest domyślna, MediaStorageHost wybiera aktywną wg ustawień
         services.AddSingleton<LocalMediaStorage>();
         services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<LocalMediaStorage>());
+        services.AddSingleton<IStorageSecrets, StorageSecrets>();
+        services.AddSingleton<OneDriveStorage>();
+        services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<OneDriveStorage>());
+        services.AddSingleton<GoogleDriveStorage>();
+        services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<GoogleDriveStorage>());
         services.AddSingleton<MediaStorageHost>();
         services.TryAddSingleton(new McpOptions());
 

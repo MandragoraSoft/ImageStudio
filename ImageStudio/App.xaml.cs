@@ -44,6 +44,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DotEnv.LoadDefaults();
 
         var services = new ServiceCollection().AddImageStudioCore().AddImageStudioInfrastructure()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });

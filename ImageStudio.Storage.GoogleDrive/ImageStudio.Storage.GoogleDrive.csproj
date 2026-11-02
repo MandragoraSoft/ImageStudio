@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" />
+  </ItemGroup>
+
+</Project>

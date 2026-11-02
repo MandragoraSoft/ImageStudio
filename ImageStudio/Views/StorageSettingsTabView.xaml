@@ -1,6 +1,10 @@
 <UserControl x:Class="ImageStudio.Views.StorageSettingsTabView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
+             xmlns:views="clr-namespace:ImageStudio.Views">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisible"/>
+    </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,8,8,0">
             <TextBlock Text="{loc:T storage.plugin}" Style="{StaticResource SectionHeader}"/>
@@ -17,15 +21,46 @@
                     <DataTemplate>
                         <StackPanel>
                             <TextBlock Text="{Binding Label}" Style="{StaticResource SectionHeader}"/>
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="{loc:T storage.browse}" Margin="6,0,0,0" Padding="10,2"
-                                        Click="Browse_Click" Style="{StaticResource SecondaryButton}"/>
-                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
-                            </DockPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MinLines="1" MaxLines="4"
+                                         VerticalScrollBarVisibility="Auto" HorizontalAlignment="Stretch"
+                                         Visibility="{Binding IsPlainText, Converter={StaticResource BoolToVisible}}"/>
+                                <PasswordBox views:PasswordBoxBehavior.BoundPassword="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                             Visibility="{Binding IsMasked, Converter={StaticResource BoolToVisible}}"/>
+                                <Button Grid.Column="1" Content="{loc:T storage.browse}" Margin="6,0,0,0" Padding="10,2" VerticalAlignment="Top"
+                                        Click="Browse_Click" Style="{StaticResource SecondaryButton}"
+                                        Visibility="{Binding IsFolder, Converter={StaticResource BoolToVisible}}"/>
+                            </Grid>
+                            <TextBlock Text="{Binding NoteText}" Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                       Visibility="{Binding HasNote, Converter={StaticResource BoolToVisible}}"/>
                         </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <ItemsControl ItemsSource="{Binding Selected.Actions}" Margin="0,12,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding Label}" Command="{Binding Command}" Margin="0,0,8,0" Padding="12,4"
+                                Style="{StaticResource SecondaryButton}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="{loc:T storage.cancel}" Command="{Binding Selected.CancelCommand}" Margin="0,8,0,0" Padding="12,4"
+                    HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}"
+                    Visibility="{Binding Selected.IsBusy, Converter={StaticResource BoolToVisible}}"/>
+            <TextBlock Text="{Binding Selected.StatusText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock Text="{Binding Selected.ErrorText}" TextWrapping="Wrap" Foreground="OrangeRed" Margin="0,6,0,0"/>
+            <TextBlock Text="{Binding Selected.HelpText}" Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,8,0,0"/>
 
             <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,12,0,0"
                        Text="{loc:T storage.note}"/>

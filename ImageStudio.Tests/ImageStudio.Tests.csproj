@@ -22,6 +22,9 @@
     <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" />
     <ProjectReference Include="..\ImageStudio.Storage.Core\ImageStudio.Storage.Core.csproj" />
     <ProjectReference Include="..\ImageStudio.Storage.Local\ImageStudio.Storage.Local.csproj" />
+    <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" />
+    <ProjectReference Include="..\ImageStudio.Storage.OneDrive\ImageStudio.Storage.OneDrive.csproj" />
+    <ProjectReference Include="..\ImageStudio.Storage.GoogleDrive\ImageStudio.Storage.GoogleDrive.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.Core\ImageStudio.Tools.Core.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" />

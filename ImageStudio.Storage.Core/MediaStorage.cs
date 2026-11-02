@@ -21,8 +21,27 @@ public interface IMediaStorage
 }
 
 // Jedno pole konfiguracji wtyczki. LabelKey to klucz tłumaczenia (brak klucza = wyświetlony tekst klucza);
-// IsFolder dodaje do pola przycisk wyboru folderu
-public sealed record StorageSetting(string Key, string LabelKey, string Value, bool IsFolder = false);
+// IsFolder dodaje do pola przycisk wyboru folderu; IsSecret: wartość trafia do IStorageSecrets, nigdy do pliku
+// ustawień (wtyczka zapisuje ją w Configure); Masked: pole z ukrytymi znakami (hasło), gdy fałsz, pole jest jawne
+// (np. Client ID, który chcesz zobaczyć, ale nie trzymać w zwykłym pliku)
+// Note: krótka informacja pod polem (np. skąd pochodzi wartość)
+public sealed record StorageSetting(string Key, string LabelKey, string Value, bool IsFolder = false, bool IsSecret = false,
+                                    bool Masked = false, StorageStatus? Note = null);
+
+// Przycisk w zakładce wtyczki (np. "Zaloguj"); wywołanie to RunActionAsync(Key)
+public sealed record StorageAction(string Key, string LabelKey);
+
+// Stan do pokazania pod polami: klucz tłumaczenia z opcjonalnym parametrem {0}
+public sealed record StorageStatus(string Key, string? Detail = null);
+
+// Sekrety wtyczek (tokeny, hasła) w magazynie aplikacji szyfrowanym DPAPI; wtyczka nie zna pliku ani formatu
+public interface IStorageSecrets
+{
+    string? Load(string name);
+
+    // Pusta wartość usuwa sekret
+    void Save(string value, string name);
+}
 
 // Wtyczka magazynu w osobnej bibliotece ImageStudio.Storage.* (jak dostawcy w ImageStudio.Providers.*): oprócz operacji
 // opisuje swoje ustawienia, które okno Ustawień pokazuje w zakładce "Zapis"
@@ -37,6 +56,15 @@ public interface IMediaStoragePlugin : IMediaStorage
     // Wartości po kluczach z Settings; pusta wartość = domyślna wtyczki
     void Configure(IReadOnlyDictionary<string, string> values);
 
-    // Folder na dysku, w którym wtyczka trzyma pliki danego rodzaju (null = brak, np. chmura)
+    // Folder na dysku, w którym wtyczka trzyma pliki danego rodzaju (null = brak)
     string? LocalFolder(MediaKind kind) => null;
+
+    // Przyciski (np. logowanie), ich obsługa (poprzedzona Configure z bieżącymi wartościami pól), stan i opis pod polami
+    IReadOnlyList<StorageAction> Actions => [];
+    Task RunActionAsync(string key, CancellationToken ct = default) => Task.CompletedTask;
+
+    // Czy przycisk jest teraz dostępny (np. "Zaloguj" tylko dla niezalogowanego)
+    bool CanRun(string key) => true;
+    StorageStatus? Status => null;
+    string? HelpKey => null;
 }

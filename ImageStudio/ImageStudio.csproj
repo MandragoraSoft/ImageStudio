@@ -48,6 +48,9 @@
     <ProjectReference Include="..\ImageStudio.Providers.OpenCodeGo\ImageStudio.Providers.OpenCodeGo.csproj" Private="$(PluginsInBundle)" />
     <!-- Magazyny wyników (IMediaStorage): jak dostawcy, trafiają do podfolderu storage\ -->
     <ProjectReference Include="..\ImageStudio.Storage.Local\ImageStudio.Storage.Local.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Storage.OneDrive\ImageStudio.Storage.OneDrive.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Storage.GoogleDrive\ImageStudio.Storage.GoogleDrive.csproj" Private="$(PluginsInBundle)" />
     <!-- Grupy narzędzi czatu (IChatToolGroup): jak dostawcy, trafiają do podfolderu tools\ -->
     <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" Private="$(PluginsInBundle)" />
