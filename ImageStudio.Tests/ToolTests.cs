@@ -221,6 +221,45 @@ public class ChatToolLoopTests
     }
 
     [Fact]
+    public async Task Tool_result_with_an_image_file_shows_the_image_in_the_chat_but_does_not_send_it_to_the_model()
+    {
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        var file = Path.Combine(Path.GetTempPath(), $"chat-tool-{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(file, png);
+        try
+        {
+            var (vm, provider, host, _) = Create();
+            provider.OnReply = ThenAnswer(Call());
+            host.OnCall = _ => System.Text.Json.JsonSerializer.Serialize(new { Id = "x", Kind = "generate", Path = file });
+            vm.Input = "narysuj";
+
+            await vm.SendCommand.ExecuteAsync(null);
+
+            var tool = vm.Messages.Single(m => m.Role == "tool");
+            Assert.Equal(png, Assert.Single(tool.Images!).Bytes);
+            Assert.All(vm.Messages.Where(m => m.Role != "user"), m => Assert.True(m.Role == "tool" || m.Images is null));
+            Assert.Null(vm.Messages.Single(m => m.Role == "assistant" && !m.HasToolCalls).Images);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task Tool_result_that_is_not_an_image_stays_text_only()
+    {
+        var (vm, provider, host, _) = Create();
+        provider.OnReply = ThenAnswer(Call());
+        host.OnCall = _ => """{"Path":"C:\nie\ma\takiego.png"}""";
+        vm.Input = "x";
+
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.Messages.Single(m => m.Role == "tool").Images);
+    }
+
+    [Fact]
     public async Task Several_calls_in_one_reply_each_get_a_result()
     {
         var (vm, provider, host, _) = Create();

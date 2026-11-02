@@ -239,7 +239,10 @@ public sealed partial class ChatViewModel : ObservableObject
 
                 Complete(live, new ChatMessage("assistant", reply.Content, reply.ToolCalls), reply);
                 foreach (var call in reply.ToolCalls)
-                    Messages.Add(new ChatMessage("tool", await RunToolAsync(call, ct), ToolCallId: call.Id, ToolName: call.Name));
+                    {
+                    var output = await RunToolAsync(call, ct);
+                    Messages.Add(new ChatMessage("tool", output, ToolCallId: call.Id, ToolName: call.Name, Images: ToolResultImages(output)));
+                }
                 _report(Loc.T("chat.msg.answering"), false);
             }
 
@@ -575,6 +578,31 @@ public sealed partial class ChatViewModel : ObservableObject
         return text.Length <= 48 ? text : text[..45] + "...";
     }
 
+    // Wynik narzędzia z plikiem obrazu (pole Path w JSON, także w liście) pokazujemy w rozmowie jako obraz. Tylko do wyświetlenia:
+    // do API idą obrazy użytkownika, a w sesji zapisujemy sam JSON (obraz wraca ze ścieżki)
+    private static List<ChatImage>? ToolResultImages(string content)
+    {
+        var images = new List<ChatImage>();
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(content);
+            var root = json.RootElement;
+            var rows = root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("items", out var items) ? items : root;
+            foreach (var row in rows.ValueKind == System.Text.Json.JsonValueKind.Array ? rows.EnumerateArray().ToArray() : [rows])
+            {
+                if (row.ValueKind != System.Text.Json.JsonValueKind.Object || !row.TryGetProperty("Path", out var path) || path.GetString() is not { } file) continue;
+                var mime = Path.GetExtension(file).ToLowerInvariant() switch { ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".webp" => "image/webp", ".gif" => "image/gif", _ => null };
+                if (mime is not null && File.Exists(file)) images.Add(new ChatImage(File.ReadAllBytes(file), mime));
+            }
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
+        {
+            // nie JSON albo plik nie do odczytu: wynik zostaje samym tekstem
+        }
+
+        return images.Count > 0 ? images : null;
+    }
+
     private static ChatMessageData ToData(ChatMessage m) => new()
     {
         Role = m.Role,
@@ -584,11 +612,11 @@ public sealed partial class ChatViewModel : ObservableObject
         ToolCallId = m.ToolCallId,
         ToolName = m.ToolName,
         Usage = m.Usage,
-        Images = m.Images?.Select(i => new ChatImageData(i.Mime, Convert.ToBase64String(i.Bytes))).ToList(),
+        Images = m.Role == "tool" ? null : m.Images?.Select(i => new ChatImageData(i.Mime, Convert.ToBase64String(i.Bytes))).ToList(),
     };
 
     private static ChatMessage FromData(ChatMessageData d) => new(d.Role, d.Content, d.ToolCalls, d.ToolCallId, d.ToolName,
-        d.Images?.Select(i => new ChatImage(Convert.FromBase64String(i.Base64), i.Mime)).ToList(), d.Reasoning, d.Usage);
+        d.Role == "tool" ? ToolResultImages(d.Content) : d.Images?.Select(i => new ChatImage(Convert.FromBase64String(i.Base64), i.Mime)).ToList(), d.Reasoning, d.Usage);
 
     // Nowa zapisywana sesja (poprzednia jest już zapisana po ostatniej odpowiedzi)
     [RelayCommand(CanExecute = nameof(CanNewChat))]
