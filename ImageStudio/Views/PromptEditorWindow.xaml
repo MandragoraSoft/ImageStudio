@@ -67,39 +67,53 @@
             </Grid>
 
             <!-- Prawa kolumna: opis obrazów i przebudowa; przy braku obu ta kolumna ma szerokość 0 (code-behind) -->
+            <!-- Wysokość kolumny jest co najmniej wysokością okna przewijania: pole instrukcji (wiersz *) wypełnia wolne miejsce,
+                 a gdy reszta się nie mieści (rozwinięty panel parametrów), kolumna się przewija -->
             <ScrollViewer x:Name="SidebarHost" Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <Button x:Name="DescribeButton" Content="{loc:T prompt.describe}" Padding="10,2" HorizontalAlignment="Left" Margin="0,0,0,10"
+                <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Button x:Name="DescribeButton" Grid.Row="0" Content="{loc:T prompt.describe}" Padding="10,2" HorizontalAlignment="Left" Margin="0,0,0,10"
                             Click="Describe_Click" Visibility="Collapsed"
                             ToolTip="{loc:T prompt.describe.tip}"/>
 
-                    <StackPanel x:Name="RebuildSection">
-                        <DockPanel>
+                    <Grid x:Name="RebuildSection" Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0">
                             <TextBlock x:Name="InstructionCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
                             <TextBlock Text="{loc:T prompt.technical}" Style="{StaticResource SectionHeader}"/>
                         </DockPanel>
-                        <TextBox x:Name="InstructionBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90"
-                                 VerticalScrollBarVisibility="Auto" TextChanged="Box_TextChanged"
+                        <TextBox x:Name="InstructionBox" Grid.Row="1" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="160"
+                                 VerticalAlignment="Stretch" VerticalScrollBarVisibility="Auto" TextChanged="Box_TextChanged"
                                  ToolTip="{loc:T prompt.technical.tip}"/>
-                        <WrapPanel Margin="0,6,0,0">
-                            <Button x:Name="RebuildButton" Content="{loc:T prompt.rewrite}" Padding="12,4" Margin="0,0,8,6" Click="Rebuild_Click"
-                                    ToolTip="{loc:T prompt.rewrite.tip}"/>
-                            <Button x:Name="UndoButton" Content="{loc:T prompt.undo}" Padding="12,4" Margin="0,0,8,6" Click="UndoRebuild_Click" IsEnabled="False"
-                                    Style="{StaticResource SecondaryButton}"/>
-                            <Button Content="{loc:T prompt.defaultInstruction}" Padding="12,4" Margin="0,0,0,6" Click="DefaultInstruction_Click"
-                                    Style="{StaticResource SecondaryButton}"/>
-                        </WrapPanel>
-                        <WrapPanel Margin="0,2,0,0">
-                            <TextBlock x:Name="HistoryLabel" VerticalAlignment="Center" Margin="0,0,10,0" Style="{StaticResource MutedTextBlock}"
-                                       ToolTip="{loc:T prompt.context.tip}"/>
-                            <Button x:Name="ClearHistoryButton" Content="{loc:T prompt.clearContext}" Padding="10,2" Click="ClearHistory_Click"
-                                    Style="{StaticResource SecondaryButton}"/>
-                        </WrapPanel>
-                        <Expander x:Name="EnhancerHost" Header="{loc:T prompt.modelParams}" IsExpanded="False" Margin="0,8,0,0">
-                            <views:EnhancerPanel Margin="0,4,0,0"/>
-                        </Expander>
-                    </StackPanel>
-                </StackPanel>
+                        <StackPanel Grid.Row="2">
+                            <WrapPanel Margin="0,6,0,0">
+                                <Button x:Name="RebuildButton" Content="{loc:T prompt.rewrite}" Padding="12,4" Margin="0,0,8,6" Click="Rebuild_Click"
+                                        ToolTip="{loc:T prompt.rewrite.tip}"/>
+                                <Button x:Name="UndoButton" Content="{loc:T prompt.undo}" Padding="12,4" Margin="0,0,8,6" Click="UndoRebuild_Click" IsEnabled="False"
+                                        Style="{StaticResource SecondaryButton}"/>
+                                <Button Content="{loc:T prompt.defaultInstruction}" Padding="12,4" Margin="0,0,0,6" Click="DefaultInstruction_Click"
+                                        Style="{StaticResource SecondaryButton}"/>
+                            </WrapPanel>
+                            <WrapPanel Margin="0,2,0,0">
+                                <TextBlock x:Name="HistoryLabel" VerticalAlignment="Center" Margin="0,0,10,0" Style="{StaticResource MutedTextBlock}"
+                                           ToolTip="{loc:T prompt.context.tip}"/>
+                                <Button x:Name="ClearHistoryButton" Content="{loc:T prompt.clearContext}" Padding="10,2" Click="ClearHistory_Click"
+                                        Style="{StaticResource SecondaryButton}"/>
+                            </WrapPanel>
+                            <Expander x:Name="EnhancerHost" Header="{loc:T prompt.modelParams}" IsExpanded="False" Margin="0,8,0,0">
+                                <views:EnhancerPanel Margin="0,4,0,0"/>
+                            </Expander>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </ScrollViewer>
         </Grid>
 

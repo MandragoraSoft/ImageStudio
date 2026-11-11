@@ -61,6 +61,36 @@ public sealed class PromptEditorWindowTests
         });
     }
 
+    // Pole instrukcji wypełnia wolną wysokość prawej kolumny, a przy małym oknie nie schodzi poniżej minimum.
+    // Rozmiar ustawiamy po Show: WindowMemory przywraca zapamiętany rozmiar przy SourceInitialized
+    [Fact]
+    public void Instruction_box_grows_with_window()
+    {
+        WpfHost.Run(() =>
+        {
+            var big = new PromptEditorWindow("Edytor", new PromptEdit("system", "koncept", "instrukcja", null),
+                edit => Task.FromResult(edit), null, Presets(), _ => { }, () => Task.FromResult(""));
+            big.Show();
+            big.Width = 1100;
+            big.Height = 900;
+            big.UpdateLayout();
+            var bigHeight = Named<TextBox>(big, "InstructionBox").ActualHeight;
+            big.Close();
+
+            var small = new PromptEditorWindow("Edytor", new PromptEdit("system", "koncept", "instrukcja", null),
+                edit => Task.FromResult(edit), null, Presets(), _ => { }, () => Task.FromResult(""));
+            small.Show();
+            small.Width = 760;
+            small.Height = 480;
+            small.UpdateLayout();
+            var smallHeight = Named<TextBox>(small, "InstructionBox").ActualHeight;
+            small.Close();
+
+            Assert.True(bigHeight > 160, $"duże okno: {bigHeight}");
+            Assert.True(smallHeight >= 160, $"małe okno: {smallHeight}");
+        });
+    }
+
     [Fact]
     public void Old_status_blocks_are_gone()
     {

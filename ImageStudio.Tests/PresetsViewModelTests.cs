@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
@@ -486,6 +488,77 @@ public sealed class PresetsWindowTests
             Assert.Same(view, vm.PickerView);
             Assert.Same(filter, vm.PickerFilter);
             Assert.Equal("a/x", vm.SelectedModelOption?.Id);
+            window.Close();
+        });
+    }
+
+    // Wszystkie elementy logiczne danego typu (sekcje, przyciski); kontrolki szablonów (ModelPicker) są pomijane
+    private static IEnumerable<T> Logical<T>(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            if (child is T match) yield return match;
+            foreach (var nested in Logical<T>(child)) yield return nested;
+        }
+    }
+
+    private static PresetModelPicker Picker(ObservableCollection<ModelOption> models) =>
+        new(new ListCollectionView(models), new ModelFilter(true, () => new ProviderModelPrefs(), new RelayCommand(() => { })));
+
+    [Fact]
+    public void Presets_window_builds_with_assist_sections()
+    {
+        WpfHost.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var models = new ObservableCollection<ModelOption> { new("a/x", null, false, ["text"], null) };
+            var pickers = new Dictionary<string, PresetModelPicker> { ["generate"] = Picker(models), ["enhancer"] = Picker(models) };
+            var context = new PresetsContext(_ => models, "fake", pickers,
+                Suggest: _ => Task.FromResult(new PresetDraft("Nazwa", "Opis")),
+                EditPrompt: _ => null);
+            app.Presets.Create(new Preset { Name = "x", Kind = "generate", Prompt = "p", Model = "a/x" });
+            var vm = app.NewPresetsViewModel(context);
+            vm.SelectedPreset = vm.Presets.First();
+
+            var window = new PresetsWindow { DataContext = vm, ShowInTaskbar = false };
+            window.Show();
+            window.UpdateLayout();
+
+            var buttons = Logical<Button>(window).ToList();
+            Assert.Equal(Visibility.Visible, buttons.Single(b => ReferenceEquals(b.Command, vm.SuggestNameCommand)).Visibility);
+            Assert.Equal(Visibility.Visible, buttons.Single(b => ReferenceEquals(b.Command, vm.SuggestDescriptionCommand)).Visibility);
+            Assert.Equal(Visibility.Visible, buttons.Single(b => ReferenceEquals(b.Command, vm.EditInEditorCommand)).Visibility);
+
+            var autoSave = Logical<CheckBox>(window).Single(c => BindingOperations.GetBinding(c, CheckBox.IsCheckedProperty)?.Path.Path == "AutoSave");
+            Assert.NotNull(autoSave);
+
+            // Na starcie rozwinięta jest tylko sekcja Prompt; reszta zwinięta
+            Assert.True(((Expander)window.FindName("PromptExpander")!).IsExpanded);
+            foreach (var name in new[] { "SystemExpander", "NegativeExpander", "DetailsExpander", "AssistExpander" })
+                Assert.False(((Expander)window.FindName(name)!).IsExpanded);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Presets_window_hides_ai_buttons_without_context()
+    {
+        WpfHost.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var models = new ObservableCollection<ModelOption> { new("a/x", null, false, ["text"], null) };
+            app.Presets.Create(new Preset { Name = "x", Kind = "generate", Prompt = "p", Model = "a/x" });
+            var vm = app.NewPresetsViewModel(new PresetsContext(_ => models, "fake"));
+            vm.SelectedPreset = vm.Presets.First();
+
+            var window = new PresetsWindow { DataContext = vm, ShowInTaskbar = false };
+            window.Show();
+            window.UpdateLayout();
+
+            var buttons = Logical<Button>(window).ToList();
+            Assert.Equal(Visibility.Collapsed, buttons.Single(b => ReferenceEquals(b.Command, vm.SuggestNameCommand)).Visibility);
+            Assert.Equal(Visibility.Collapsed, buttons.Single(b => ReferenceEquals(b.Command, vm.SuggestDescriptionCommand)).Visibility);
+            Assert.Equal(Visibility.Collapsed, buttons.Single(b => ReferenceEquals(b.Command, vm.EditInEditorCommand)).Visibility);
             window.Close();
         });
     }

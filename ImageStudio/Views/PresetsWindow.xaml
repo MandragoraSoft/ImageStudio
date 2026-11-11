@@ -5,16 +5,43 @@
         xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
         xmlns:local="clr-namespace:ImageStudio.Views"
         Style="{StaticResource WindowBase}"
-        Title="{loc:T presets.title}" Width="1000" Height="660" MinWidth="760" MinHeight="460"
+        Title="{loc:T presets.title}" Width="1100" Height="720" MinWidth="760" MinHeight="460"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <local:KindFilterLabelConverter x:Key="KindLabel"/>
+
+        <!-- Kafelek proporcji jak w SizePanel (głównego okna): wybrany podświetlony akcentem -->
+        <Style x:Key="AspectTile" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="12,4" Cursor="Hand">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="12"/>
-            <ColumnDefinition Width="410"/>
+            <ColumnDefinition Width="460"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -49,79 +76,126 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Edycja zaznaczonego zestawu -->
+        <!-- Edycja zaznaczonego zestawu: pola podstawowe, potem zwijane sekcje (rozwinięta tylko Prompt) -->
         <ScrollViewer Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock Text="{loc:T common.name}" Style="{StaticResource SectionHeader}"/>
-                <!-- Enter w nazwie zapisuje zmiany (a nie wczytuje zestawu przyciskiem domyślnym), gdy jest co zapisać -->
-                <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Return" Command="{Binding SaveDetailsCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="{loc:T presets.ai}" Padding="10,2" Margin="6,0,0,0" VerticalAlignment="Top"
+                            Style="{StaticResource SecondaryButton}" Command="{Binding SuggestNameCommand}"
+                            ToolTip="{loc:T presets.ai.name.tip}" Visibility="{Binding CanSuggest, Converter={StaticResource BoolToVis}}"/>
+                    <!-- Enter w nazwie zapisuje zmiany (a nie wczytuje zestawu przyciskiem domyślnym), gdy jest co zapisać -->
+                    <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding SaveDetailsCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                </DockPanel>
+
                 <TextBlock Text="{loc:T common.description}" Style="{StaticResource SectionHeader}"/>
-                <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalScrollBarVisibility="Auto"/>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="{loc:T presets.ai}" Padding="10,2" Margin="6,0,0,0" VerticalAlignment="Top"
+                            Style="{StaticResource SecondaryButton}" Command="{Binding SuggestDescriptionCommand}"
+                            ToolTip="{loc:T presets.ai.description.tip}" Visibility="{Binding CanSuggest, Converter={StaticResource BoolToVis}}"/>
+                    <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalScrollBarVisibility="Auto"/>
+                </DockPanel>
 
                 <TextBlock Text="{loc:T common.type}" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"/>
                 <TextBlock Text="{Binding SelectedPreset.KindLabel, TargetNullValue='—'}"/>
-                <TextBlock Text="{loc:T presets.aiModel}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                <TextBlock Text="{Binding SelectedPreset.EnhancerModel, TargetNullValue='—'}" TextWrapping="Wrap"/>
 
                 <TextBlock Text="{loc:T common.model}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
                 <views:ModelPicker HasFilters="True" ItemsSource="{Binding PickerView}" FiltersContext="{Binding PickerFilter}"
                                    SelectedItem="{Binding SelectedModelOption}"/>
                 <TextBlock Text="{Binding ModelWarning}" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>
 
-                <TextBlock Text="{loc:T presets.size}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="{loc:T presets.width}" Style="{StaticResource MutedTextBlock}"/>
-                        <TextBox Text="{Binding EditWidth, UpdateSourceTrigger=PropertyChanged}"/>
+                <Expander x:Name="PromptExpander" Header="{loc:T common.prompt}" IsExpanded="True" Margin="0,8,0,0">
+                    <StackPanel Margin="0,4,0,0">
+                        <TextBox Text="{Binding EditPrompt, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                        <Button Content="{loc:T presets.editInEditor}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                Style="{StaticResource SecondaryButton}" Command="{Binding EditInEditorCommand}"
+                                Visibility="{Binding CanEditInEditor, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="{loc:T presets.height}" Style="{StaticResource MutedTextBlock}"/>
-                        <TextBox Text="{Binding EditHeight, UpdateSourceTrigger=PropertyChanged}"/>
+                </Expander>
+
+                <Expander x:Name="SystemExpander" Header="{loc:T presets.systemPrompt}" Margin="0,8,0,0">
+                    <TextBox Text="{Binding EditSystemPrompt, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="160" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                </Expander>
+
+                <Expander x:Name="NegativeExpander" Header="{loc:T gen.negative}" Margin="0,8,0,0">
+                    <TextBox Text="{Binding EditNegativePrompt, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="80" VerticalScrollBarVisibility="Auto"/>
+                </Expander>
+
+                <Expander x:Name="DetailsExpander" Margin="0,8,0,0">
+                    <Expander.Header>
+                        <StackPanel>
+                            <TextBlock Text="{loc:T presets.section.details}"/>
+                            <TextBlock Text="{Binding DetailsSummary}" Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Expander.Header>
+                    <StackPanel Margin="0,4,0,0">
+                        <ListBox ItemsSource="{Binding AspectPresets}" SelectedItem="{Binding SelectedAspect}"
+                                 Background="Transparent" BorderThickness="0" Margin="0,0,0,6"
+                                 ItemContainerStyle="{StaticResource AspectTile}">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                        </ListBox>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{loc:T presets.width}" Style="{StaticResource MutedTextBlock}"/>
+                                <TextBox Text="{Binding EditWidth, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="{loc:T presets.height}" Style="{StaticResource MutedTextBlock}"/>
+                                <TextBox Text="{Binding EditHeight, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="{loc:T gen.seed}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.seed.tip}"/>
+                        <TextBox Text="{Binding EditSeedText, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T gen.seed.tip}"/>
+                        <TextBlock Text="{loc:T gen.quality}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.quality.tip}"/>
+                        <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding EditQuality}" ToolTip="{loc:T gen.quality.tip}"/>
                     </StackPanel>
-                </Grid>
+                </Expander>
 
-                <TextBlock Text="{loc:T gen.seed}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.seed.tip}"/>
-                <TextBox Text="{Binding EditSeedText, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T gen.seed.tip}"/>
-                <TextBlock Text="{loc:T gen.quality}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.quality.tip}"/>
-                <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding EditQuality}" ToolTip="{loc:T gen.quality.tip}"/>
+                <Expander x:Name="AssistExpander" Header="{loc:T presets.section.assist}" Margin="0,8,0,0">
+                    <StackPanel Margin="0,4,0,0">
+                        <views:ModelPicker Header="{loc:T enh.model}" HasFilters="True" ItemsSource="{Binding EnhancerPickerView}"
+                                           FiltersContext="{Binding EnhancerPickerFilter}" SelectedItem="{Binding SelectedEnhancerOption}"/>
+                        <TextBlock Text="{Binding EnhancerWarning}" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>
 
-                <TextBlock Text="{loc:T common.prompt}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
-                <TextBox Text="{Binding EditPrompt, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True" TextWrapping="Wrap" Height="140" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
-                <TextBlock Text="{loc:T presets.systemPrompt}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
-                <TextBox Text="{Binding EditSystemPrompt, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
-                <TextBlock Text="{loc:T gen.negative}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
-                <TextBox Text="{Binding EditNegativePrompt, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{loc:T prompt.technical}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T prompt.technical.tip}"/>
+                        <TextBox Text="{Binding EditEnhancerInstruction, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" Height="80" VerticalScrollBarVisibility="Auto"/>
 
-                <TextBlock Text="{loc:T presets.aiParams}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
-                <ItemsControl ItemsSource="{Binding EditParameters}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="0,2">
-                                <TextBox DockPanel.Dock="Right" Width="90" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
-                                <CheckBox Content="{Binding Key, Mode=OneWay}" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <Button Content="{loc:T presets.saveChanges}" Margin="0,12,0,0" HorizontalAlignment="Left"
-                        Command="{Binding SaveDetailsCommand}"/>
+                        <TextBlock Text="{loc:T presets.aiParams}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                        <ItemsControl ItemsSource="{Binding EditParameters}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,2">
+                                        <TextBox DockPanel.Dock="Right" Width="90" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <CheckBox Content="{Binding Key, Mode=OneWay}" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Expander>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Akcje -->
+        <!-- Akcje: po lewej wczytanie i zarządzanie, po prawej autozapis, zapis i zamknięcie -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="{loc:T common.load}" Width="110" IsDefault="True" Command="{Binding LoadPresetCommand}"/>
             <Button Content="{loc:T common.remove}" Width="90" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Command="{Binding DeletePresetCommand}"/>
@@ -131,7 +205,12 @@
                     Command="{Binding ImportLegacyCommand}" ToolTip="{loc:T presets.import.tip}"/>
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0" Style="{StaticResource MutedTextBlock}"/>
         </StackPanel>
-        <Button Grid.Row="2" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right" Margin="0,12,0,0"
-                Style="{StaticResource SecondaryButton}"/>
+        <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <!-- Zamknięcie też pyta o niezapisane zmiany (Closing w code-behind); IsCancel bez własnego Click, inaczej pytanie padałoby dwa razy -->
+            <CheckBox Content="{loc:T presets.autoSave}" IsChecked="{Binding AutoSave}" ToolTip="{loc:T presets.autoSave.tip}"
+                      VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button Content="{loc:T presets.saveChanges}" Padding="12,0" Margin="0,0,8,0" Command="{Binding SaveDetailsCommand}"/>
+            <Button Content="{loc:T common.close}" Width="90" IsCancel="True" Style="{StaticResource SecondaryButton}"/>
+        </StackPanel>
     </Grid>
 </Window>
