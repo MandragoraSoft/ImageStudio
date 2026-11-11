@@ -90,6 +90,33 @@ public sealed class MarkdownTests
         });
     }
 
+    // W oknie przebudowa jest ograniczana (strumień): pierwsza zmiana od razu, kolejne czekają, a ostatnia zawsze zostaje narysowana
+    [Fact]
+    public void View_in_a_window_throttles_rebuilds_and_still_shows_the_last_text()
+    {
+        WpfHost.Run(() =>
+        {
+            var view = new MarkdownView();
+            var window = new Window { Content = view, ShowInTaskbar = false };
+            window.Show();
+            string Text() => new TextRange(view.Document.ContentStart, view.Document.ContentEnd).Text.Trim();
+
+            view.Markdown = "raz";
+            view.Markdown = "raz dwa";
+            view.Markdown = "raz dwa **trzy**";
+            Assert.Equal("raz", Text());
+
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+            timer.Start();
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+
+            Assert.Equal("raz dwa trzy", Text());
+            window.Close();
+        });
+    }
+
     [Fact]
     public void Only_assistant_messages_are_markdown()
     {

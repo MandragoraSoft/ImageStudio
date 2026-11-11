@@ -57,7 +57,7 @@
                        ToolTip="{loc:T prompt.concept.tip}"/>
         </DockPanel>
         <TextBox x:Name="PromptBox" Grid.Row="3" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14"
+                 VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14" MinHeight="140"
                  TextChanged="Box_TextChanged"/>
 
         <StackPanel x:Name="RebuildSection" Grid.Row="4" Margin="0,10,0,0">
@@ -83,7 +83,7 @@
                         Style="{StaticResource SecondaryButton}"/>
             </StackPanel>
             <TextBlock x:Name="ChangesStatus" TextWrapping="Wrap" Margin="0,4,0,0" Style="{StaticResource MutedTextBlock}"/>
-            <Expander x:Name="EnhancerHost" Header="{loc:T prompt.modelParams}" IsExpanded="True" Margin="0,8,0,0">
+            <Expander x:Name="EnhancerHost" Header="{loc:T prompt.modelParams}" IsExpanded="False" Margin="0,8,0,0">
                 <views:EnhancerPanel Margin="0,4,0,0"/>
             </Expander>
             <TextBlock x:Name="RebuildStatus" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>

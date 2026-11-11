@@ -87,12 +87,12 @@
         <!-- Akcje -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="{loc:T common.load}" Width="110" IsDefault="True" Command="{Binding LoadPresetCommand}"/>
-            <Button Content="{loc:T common.remove}" Width="90" Margin="8,0,0,0" Command="{Binding DeletePresetCommand}"/>
-            <Button Content="{loc:T presets.import}" Margin="8,0,0,0" Padding="10,2"
+            <Button Content="{loc:T common.remove}" Width="90" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Command="{Binding DeletePresetCommand}"/>
+            <Button Content="{loc:T presets.import}" Margin="8,0,0,0" Padding="10,2" Style="{StaticResource SecondaryButton}"
                     Command="{Binding ImportLegacyCommand}" ToolTip="{loc:T presets.import.tip}"/>
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0" Style="{StaticResource MutedTextBlock}"/>
         </StackPanel>
-        <Button Grid.Row="1" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right"
+        <Button Grid.Row="1" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right" Margin="0,12,0,0"
                 Style="{StaticResource SecondaryButton}"/>
     </Grid>
 </Window>

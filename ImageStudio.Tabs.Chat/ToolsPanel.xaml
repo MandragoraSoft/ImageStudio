@@ -16,7 +16,7 @@
                       ToolTip="{loc:T tools.confirm.tip}"/>
             <StackPanel Orientation="Horizontal" Margin="22,4,0,0">
                 <TextBlock Text="{Binding PermissionsSummary}" Style="{StaticResource MutedTextBlock}" VerticalAlignment="Center"/>
-                <Button Content="{loc:T tools.permissions.forget}" Padding="8,2" Margin="8,0,0,0"
+                <Button Content="{loc:T tools.permissions.forget}" Padding="8,2" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"
                         Command="{Binding ForgetPermissionsCommand}" ToolTip="{loc:T tools.permissions.forget.tip}"/>
             </StackPanel>
 
@@ -48,11 +48,11 @@
             </ItemsControl>
 
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding HasBuiltin, Converter={StaticResource BoolToVis}}">
-                <Button Content="{loc:T tools.openMemory}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenMemoryCommand}"
+                <Button Content="{loc:T tools.openMemory}" Padding="10,4" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}" Command="{Binding OpenMemoryCommand}"
                         ToolTip="{loc:T tools.openMemory.tip}"/>
-                <Button Content="{loc:T tools.openFiles}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenWorkspaceCommand}"
+                <Button Content="{loc:T tools.openFiles}" Padding="10,4" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}" Command="{Binding OpenWorkspaceCommand}"
                         ToolTip="{loc:T tools.openFiles.tip}"/>
-                <Button Content="{loc:T tools.openSkills}" Padding="10,4" Command="{Binding OpenSkillsCommand}"
+                <Button Content="{loc:T tools.openSkills}" Padding="10,4" Style="{StaticResource SecondaryButton}" Command="{Binding OpenSkillsCommand}"
                         ToolTip="{loc:T tools.openSkills.tip}" Visibility="{Binding HasSkills, Converter={StaticResource BoolToVis}}"/>
             </StackPanel>
 
@@ -74,8 +74,8 @@
             <TextBlock Text="{Binding Info}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Button Content="{loc:T tools.openJson}" Padding="10,4" Margin="0,0,6,0" Command="{Binding OpenConfigCommand}"/>
-                <Button Content="{loc:T tools.reload}" Padding="10,4" Command="{Binding ReloadCommand}"/>
+                <Button Content="{loc:T tools.openJson}" Padding="10,4" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}" Command="{Binding OpenConfigCommand}"/>
+                <Button Content="{loc:T tools.reload}" Padding="10,4" Style="{StaticResource SecondaryButton}" Command="{Binding ReloadCommand}"/>
             </StackPanel>
 
             <TextBlock Text="{loc:T tools.server}" Style="{StaticResource SectionHeader}"/>
@@ -87,7 +87,7 @@
                 <TextBox Text="{Binding Server.Port, UpdateSourceTrigger=LostFocus}" Width="70"/>
             </StackPanel>
             <TextBlock Text="{Binding Server.Status}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0"/>
-            <Button Content="{loc:T tools.copyConfig}" Padding="10,4" Margin="0,6,0,0" HorizontalAlignment="Left"
+            <Button Content="{loc:T tools.copyConfig}" Padding="10,4" Margin="0,6,0,0" HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}"
                     Command="{Binding Server.CopyConfigCommand}"
                     ToolTip="{loc:T tools.copyConfig.tip}"/>
             <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"

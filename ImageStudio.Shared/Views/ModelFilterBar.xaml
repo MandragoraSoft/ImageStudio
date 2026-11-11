@@ -5,8 +5,11 @@
         <StackPanel>
             <TextBlock Text="{loc:T filter.title}" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
 
-            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
-                     ToolTip="{loc:T filter.search.tip}" Margin="0,0,0,6"/>
+            <DockPanel Margin="0,0,0,6">
+                <TextBlock Text="{loc:T filter.search}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                         ToolTip="{loc:T filter.search.tip}"/>
+            </DockPanel>
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -30,7 +33,7 @@
                 </Grid.ColumnDefinitions>
                 <CheckBox Content="{loc:T filter.preferred}" IsChecked="{Binding PreferredOnly}" VerticalAlignment="Center"
                           ToolTip="{loc:T filter.preferred.tip}"/>
-                <Button Grid.Column="1" Content="{loc:T filter.browse}" Padding="10,2"
+                <Button Grid.Column="1" Content="{loc:T filter.browse}" Padding="10,2" Style="{StaticResource SecondaryButton}"
                         Command="{Binding OpenModelBrowserCommand}"/>
             </Grid>
         </StackPanel>

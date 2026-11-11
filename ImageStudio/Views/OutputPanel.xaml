@@ -10,15 +10,15 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="{loc:T common.clear}" Width="80" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T common.clear}" Width="80" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding ClearResultCommand}" ToolTip="{loc:T out.clear.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T voice.saveAs}" Width="110" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T voice.saveAs}" Width="110" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding SaveImageAsCommand}" ToolTip="{loc:T out.saveAs.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T out.copy}" Width="90" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T out.copy}" Width="90" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding CopyImageCommand}" ToolTip="{loc:T out.copy.tip}"/>
-            <Button DockPanel.Dock="Right" Content="100%" Width="60" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="100%" Width="60" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding ResetZoomCommand}" ToolTip="{loc:T out.actualSize.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T out.fit}" Width="80" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T out.fit}" Width="80" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding FitImageCommand}" ToolTip="{loc:T out.fit.tip}"/>
             <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" Margin="0,0,12,0" Width="170"/>
             <Slider Minimum="0.1" Maximum="4" Value="{Binding Zoom}" VerticalAlignment="Center"/>
@@ -76,14 +76,16 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Button HorizontalAlignment="Right" Content="{loc:T voice.clearGallery}" Padding="10,2"
+                <Button HorizontalAlignment="Right" Content="{loc:T voice.clearGallery}" Padding="10,2" Style="{StaticResource SecondaryButton}"
                         Command="{Binding ClearGalleryCommand}"/>
-                <ListBox Grid.Row="1" Margin="0,6,0,0" Height="140"
+                <ListBox Grid.Row="1" Margin="0,6,0,0" Height="166" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                          ItemsSource="{Binding Gallery}" SelectedItem="{Binding SelectedGalleryEntry}"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto" Background="Transparent" BorderThickness="0">
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" Background="Transparent" BorderThickness="0"
+                         VirtualizingPanel.ScrollUnit="Pixel">
+                    <!-- Panel pozycji wirtualizowany: galeria ma setki wpisów, w drzewie są tylko kafelki widoczne na ekranie -->
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"/>
+                            <VirtualizingStackPanel Orientation="Horizontal"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>

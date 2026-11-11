@@ -7,7 +7,12 @@ namespace ImageStudio.Tests;
 // Ujednolicony układ zakładek lewego panelu: wybór modelu jest pierwszy (w zakładce albo w jej akordeonie) i ma tę samą nazwę
 public sealed class TabLayoutTests
 {
-    private static StackPanel Stack(UserControl panel) => (StackPanel)((ScrollViewer)panel.Content).Content;
+    // Formularz zakładki; w Generowaniu, Edycji i Wideo leży w DockPanel razem z przypiętym na dole przyciskiem akcji
+    private static StackPanel Stack(UserControl panel) =>
+        (StackPanel)(panel.Content as ScrollViewer ?? ((DockPanel)panel.Content).Children.OfType<ScrollViewer>().Single()).Content;
+
+    // Główna akcja jest poza przewijanym formularzem, więc widać ją bez przewijania
+    private static Button Action(UserControl panel) => ((DockPanel)panel.Content).Children.OfType<Button>().Single();
 
     private static void AssertModelFirst(Panel container)
     {
@@ -41,7 +46,7 @@ public sealed class TabLayoutTests
     }
 
     [Fact]
-    public void Prompt_comes_right_after_the_model_and_the_action_button_is_last()
+    public void Prompt_comes_right_after_the_model_and_the_action_button_is_pinned_below_the_form()
     {
         WpfHost.Run(() =>
         {
@@ -52,8 +57,8 @@ public sealed class TabLayoutTests
                 Assert.Equal(Loc.T("common.editPrompt"), ((Button)children[1]).Content);
             }
 
-            Assert.Equal(Loc.T("gen.generate"), ((Button)Stack(new ImageStudio.Tabs.Generate.GenerationPanel()).Children.OfType<Button>().Last()).Content);
-            Assert.Equal(Loc.T("edit.run"), ((Button)Stack(new ImageStudio.Tabs.Edit.EditPanel()).Children.OfType<Button>().Last()).Content);
+            Assert.Equal(Loc.T("gen.generate"), Action(new ImageStudio.Tabs.Generate.GenerationPanel()).Content);
+            Assert.Equal(Loc.T("edit.run"), Action(new ImageStudio.Tabs.Edit.EditPanel()).Content);
         });
     }
 }

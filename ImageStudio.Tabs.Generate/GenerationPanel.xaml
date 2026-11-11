@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
+    <!-- Główna akcja jest przypięta pod przewijanym formularzem: zawsze widoczna, bez przewijania na dół -->
+    <DockPanel>
+        <Button Content="{loc:T gen.generate}" Height="34" DockPanel.Dock="Bottom" Margin="10,6,10,10" Command="{Binding GenerateCommand}" ToolTip="Ctrl+Enter"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <!-- Układ każdej zakładki: Model, Prompt, Wejście, Parametry, Rozmiar, Akcja -->
@@ -11,11 +14,24 @@
 
             <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditGeneratePromptCommand}"
                     ToolTip="{loc:T common.editPrompt.tip}"/>
+            <!-- Podgląd promptu: bez niego nie widać, co pójdzie do modelu (pełna edycja w oknie) -->
+            <TextBlock Text="{Binding GeneratePrompt}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="52"
+                       Margin="2,4,0,6" ToolTip="{Binding GeneratePrompt}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <UniformGrid Columns="2" Margin="0,4,0,8">
-                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
+                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0" Style="{StaticResource SecondaryButton}"
                         Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
-                <Button Content="{loc:T common.presets}"
+                <Button Content="{loc:T common.presets}" Style="{StaticResource SecondaryButton}"
                         Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
             </UniformGrid>
 
@@ -45,7 +61,7 @@
                 <views:SizePanel Margin="0,4,0,0"/>
             </Expander>
 
-            <Button Content="{loc:T gen.generate}" Height="34" Command="{Binding GenerateCommand}" ToolTip="Ctrl+Enter"/>
         </StackPanel>
     </ScrollViewer>
+    </DockPanel>
 </UserControl>

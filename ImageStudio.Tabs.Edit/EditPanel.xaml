@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
+    <!-- Główna akcja jest przypięta pod przewijanym formularzem: zawsze widoczna, bez przewijania na dół -->
+    <DockPanel>
+        <Button Content="{loc:T edit.run}" Height="34" DockPanel.Dock="Bottom" Margin="10,6,10,10" Command="{Binding EditCommand}" ToolTip="Ctrl+Enter"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" FiltersContext="{Binding EditFilter}" ReloadCommand="{Binding ReloadModelsCommand}"
@@ -10,11 +13,24 @@
 
             <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditEditPromptCommand}"
                     ToolTip="{loc:T common.editPrompt.tip}"/>
+            <!-- Podgląd promptu: bez niego nie widać, co pójdzie do modelu (pełna edycja w oknie) -->
+            <TextBlock Text="{Binding EditPrompt}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="52"
+                       Margin="2,4,0,6" ToolTip="{Binding EditPrompt}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <UniformGrid Columns="2" Margin="0,4,0,8">
-                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0"
+                <Button Content="{loc:T common.savePreset}" Margin="0,0,4,0" Style="{StaticResource SecondaryButton}"
                         Command="{Binding SavePresetCommand}" ToolTip="{loc:T common.savePreset.tip}"/>
-                <Button Content="{loc:T common.presets}"
+                <Button Content="{loc:T common.presets}" Style="{StaticResource SecondaryButton}"
                         Command="{Binding OpenPresetsCommand}" ToolTip="{loc:T common.presets.tip}"/>
             </UniformGrid>
 
@@ -22,14 +38,14 @@
                 <StackPanel Margin="0,4,0,0">
                     <TextBlock Text="{loc:T edit.refs.note}" Style="{StaticResource MutedTextBlock}" Margin="0,0,0,6"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <Button Content="{loc:T common.add}" Width="90" Margin="0,0,6,0" Command="{Binding AddReferencesCommand}"/>
-                        <Button Content="{loc:T common.clear}" Width="90" Margin="0,0,6,0" Command="{Binding ClearReferencesCommand}"/>
-                        <Button Content="{loc:T common.pasteClipboard}" Padding="10,6" Command="{Binding PasteReferenceCommand}"
+                        <Button Content="{loc:T common.add}" Width="90" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}" Command="{Binding AddReferencesCommand}"/>
+                        <Button Content="{loc:T common.clear}" Width="90" Margin="0,0,6,0" Style="{StaticResource SecondaryButton}" Command="{Binding ClearReferencesCommand}"/>
+                        <Button Content="{loc:T common.pasteClipboard}" Padding="10,6" Style="{StaticResource SecondaryButton}" Command="{Binding PasteReferenceCommand}"
                                 ToolTip="{loc:T edit.paste.tip}"/>
                     </StackPanel>
 
                     <DockPanel Margin="0,0,0,6">
-                        <Button DockPanel.Dock="Right" Content="{loc:T edit.addUrl}" Width="110" Margin="6,0,0,0"
+                        <Button DockPanel.Dock="Right" Content="{loc:T edit.addUrl}" Width="110" Margin="6,0,0,0" Style="{StaticResource SecondaryButton}"
                                 Command="{Binding AddReferenceFromUrlCommand}"/>
                         <TextBox Text="{Binding ReferenceUrl, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="{loc:T edit.url.tip}"/>
@@ -66,7 +82,7 @@
                 </StackPanel>
             </Expander>
 
-            <Button Content="{loc:T edit.run}" Height="34" Margin="0,6,0,0" Command="{Binding EditCommand}" ToolTip="Ctrl+Enter"/>
         </StackPanel>
     </ScrollViewer>
+    </DockPanel>
 </UserControl>

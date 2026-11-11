@@ -19,8 +19,11 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
-                     ToolTip="{loc:T browser.search.tip}"/>
+            <DockPanel>
+                <TextBlock Text="{loc:T filter.search}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                         ToolTip="{loc:T browser.search.tip}"/>
+            </DockPanel>
             <CheckBox Grid.Column="1" Content="{loc:T browser.preferred}" IsChecked="{Binding OnlyPreferred}"
                       VerticalAlignment="Center" Margin="12,0,0,0"/>
         </Grid>

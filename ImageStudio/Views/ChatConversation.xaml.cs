@@ -17,10 +17,23 @@ public partial class ChatConversation : UserControl
         DataContextChanged += (_, e) =>
         {
             if (e.NewValue is not ChatViewModel vm) return;
-            vm.Messages.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(Scroll.ScrollToEnd, DispatcherPriority.Background);
+            vm.Messages.CollectionChanged += (_, _) => Dispatcher.BeginInvoke(ScrollToEnd, DispatcherPriority.Background);
             // Odpowiedź strumieniowa rośnie w miejscu: też przewija na dół
-            vm.MessageUpdated += () => Dispatcher.BeginInvoke(Scroll.ScrollToEnd, DispatcherPriority.Background);
+            vm.MessageUpdated += () => Dispatcher.BeginInvoke(ScrollToEnd, DispatcherPriority.Background);
         };
+    }
+
+    // ScrollViewer siedzi w szablonie listy wiadomości (wirtualizacja), więc nie ma pola o tej nazwie
+    private void ScrollToEnd() => (MessageList.Template?.FindName("Scroll", MessageList) as ScrollViewer)?.ScrollToEnd();
+
+    // Treść urosła, gdy rozmowa stała na samym dole (Markdown przebudowuje się z opóźnieniem, wirtualizacja poprawia szacunki
+    // wysokości): zostajemy na dole. Kto przewinął w górę, nie jest ściągany; pola tekstowe w dymkach też zgłaszają to zdarzenie
+    private void Messages_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.OriginalSource is not ScrollViewer { Name: "Scroll" } scroll || e.ExtentHeightChange <= 0) return;
+
+        var bottomBefore = e.ExtentHeight - e.ExtentHeightChange - (e.ViewportHeight - e.ViewportHeightChange);
+        if (e.VerticalOffset - e.VerticalChange >= bottomBefore - 2) scroll.ScrollToEnd();
     }
 
     // Przeciąganie plików na panel; przeciąganie tekstu do pola wiadomości działa jak dotąd

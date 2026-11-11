@@ -27,7 +27,8 @@
             </TextBlock.Resources>
         </TextBlock>
         <ListBox x:Name="ResultList" Grid.Row="1" ItemsSource="{Binding Items}" HorizontalContentAlignment="Stretch" BorderThickness="0"
-                 Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                 Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 VirtualizingPanel.ScrollUnit="Pixel">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="Focusable" Value="False"/>
