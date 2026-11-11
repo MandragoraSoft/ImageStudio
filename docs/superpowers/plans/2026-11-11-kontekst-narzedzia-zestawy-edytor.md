@@ -281,3 +281,97 @@ Decyzje:
 - [ ] **Step 4: Testy kontrolki** przez `WpfHost.Run`: `Toggle_defaults_to_any` (środkowy segment zaznaczony), `Clicking_segment_updates_value` (zaznaczenie pierwszego segmentu ustawia `Value == TriState.Only`, trzeciego `TriState.Exclude`), `Setting_value_updates_segments` (ustawienie `Value = TriState.Exclude` zaznacza trzeci segment i odznacza pozostałe), `Texts_come_from_properties` (segmenty pokazują `OnlyText`, `AnyText`, `ExcludeText`).
 - [ ] **Step 5:** Zaimplementuj `TriStateToggle`, podmień `CheckBox` w `ModelFilterBar.xaml` i `ModelBrowserWindow.xaml`, dodaj klucze; `pwsh tools/Check-Translations.ps1 -Strict` bez błędów.
 - [ ] **Step 6:** Build i cały zestaw testów; aktualizacja `docs/dev/ui-shell.md`; commit „Zamień filtr NSFW na trójstanowy (tylko, wszystkie, ukryj) z kontrolką TriStateToggle, testy”.
+
+---
+
+## Runda 2 (2026-11-11): zestawy połączone z edytorem promptów
+
+Uzgodnione z użytkownikiem: (1) okno Zestawy otwiera ten sam edytor promptów dla promptu wybranego zestawu, a pola promptów w Zestawach zostają jako zwijany podgląd z szybką edycją; (2) pole „Zapisuj automatycznie” (zapamiętywane): zaznaczone = zapis bez pytania przy zmianie zestawu i zamknięciu; (3) predefiniowane rozmiary to te same proporcje co w głównym oknie. Dodatkowo: przyciski AI przy Nazwie i Opisie, zmiana tekstowego modelu wspomagania w zestawie, zwijane sekcje, większe pola promptów, większe pole instrukcji technicznej w edytorze.
+
+Task 6 to logika (ViewModele, kontekst, testy), Task 7 to XAML obu okien. Global Constraints z początku pliku obowiązują.
+
+### Task 6: Zestawy: logika (AI dla nazwy i opisu, model wspomagania, proporcje, autozapis, otwieranie edytora)
+
+**Files:**
+- Modify: `ImageStudio/Services/StudioContracts.cs` (`StudioDefaults`: listy współdzielone)
+- Create: `ImageStudio/Services/ImageAspect.cs` (wydzielona matematyka proporcji)
+- Modify: `ImageStudio/ViewModels/MainViewModel.cs` (`AspectRatios` ~25-28, `AspectPresets` ~288, `QualityOptions` ~287, `AspectLabel` ~331-344), `MainViewModel.Size.cs` (`SetAspect` ~54-74, `Snap` ~101)
+- Modify: `ImageStudio/ViewModels/MainViewModel.Settings.cs` (`OpenPresets`, `SuggestPresetDraftAsync` ~195-208, `SaveState`/stan)
+- Modify: `ImageStudio/ViewModels/MainViewModel.Generation.cs` (`RebuildPromptAsync` ~119-128, `DescribeImagesAsync` ~106-116)
+- Modify: `ImageStudio/ViewModels/PresetsViewModel.cs`, `ImageStudio/Configuration/UserState.cs`
+- Test: `ImageStudio.Tests/PresetsViewModelTests.cs` (nowa klasa `PresetAssistTests`), `ImageStudio.Tests/ImageAspectTests.cs` (nowy)
+
+**Interfaces:**
+- Produces (używa ich Task 7):
+  - `StudioDefaults.ImageAspects` (`IReadOnlyList<string>`: `"1:1"`, `"4:3"`, `"3:2"`, `"16:9"`, `"9:16"`) i `StudioDefaults.Qualities` (`"auto"`, `"low"`, `"medium"`, `"high"`), publiczne statyczne; `MainViewModel.AspectPresets`, `MainViewModel.QualityOptions` i `PresetsViewModel.QualityOptions` zwracają te listy (koniec z kopiami)
+  - `public static class ImageAspect` (`ImageStudio.Services`): `double? Ratio(string label)` (parsuje `"W:H"`; błędny tekst → null), `string? LabelFor(int width, int height)` (etykieta z `StudioDefaults.ImageAspects` o proporcji w tolerancji 0,02; inaczej null), `int Snap(double value)` (wielokrotność 8, minimum 8). To przeniesienie istniejącej logiki z `MainViewModel` (`AspectRatios`, `AspectLabel`, `Snap`); `MainViewModel` ma z niej korzystać, a jego zachowanie nie może się zmienić.
+  - `public sealed record PresetSuggestRequest(string Prompt, string? SystemPrompt, string? Model)`
+  - `public sealed record PresetPromptEditRequest(string Title, PromptEdit Initial, string? Model, IReadOnlyDictionary<string, ParamState> Parameters)`
+  - `PresetsContext` dostaje nowe opcjonalne pola na końcu: `Func<PresetSuggestRequest, Task<PresetDraft>>? Suggest = null`, `Func<PresetPromptEditRequest, PromptEdit?>? EditPrompt = null`, `bool AutoSave = false`, `Action<bool>? AutoSaveChanged = null`; słownik `Pickers` dostaje trzeci klucz `"enhancer"` (widok modeli tekstowych z filtrem `EnhancerFilter`, tworzony tak samo jak dwa istniejące: nowy `ListCollectionView`, nie `CollectionViewSource`)
+  - `PresetsViewModel`:
+    - `SuggestNameCommand`, `SuggestDescriptionCommand` (asynchroniczne), `bool IsSuggesting`, `bool CanSuggest` (kontekst podał `Suggest`)
+    - `EditEnhancerModel` (`string?`), `EditEnhancerInstruction` (`string`), `SelectedEnhancerOption` (`ModelOption?`), `EnhancerPickerView`, `EnhancerPickerFilter`, `string EnhancerWarning`
+    - `IReadOnlyList<string> AspectPresets`, `string? SelectedAspect`
+    - `string DetailsSummary` (np. `"1024 × 1024 · seed: losowy · auto"`, do nagłówka zwijanej sekcji; teksty przez `Loc.T`)
+    - `EditInEditorCommand`, `bool CanEditInEditor`
+    - `[ObservableProperty] bool _autoSave`
+  - `UserState.PresetsAutoSave` (`bool`)
+
+Decyzje:
+- **AI dla nazwy i opisu:** każdy przycisk robi jedno zapytanie `Suggest(new PresetSuggestRequest(EditPrompt, EditSystemPrompt lub null gdy pusty, EditEnhancerModel))` i wpisuje tylko swoje pole (`SuggestName` → `EditName`, `SuggestDescription` → `EditDescription`). CanExecute: `CanSuggest`, jest zaznaczenie, `!IsSuggesting`, `EditPrompt` niepusty. W trakcie `Status = Loc.T("presetSave.msg.thinking")`; błąd → `Status = Loc.T("presetSave.msg.failed", ex.Message)` (oba klucze istnieją); `IsSuggesting` zdejmowane w `finally`. Wynik tylko zmienia pole edycji (zestaw staje się „zmieniony”), niczego nie zapisuje.
+- **`MainViewModel`:** `SuggestPresetDraftAsync` rozbij na wersję z parametrami `(string prompt, string? system, string? model)`; dotychczasowe wywołanie z okna zapisu przekazuje bieżące wartości i działa jak dotąd. Model: `model` z żądania, jeśli jest na liście `EnhancerModels`, inaczej `SelectedEnhancerModel`; gdy żadnego nie ma, wyjątek z tekstem z `Loc.T`.
+- **Model wspomagania w zestawie:** `EditEnhancerModel` wchodzi do `IsDirty` i do zapisu (`Preset.EnhancerModel`); tak samo `EditEnhancerInstruction` (`Preset.EnhancerInstruction`). `EnhancerWarning` działa jak `ModelWarning`: niepusty, gdy zapisany model nie jest na niepustej liście; model spoza listy nie jest podmieniany.
+- **Proporcje:** `SelectedAspect` get = `ImageAspect.LabelFor(EditWidth, EditHeight)`; set (nie-null) = `EditHeight = ImageAspect.Snap(EditWidth / ratio)`. Zmiana `EditWidth`/`EditHeight` zgłasza `SelectedAspect` i `DetailsSummary`.
+- **Autozapis:** `AutoSave` startuje z `context.AutoSave`; zmiana woła `context.AutoSaveChanged`. `MainViewModel` zapisuje wartość w `UserState.PresetsAutoSave` (wzorem innych pól stanu). Gdy `AutoSave` jest włączony, `ResolveUnsaved` nie woła `Confirm`, tylko od razu zapisuje (`TrySaveDetails`). Błąd walidacji: przy zmianie zaznaczenia zmiany są odrzucane, a `Status` mówi dlaczego (jak dziś po odpowiedzi „tak”); przy zamykaniu `ConfirmClose()` zwraca false (okno zostaje).
+- **Edytor z okna Zestawy:** `EditInEditorCommand` woła `context.EditPrompt(new PresetPromptEditRequest(tytuł, new PromptEdit(...) z EditSystemPrompt, EditPrompt, EditEnhancerInstruction i pustą historią, EditEnhancerModel, bieżące EditParameters jako słownik))`; wynik nie-null wpisuje `EditSystemPrompt`, `EditPrompt`, `EditEnhancerInstruction` (sprawdź dokładną kolejność i nazwy pól rekordu `PromptEdit` w `IDialogService.cs`). Tytuł: `Loc.T("presets.editor.title", EditName)`. Wynik tylko zmienia pola edycji.
+- **`MainViewModel` jako dostawca `EditPrompt`:** woła `_dialogs.ShowPromptEditor(title, initial, rebuild, enhancerContext: null, presets: null, savePreset: null, describeImages)`: bez paska zestawów i bez panelu parametrów modelu (model i parametry przebudowy ustawia się w oknie Zestawy). `rebuild` i `describeImages` używają modelu z żądania (jeśli jest na liście `EnhancerModels`, inaczej `SelectedEnhancerModel`) i włączonych parametrów z żądania. W tym celu `RebuildPromptAsync` i `DescribeImagesAsync` dostają opcjonalne parametry (model, parametry, własna lista historii) z wartościami domyślnymi zachowującymi dzisiejsze działanie; historia tej sesji edytora nie trafia do `_generateHistory`/`_editHistory` i nie jest zapisywana w zestawie.
+
+- [ ] **Step 1: Testy `ImageAspect`:** `Ratio("16:9")` ≈ 1,7778; `Ratio("abc")` null; `LabelFor(1024, 1024) == "1:1"`; `LabelFor(1344, 768) == "16:9"`; `LabelFor(1000, 333)` null; `Snap`: najpierw przeczytaj istniejącą implementację `MainViewModel.Snap` i zapisz w teście jej faktyczne wyniki dla 100.3, 3 i 1024; listy `StudioDefaults.ImageAspects` i `Qualities` mają podane wartości.
+- [ ] **Step 2:** Wydziel `ImageAspect` i listy; `MainViewModel` korzysta z nich. Cały zestaw testów przechodzi bez zmian w istniejących testach (to dowód, że zachowanie głównego okna się nie zmieniło).
+- [ ] **Step 3: Testy AI** (`PresetAssistTests`; kontekst z atrapą `Suggest` zwracającą `new PresetDraft("Nowa nazwa", "Nowy opis")` i zapamiętującą żądanie):
+  - `Suggest_name_fills_only_name`, `Suggest_description_fills_only_description`
+  - `Suggest_sends_prompt_system_and_preset_model` (żądanie ma `EditPrompt`, `EditSystemPrompt`, `EditEnhancerModel`)
+  - `Suggest_failure_sets_status_and_clears_busy` (atrapa rzuca; `Status` niepusty, `IsSuggesting == false`, pola bez zmian)
+  - `Suggest_is_unavailable_without_context` (`CanSuggest == false`, polecenia nieaktywne), `Suggest_needs_prompt` (pusty `EditPrompt` → nieaktywne)
+  - `Suggested_name_marks_dirty_but_does_not_save`
+  - w `MainViewModel` (na `TestApp` z `FakeProvider`): `Preset_suggestion_uses_requested_model_when_available` i `Preset_suggestion_falls_back_to_selected_enhancer_model`
+- [ ] **Step 4:** Zaimplementuj.
+- [ ] **Step 5: Testy modelu wspomagania i proporcji:** `Changing_enhancer_model_is_saved`, `Missing_enhancer_model_warns_and_is_kept`, `Enhancer_instruction_is_saved`, `Selected_aspect_reflects_size` (1024×1024 → `"1:1"`), `Choosing_aspect_sets_height` (szerokość 1024, `SelectedAspect = "16:9"` → `EditHeight == 576`), `Custom_size_has_no_aspect`, `Details_summary_changes_with_size`.
+- [ ] **Step 6:** Zaimplementuj.
+- [ ] **Step 7: Testy autozapisu i edytora:**
+  - `Auto_save_switching_saves_without_asking` (`FakeDialogs.ConfirmCount == 0`, poprzedni zestaw zapisany), `Auto_save_close_saves_without_asking`, `Auto_save_invalid_close_stays_open`, `Auto_save_off_still_asks`, `Auto_save_change_is_reported_to_context`, `Auto_save_is_persisted_in_state` (przez `TestApp`: `MemoryUserStateStore` ma `PresetsAutoSave == true`)
+  - `Edit_in_editor_writes_result_to_fields` (atrapa `EditPrompt` zwraca zmienione wartości → trzy pola edycji zmienione, zestaw w magazynie bez zmian), `Edit_in_editor_cancel_changes_nothing`, `Edit_in_editor_passes_preset_model_and_parameters`
+  - w `MainViewModel`: `Editor_from_presets_does_not_touch_main_prompts` (po wywołaniu dostarczonego `EditPrompt` z `FakeDialogs` zwracającym wynik: `GeneratePrompt` głównego okna bez zmian)
+- [ ] **Step 8:** Zaimplementuj, w tym `UserState.PresetsAutoSave` i spięcie w `OpenPresets`.
+- [ ] **Step 9:** Build, cały zestaw testów, `pwsh tools/Check-Translations.ps1 -Strict`; commit „Dodaj w zestawach wspomaganie AI nazwy i opisu, model wspomagania, proporcje, autozapis i otwieranie edytora promptów; testy”.
+
+### Task 7: Zestawy i edytor: układ okien
+
+**Files:**
+- Modify: `ImageStudio/Views/PresetsWindow.xaml`
+- Modify: `ImageStudio/Views/PromptEditorWindow.xaml` (prawa kolumna, `InstructionBox`)
+- Modify: `Strings.pl.json`, `Strings.en.json`, `docs/dev/prompts-and-presets.md`
+- Test: `ImageStudio.Tests/PresetsViewModelTests.cs` (`PresetsWindowTests`), `ImageStudio.Tests/PromptEditorWindowTests.cs`
+
+**Interfaces:**
+- Consumes: wszystko z bloku „Produces” Task 6.
+
+Decyzje:
+- **Okno Zestawy, prawa kolumna, od góry:**
+  1. Nazwa: pole z przyciskiem AI po prawej (`SuggestNameCommand`, tekst `presets.ai`, podpowiedź `presets.ai.name.tip`); przycisk widoczny tylko gdy `CanSuggest`.
+  2. Opis: pole (Height 60) z takim samym przyciskiem (`SuggestDescriptionCommand`, podpowiedź `presets.ai.description.tip`).
+  3. Rodzaj (tekst) i Model (`ModelPicker` z `ModelWarning`), jak dziś.
+  4. `Expander` „Prompt” (rozwinięty): pole Height 220, pod nim przycisk „Edytuj w edytorze…” (`EditInEditorCommand`, `presets.editInEditor`, widoczny gdy `CanEditInEditor`).
+  5. `Expander` „Prompt systemowy” (zwinięty): pole Height 160.
+  6. `Expander` „Prompt negatywny” (zwinięty): pole Height 80.
+  7. `Expander` z nagłówkiem „Rozmiar, seed, jakość” i tekstem `DetailsSummary` w stylu `MutedTextBlock` (zwinięty): kafelki proporcji (`ListBox` z `AspectPresets`/`SelectedAspect`, wygląd wzorowany na `ImageStudio.Shared/Views/SizePanel.xaml`), pola szerokości i wysokości, seed, jakość.
+  8. `Expander` „Wspomaganie AI” (zwinięty): `ModelPicker` (`HasFilters="True"`, `ItemsSource={Binding EnhancerPickerView}`, `FiltersContext={Binding EnhancerPickerFilter}`, `SelectedItem={Binding SelectedEnhancerOption}`) z `EnhancerWarning`, pole instrukcji (`EditEnhancerInstruction`, Height 80), lista parametrów jak dziś.
+- Dolny pasek okna: do istniejących przycisków dochodzi `CheckBox` „Zapisuj automatycznie” (`AutoSave`, `presets.autoSave`, podpowiedź `presets.autoSave.tip`) oraz przeniesiony tu przycisk „Zapisz zmiany” (aktywny tylko przy zmianach).
+- Stan zwinięcia sekcji nie jest zapamiętywany między otwarciami okna.
+- Okno: `Width="1100" Height="720"`, prawa kolumna 460.
+- **Edytor promptów:** `InstructionBox` ma rosnąć w dół. W prawej kolumnie zawartość `ScrollViewer` (`SidebarHost`) zamień ze `StackPanel` na `Grid` z `MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}"`, w którym wiersz z `InstructionBox` ma `Height="*"`, a samo pole `MinHeight="160"` zamiast stałego `Height="90"`. Efekt: pole wypełnia wolną wysokość kolumny, a gdy treść się nie mieści (rozwinięty panel parametrów, małe okno), kolumna się przewija. Wszystkie `x:Name` i zachowanie code-behind zostają.
+
+- [ ] **Step 1: Testy okien** (`WpfHost.Run`): `Presets_window_builds_with_assist_sections` (okno z pełnym kontekstem tworzy się; istnieją elementy związane z `SuggestNameCommand`, `EditInEditorCommand`, `AutoSave`; wśród `Expander` dokładnie jeden jest rozwinięty na starcie), `Presets_window_hides_ai_buttons_without_context`, `Instruction_box_grows_with_window` (edytor w oknie 1100×900 po `UpdateLayout`: `InstructionBox.ActualHeight > 160`; w oknie 760×480: `>= 160`).
+- [ ] **Step 2:** Uruchom, potwierdź niepowodzenie; przebuduj XAML obu okien; testy przechodzą.
+- [ ] **Step 3:** Klucze tłumaczeń (`presets.ai`, `presets.ai.name.tip`, `presets.ai.description.tip`, `presets.editInEditor`, `presets.section.prompt`, `presets.section.details`, `presets.section.assist`, `presets.autoSave`, `presets.autoSave.tip`, `presets.instruction` i inne potrzebne; używaj istniejących kluczy tam, gdzie pasują); `pwsh tools/Check-Translations.ps1 -Strict` 0/0.
+- [ ] **Step 4:** Build i cały zestaw testów; aktualizacja `docs/dev/prompts-and-presets.md`; commit „Przebuduj okno zestawów na zwijane sekcje z przyciskami AI i autozapisem, powiększ instrukcję techniczną w edytorze promptów; testy”.
