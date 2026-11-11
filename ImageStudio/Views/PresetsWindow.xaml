@@ -1,23 +1,43 @@
 <Window x:Class="ImageStudio.Views.PresetsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
+        xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
+        xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
+        xmlns:local="clr-namespace:ImageStudio.Views"
         Style="{StaticResource WindowBase}"
-        Title="{loc:T presets.title}" Width="980" Height="620" MinWidth="760" MinHeight="460"
+        Title="{loc:T presets.title}" Width="1000" Height="660" MinWidth="760" MinHeight="460"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <local:KindFilterLabelConverter x:Key="KindLabel"/>
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="12"/>
-            <ColumnDefinition Width="400"/>
+            <ColumnDefinition Width="410"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Szukanie i filtr rodzaju nad siatką -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <ComboBox DockPanel.Dock="Right" Width="150" Margin="8,0,0,0"
+                      ItemsSource="{Binding KindFilters}" SelectedItem="{Binding KindFilter}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Converter={StaticResource KindLabel}}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{loc:T filter.search}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource MutedTextBlock}"/>
+            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+        </DockPanel>
+
         <!-- Siatka zestawów -->
-        <DataGrid ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
                   AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
                   CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
                   MouseDoubleClick="Grid_MouseDoubleClick">
@@ -29,11 +49,11 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Podgląd zaznaczonego zestawu -->
-        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+        <!-- Edycja zaznaczonego zestawu -->
+        <ScrollViewer Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock Text="{loc:T common.name}" Style="{StaticResource SectionHeader}"/>
-                <!-- Enter w nazwie zapisuje nazwę (a nie wczytuje zestawu przyciskiem domyślnym), gdy jest co zapisać -->
+                <!-- Enter w nazwie zapisuje zmiany (a nie wczytuje zestawu przyciskiem domyślnym), gdy jest co zapisać -->
                 <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}">
                     <TextBox.InputBindings>
                         <KeyBinding Key="Return" Command="{Binding SaveDetailsCommand}"/>
@@ -42,57 +62,76 @@
                 <TextBlock Text="{loc:T common.description}" Style="{StaticResource SectionHeader}"/>
                 <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalScrollBarVisibility="Auto"/>
-                <Button Content="{loc:T presets.saveMeta}" Margin="0,6,0,0" HorizontalAlignment="Left"
-                        Command="{Binding SaveDetailsCommand}"/>
 
-                <TextBlock Text="{loc:T presets.preview}" Style="{StaticResource SectionHeader}" Margin="0,16,0,4"/>
-                <Border Style="{StaticResource Panel}">
+                <TextBlock Text="{loc:T common.type}" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,0"/>
+                <TextBlock Text="{Binding SelectedPreset.KindLabel, TargetNullValue='—'}"/>
+                <TextBlock Text="{loc:T presets.aiModel}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
+                <TextBlock Text="{Binding SelectedPreset.EnhancerModel, TargetNullValue='—'}" TextWrapping="Wrap"/>
+
+                <TextBlock Text="{loc:T common.model}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <views:ModelPicker HasFilters="True" ItemsSource="{Binding PickerView}" FiltersContext="{Binding PickerFilter}"
+                                   SelectedItem="{Binding SelectedModelOption}"/>
+                <TextBlock Text="{Binding ModelWarning}" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource WarningBrush}"/>
+
+                <TextBlock Text="{loc:T presets.size}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Text="{loc:T common.type}" Style="{StaticResource MutedTextBlock}"/>
-                        <TextBlock Text="{Binding SelectedPreset.KindLabel, TargetNullValue='—'}"/>
-                        <TextBlock Text="{loc:T common.model}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                        <TextBlock Text="{Binding SelectedPreset.Model, TargetNullValue='—'}" TextWrapping="Wrap"/>
-                        <TextBlock Text="{loc:T presets.size}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                        <TextBlock Text="{Binding SelectedPreset.SizeLabel, TargetNullValue='—'}"/>
-                        <TextBlock Text="{loc:T presets.seedQuality}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                        <TextBlock Text="{Binding SelectedPreset.SeedText, Converter={x:Static loc:NullToLoc.Instance}, ConverterParameter=presets.random}"/>
-                        <TextBlock Text="{Binding SelectedPreset.Quality, Converter={x:Static loc:NullToLoc.Instance}, ConverterParameter=presets.auto}"/>
-                        <TextBlock Text="{loc:T presets.aiModel}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                        <TextBlock Text="{Binding SelectedPreset.EnhancerModel, TargetNullValue='—'}" TextWrapping="Wrap"/>
-                        <TextBlock Text="{loc:T presets.aiParams}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,0"/>
-                        <ItemsControl ItemsSource="{Binding SelectedPreset.Parameters}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock>
-                                        <Run Text="{Binding Key, Mode=OneWay}"/>
-                                        <Run Text=": "/>
-                                        <Run Text="{Binding Value.Value, Mode=OneWay, StringFormat='{}{0:0.##}'}"/>
-                                        <Run Text="{Binding Value.Enabled, Mode=OneWay, StringFormat=' ({0})'}" Foreground="{DynamicResource TextMutedBrush}"/>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <TextBlock Text="{loc:T presets.width}" Style="{StaticResource MutedTextBlock}"/>
+                        <TextBox Text="{Binding EditWidth, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
-                </Border>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{loc:T presets.height}" Style="{StaticResource MutedTextBlock}"/>
+                        <TextBox Text="{Binding EditHeight, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Grid>
 
-                <TextBlock Text="{loc:T common.prompt}" Style="{StaticResource MutedTextBlock}" Margin="0,8,0,2"/>
-                <TextBox Text="{Binding SelectedPreset.Prompt, Mode=OneWay}" IsReadOnly="True"
-                         AcceptsReturn="True" TextWrapping="Wrap" Height="260" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
-                <TextBlock Text="{loc:T gen.negative}" Style="{StaticResource MutedTextBlock}" Margin="0,6,0,2"/>
-                <TextBox Text="{Binding SelectedPreset.NegativePrompt, Mode=OneWay, TargetNullValue=''}" IsReadOnly="True"
-                         TextWrapping="Wrap"/>
+                <TextBlock Text="{loc:T gen.seed}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.seed.tip}"/>
+                <TextBox Text="{Binding EditSeedText, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T gen.seed.tip}"/>
+                <TextBlock Text="{loc:T gen.quality}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0" ToolTip="{loc:T gen.quality.tip}"/>
+                <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding EditQuality}" ToolTip="{loc:T gen.quality.tip}"/>
+
+                <TextBlock Text="{loc:T common.prompt}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <TextBox Text="{Binding EditPrompt, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="140" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                <TextBlock Text="{loc:T presets.systemPrompt}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <TextBox Text="{Binding EditSystemPrompt, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                <TextBlock Text="{loc:T gen.negative}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <TextBox Text="{Binding EditNegativePrompt, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap"/>
+
+                <TextBlock Text="{loc:T presets.aiParams}" Style="{StaticResource SectionHeader}" Margin="0,8,0,0"/>
+                <ItemsControl ItemsSource="{Binding EditParameters}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,2">
+                                <TextBox DockPanel.Dock="Right" Width="90" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"/>
+                                <CheckBox Content="{Binding Key, Mode=OneWay}" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button Content="{loc:T presets.saveChanges}" Margin="0,12,0,0" HorizontalAlignment="Left"
+                        Command="{Binding SaveDetailsCommand}"/>
             </StackPanel>
         </ScrollViewer>
 
         <!-- Akcje -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,0">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="{loc:T common.load}" Width="110" IsDefault="True" Command="{Binding LoadPresetCommand}"/>
             <Button Content="{loc:T common.remove}" Width="90" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Command="{Binding DeletePresetCommand}"/>
+            <Button Content="{loc:T presets.duplicate}" Margin="8,0,0,0" Padding="10,2" Style="{StaticResource SecondaryButton}"
+                    Command="{Binding DuplicatePresetCommand}"/>
             <Button Content="{loc:T presets.import}" Margin="8,0,0,0" Padding="10,2" Style="{StaticResource SecondaryButton}"
                     Command="{Binding ImportLegacyCommand}" ToolTip="{loc:T presets.import.tip}"/>
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0" Style="{StaticResource MutedTextBlock}"/>
         </StackPanel>
-        <Button Grid.Row="1" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right" Margin="0,12,0,0"
+        <Button Grid.Row="2" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right" Margin="0,12,0,0"
                 Style="{StaticResource SecondaryButton}"/>
     </Grid>
 </Window>

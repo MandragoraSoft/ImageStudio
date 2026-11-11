@@ -232,8 +232,8 @@ internal sealed class TestApp : IDisposable
     public MemorySettingsStore Settings => (MemorySettingsStore)Get<ISettingsStore>();
     public IReadOnlyList<IMainTab> Tabs => Services.GetServices<IMainTab>().OrderBy(t => t.Order).ToList();
 
-    public PresetsViewModel NewPresetsViewModel() =>
-        new(Dialogs, Get<IPresetStore>(), Get<LegacyPromptImporter>());
+    public PresetsViewModel NewPresetsViewModel(PresetsContext? context = null) =>
+        new(Dialogs, Get<IPresetStore>(), Get<LegacyPromptImporter>(), context);
 
     public void Dispose()
     {

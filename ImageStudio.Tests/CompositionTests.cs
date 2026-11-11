@@ -128,6 +128,23 @@ public sealed class CompositionTests
     }
 
     [Fact]
+    public void Saved_preset_records_the_active_provider()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var vm = app.Vm;
+            vm.InitializeAsync().GetAwaiter().GetResult();
+            app.Dialogs.SavePresetAnswer = (_, _) => new PresetDraft("moj zestaw", "opis");
+            vm.GeneratePrompt = "zachód słońca";
+
+            vm.SavePresetCommand.Execute(null);
+
+            Assert.Equal(app.Provider.Id, Assert.Single(app.Presets.Presets).Provider);
+        });
+    }
+
+    [Fact]
     public void Settings_dialog_reads_secrets_and_saves_through_the_injected_stores()
     {
         Sta.Run(() =>

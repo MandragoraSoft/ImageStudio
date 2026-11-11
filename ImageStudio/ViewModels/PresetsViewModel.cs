@@ -1,5 +1,6 @@
 using ImageStudio.Localization;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
@@ -7,14 +8,49 @@ using ImageStudio.Services;
 
 namespace ImageStudio.ViewModels;
 
-// Okno zarządzania zestawami: lista, podgląd, zmiana nazwy/opisu, usuwanie i wczytanie
-public sealed partial class PresetsViewModel : ObservableObject
+// Selektor modelu w oknie zestawów: widok modeli rodzaju (osobny od głównego okna) i filtr zakładki z MainViewModel
+public sealed record PresetModelPicker(ICollectionView View, ModelFilter Filter);
+
+// Dane z głównego okna: modele każdego rodzaju, id aktywnego dostawcy (zapisywane przy zmianie modelu) i selektory modeli
+public sealed record PresetsContext(
+    Func<string, IReadOnlyList<ModelOption>> ModelsFor,
+    string? ProviderId,
+    IReadOnlyDictionary<string, PresetModelPicker>? Pickers = null);
+
+// Parametr ulepszania promptu w edytorze: klucz jest stały, włączenie i wartość można zmienić
+public sealed partial class PresetParamItem(string key, bool enabled, double value) : ObservableObject
 {
-    public ObservableCollection<Preset> Presets { get; } = [];
+    public string Key { get; } = key;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadPresetCommand), nameof(DeletePresetCommand), nameof(SaveDetailsCommand))]
-    [NotifyPropertyChangedFor(nameof(HasSelection))]
+    private bool _enabled = enabled;
+
+    [ObservableProperty]
+    private double _value = value;
+}
+
+// Okno zarządzania zestawami: lista z wyszukiwaniem, edycja wszystkich pól, duplikowanie, usuwanie i wczytanie
+public sealed partial class PresetsViewModel : ObservableObject
+{
+    // Pełna lista zestawów; Presets to jej widok po filtrach
+    private readonly List<Preset> _all = [];
+
+    // Zmiany wykonywane przez program (przebudowa listy, przeładowanie) nie pytają o niezapisane zmiany
+    private bool _busy;
+
+    private readonly PresetsContext? _context;
+
+    public ObservableCollection<Preset> Presets { get; } = [];
+
+    public IReadOnlyList<string> KindFilters { get; } = ["all", "generate", "edit"];
+
+    public IReadOnlyList<string> QualityOptions { get; } = ["auto", "low", "medium", "high"];
+
+    public ObservableCollection<PresetParamItem> EditParameters { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadPresetCommand), nameof(DeletePresetCommand), nameof(DuplicatePresetCommand), nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(PickerView), nameof(PickerFilter), nameof(SelectedModelOption), nameof(ModelWarning))]
     private Preset? _selectedPreset;
 
     [ObservableProperty]
@@ -24,6 +60,46 @@ public sealed partial class PresetsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
     private string _editDescription = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editPrompt = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editSystemPrompt = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editNegativePrompt = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editSeedText = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editQuality = "auto";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private int _editWidth;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private int _editHeight;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedModelOption), nameof(ModelWarning))]
+    private string? _editModel;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _searchText = "";
+
+    [ObservableProperty]
+    private string _kindFilter = "all";
 
     [ObservableProperty]
     private string _status = "";
@@ -38,66 +114,245 @@ public sealed partial class PresetsViewModel : ObservableObject
     private readonly IPresetStore _presets;
     private readonly LegacyPromptImporter _importer;
 
-    public PresetsViewModel(IDialogService dialogs, IPresetStore presets, LegacyPromptImporter importer)
+    public PresetsViewModel(IDialogService dialogs, IPresetStore presets, LegacyPromptImporter importer, PresetsContext? context = null)
     {
         _dialogs = dialogs;
         _presets = presets;
         _importer = importer;
+        _context = context;
         Reload(null);
     }
 
     public bool HasSelection => SelectedPreset is not null;
 
-    partial void OnSelectedPresetChanged(Preset? value)
+    // Niezapisane zmiany: którekolwiek pole edycji różni się od zaznaczonego zestawu
+    public bool IsDirty => SelectedPreset is { } p
+        && (Norm(EditName) != Norm(p.Name) || Norm(EditDescription) != Norm(p.Description)
+            || EditPrompt != (p.Prompt ?? "") || EditSystemPrompt != (p.SystemPrompt ?? "")
+            || Norm(EditNegativePrompt) != Norm(p.NegativePrompt) || Norm(EditSeedText) != Norm(p.SeedText)
+            || EditQuality != (p.Quality ?? "auto") || EditWidth != p.Width || EditHeight != p.Height
+            || EditModel != p.Model || ParametersChanged(p));
+
+    // Selektor modelu i jego filtr dla rodzaju zaznaczonego zestawu (null bez kontekstu)
+    private PresetModelPicker? CurrentPicker =>
+        SelectedPreset is { } p && _context?.Pickers is { } pickers && pickers.TryGetValue(p.Kind, out var picker) ? picker : null;
+
+    public ICollectionView? PickerView => CurrentPicker?.View;
+
+    public ModelFilter? PickerFilter => CurrentPicker?.Filter;
+
+    // Zaznaczenie w ModelPicker: tylko wybór użytkownika zmienia EditModel; model spoza listy zostaje jako Id
+    public ModelOption? SelectedModelOption
     {
-        EditName = value?.Name ?? "";
-        EditDescription = value?.Description ?? "";
+        get => SelectedPreset is { } p ? ModelsOf(p.Kind).FirstOrDefault(m => m.Id == EditModel) : null;
+        set
+        {
+            if (value is not null) EditModel = value.Id;
+        }
     }
+
+    // Ostrzeżenie, gdy zapisany model nie jest na bieżącej liście modeli tego rodzaju
+    public string ModelWarning => SelectedPreset is { } p && !string.IsNullOrEmpty(EditModel)
+        && ModelsOf(p.Kind) is { Count: > 0 } models && !models.Any(m => m.Id == EditModel)
+        ? Loc.T("presets.msg.modelMissing", EditModel)
+        : "";
 
     private bool HasSelectedPreset => SelectedPreset is not null;
 
+    private IReadOnlyList<ModelOption> ModelsOf(string kind) => _context?.ModelsFor(kind) ?? [];
+
+    // Przed zmianą zaznaczenia pytamy o niezapisane zmiany; zapis zestawu, który przestaje być zaznaczony, też tu się dzieje
+    partial void OnSelectedPresetChanging(Preset? value) => ResolveUnsaved();
+
+    partial void OnSelectedPresetChanged(Preset? value) => LoadEditFields(value);
+
+    partial void OnSearchTextChanged(string value) => RefreshVisible();
+
+    partial void OnKindFilterChanged(string value) => RefreshVisible();
+
+    private static string Norm(string? text) => text?.Trim() ?? "";
+
+    private bool ParametersChanged(Preset p) => EditParameters.Any(i =>
+        !p.Parameters.TryGetValue(i.Key, out var state) || state.Enabled != i.Enabled || state.Value != i.Value);
+
+    private void LoadEditFields(Preset? p)
+    {
+        EditName = p?.Name ?? "";
+        EditDescription = p?.Description ?? "";
+        EditPrompt = p?.Prompt ?? "";
+        EditSystemPrompt = p?.SystemPrompt ?? "";
+        EditNegativePrompt = p?.NegativePrompt ?? "";
+        EditSeedText = p?.SeedText ?? "";
+        EditQuality = p?.Quality ?? "auto";
+        EditWidth = p?.Width ?? 0;
+        EditHeight = p?.Height ?? 0;
+        EditModel = p?.Model;
+
+        EditParameters.Clear();
+        if (p is null) return;
+        foreach (var (key, state) in p.Parameters)
+        {
+            var item = new PresetParamItem(key, state.Enabled, state.Value);
+            item.PropertyChanged += (_, _) => SaveDetailsCommand.NotifyCanExecuteChanged();
+            EditParameters.Add(item);
+        }
+    }
+
+    // Ładuje listę z magazynu i zaznacza wskazany zestaw (albo pierwszy)
     private void Reload(string? selectFilePath)
     {
-        Presets.Clear();
-        foreach (var preset in _presets.LoadAll()) Presets.Add(preset);
-        SelectedPreset = Presets.FirstOrDefault(p => p.FilePath == selectFilePath) ?? Presets.FirstOrDefault();
+        _all.Clear();
+        _all.AddRange(_presets.LoadAll());
+        ApplyFilter(selectFilePath);
+    }
+
+    // Przebudowa widoku po filtrach; zaznaczenie zostaje, jeśli zestaw nadal pasuje
+    private void ApplyFilter(string? selectFilePath)
+    {
+        var wasBusy = _busy;
+        _busy = true;
+        try
+        {
+            Presets.Clear();
+            foreach (var preset in _all.OrderByDescending(p => p.UpdatedUtc).Where(Matches)) Presets.Add(preset);
+            SelectedPreset = Presets.FirstOrDefault(p => p.FilePath == selectFilePath) ?? Presets.FirstOrDefault();
+        }
+        finally
+        {
+            _busy = wasBusy;
+        }
+    }
+
+    // Zmiana filtra: jeśli zaznaczony zestaw znika z listy, najpierw pytamy o jego niezapisane zmiany
+    private void RefreshVisible()
+    {
+        if (SelectedPreset is { } p && !Matches(p)) ResolveUnsaved();
+        ApplyFilter(SelectedPreset?.FilePath);
+    }
+
+    private bool Matches(Preset p)
+    {
+        if (KindFilter != "all" && p.Kind != KindFilter) return false;
+        var text = SearchText.Trim();
+        return text.Length == 0
+               || (p.Name?.Contains(text, StringComparison.OrdinalIgnoreCase) ?? false)
+               || (p.Description?.Contains(text, StringComparison.OrdinalIgnoreCase) ?? false)
+               || (p.Prompt?.Contains(text, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    // Pytanie o niezapisane zmiany: tak = zapis (przy błędzie walidacji zmiany są odrzucane), nie = odrzucenie.
+    // Zwraca false tylko wtedy, gdy użytkownik chciał zapisać, a zapis się nie udał
+    private bool ResolveUnsaved()
+    {
+        if (_busy || SelectedPreset is not { } current || !IsDirty) return true;
+        if (!_dialogs.Confirm(Loc.T("presets.confirmUnsaved", current.Name), Loc.T("presets.confirmUnsaved.title"))) return true;
+        if (!TrySaveDetails()) return false;
+        ApplyFilter(current.FilePath);
+        return true;
+    }
+
+    // Walidacja i zapis wszystkich pól zaznaczonego zestawu; błąd ustawia Status i niczego nie zapisuje
+    private bool TrySaveDetails()
+    {
+        if (SelectedPreset is not { } preset) return false;
+
+        var name = Norm(EditName);
+        if (name.Length == 0) return Fail(Loc.T("presets.msg.emptyName"));
+        if (_presets.LoadAll().Any(o => o.FilePath != preset.FilePath && o.Kind == preset.Kind
+                                        && string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)))
+            return Fail(Loc.T("presets.msg.duplicateName"));
+        if (EditWidth <= 0 || EditHeight <= 0) return Fail(Loc.T("presets.msg.badSize"));
+
+        // Zmieniony model z listy zapisuje id dostawcy; bez zmiany Provider zostaje jak był (także null)
+        if (EditModel != preset.Model && EditModel is not null && _context is { } context
+            && ModelsOf(preset.Kind).Any(m => m.Id == EditModel))
+            preset.Provider = context.ProviderId;
+
+        var seed = Norm(EditSeedText);
+        preset.Name = name;
+        preset.Description = Norm(EditDescription);
+        preset.Prompt = EditPrompt;
+        preset.SystemPrompt = EditSystemPrompt;
+        preset.NegativePrompt = Norm(EditNegativePrompt);
+        preset.SeedText = seed.Length == 0 ? null : seed;
+        preset.Quality = EditQuality;
+        preset.Width = EditWidth;
+        preset.Height = EditHeight;
+        preset.Model = EditModel;
+        foreach (var item in EditParameters)
+            preset.Parameters[item.Key] = new ParamState { Enabled = item.Enabled, Value = item.Value };
+
+        _presets.Save(preset);
+        return true;
+    }
+
+    private bool Fail(string message)
+    {
+        Status = message;
+        return false;
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
     private void LoadPreset()
     {
+        if (SelectedPreset is null || !ResolveUnsaved()) return;
         ChosenPreset = SelectedPreset;
         CloseRequested?.Invoke();
     }
 
-    // Zapis aktywny tylko po zmianie nazwy lub opisu zaznaczonego zestawu
-    private bool DetailsChanged => SelectedPreset is { } p
-                                   && (EditName.Trim() != p.Name || EditDescription.Trim() != (p.Description ?? ""));
-
-    // Nazwa i opis są w pliku; nazwa pliku się nie zmienia
-    [RelayCommand(CanExecute = nameof(DetailsChanged))]
+    // Nazwa i opis są w pliku; nazwa pliku się nie zmienia. Zapisuje wszystkie pola edycji
+    [RelayCommand(CanExecute = nameof(IsDirty))]
     private void SaveDetails()
     {
-        if (SelectedPreset is null) return;
+        if (!TrySaveDetails()) return;
+        ApplyFilter(SelectedPreset?.FilePath);
+        Status = Loc.T("presets.msg.changesSaved");
+    }
 
-        var name = EditName.Trim();
-        if (string.IsNullOrWhiteSpace(name))
+    // Kopia wszystkich pól zaznaczonego zestawu; nazwa dostaje numer, gdy zajęta w tym rodzaju
+    [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
+    private void DuplicatePreset()
+    {
+        if (SelectedPreset is not { } source || !ResolveUnsaved()) return;
+
+        var copy = _presets.Create(new Preset
         {
-            Status = Loc.T("presets.msg.emptyName");
-            return;
-        }
+            Name = CopyName(source),
+            Description = source.Description,
+            Kind = source.Kind,
+            Prompt = source.Prompt,
+            SystemPrompt = source.SystemPrompt,
+            Model = source.Model,
+            Provider = source.Provider,
+            Width = source.Width,
+            Height = source.Height,
+            SeedText = source.SeedText,
+            NegativePrompt = source.NegativePrompt,
+            Quality = source.Quality,
+            EnhancerModel = source.EnhancerModel,
+            EnhancerInstruction = source.EnhancerInstruction,
+            Parameters = source.Parameters.ToDictionary(p => p.Key, p => new ParamState { Enabled = p.Value.Enabled, Value = p.Value.Value }),
+        });
+        Reload(copy.FilePath);
+        Status = Loc.T("presets.msg.duplicated", copy.Name);
+    }
 
-        SelectedPreset.Name = name;
-        SelectedPreset.Description = EditDescription.Trim();
-        _presets.Save(SelectedPreset);
-        Reload(SelectedPreset.FilePath);
-        Status = Loc.T("presets.msg.metaSaved");
+    private string CopyName(Preset source)
+    {
+        var taken = _presets.LoadAll().Where(p => p.Kind == source.Kind).Select(p => p.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var baseName = Loc.T("presets.copyName", source.Name);
+        var name = baseName;
+        for (var n = 2; taken.Contains(name); n++) name = $"{baseName} {n}";
+        return name;
     }
 
     // Jednorazowy import starej historii promptów; powtórne uruchomienie pomija już zaimportowane
     [RelayCommand]
     private void ImportLegacy()
     {
+        if (!ResolveUnsaved()) return;
+
         var result = _importer.Import();
         if (!result.FileFound)
         {

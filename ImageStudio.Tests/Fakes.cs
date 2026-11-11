@@ -222,7 +222,7 @@ internal sealed class FakeDialogs : IDialogService
         }
         return PromptEditResult;
     }
-    public ImageStudio.Configuration.Preset? ShowPresets() => throw new NotSupportedException();
+    public ImageStudio.Configuration.Preset? ShowPresets(ImageStudio.ViewModels.PresetsContext? context = null) => throw new NotSupportedException();
     public bool ConfirmToolCall(ToolCall call) => true;
     public bool ConfirmAnswer { get; set; } = true;
     public bool Confirm(string text, string title) => ConfirmAnswer;

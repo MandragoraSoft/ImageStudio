@@ -161,11 +161,34 @@ public sealed partial class MainViewModel
         Status = Loc.T("presets.msg.saved", draft.Name);
     }
 
+    // Okno zestawów dostaje własne widoki modeli nad tymi samymi listami (współdzielony widok zsynchronizowałby zaznaczenie
+    // z selektorem głównego okna) z filtrem zakładki. Subskrypcje filtra zdejmujemy po zamknięciu okna. Widok tworzony wprost
+    // (nie tymczasowym CollectionViewSource), bo ten bywa zbierany przez GC
     [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
     private void OpenPresets()
     {
-        var preset = _dialogs.ShowPresets();
-        if (preset is not null) ApplyPreset(preset);
+        var detach = new List<Action>();
+        var pickers = new Dictionary<string, PresetModelPicker>();
+        foreach (var (kind, filter) in new[] { ("generate", GenerateFilter), ("edit", EditFilter) })
+        {
+            var view = new ListCollectionView(ModelsFor(kind));
+            view.Filter = filter.Matches;
+            void Refresh() => view.Refresh();
+            filter.Changed += Refresh;
+            detach.Add(() => filter.Changed -= Refresh);
+            pickers[kind] = new PresetModelPicker(view, filter);
+        }
+
+        try
+        {
+            var context = new PresetsContext(kind => kind is "generate" or "edit" ? ModelsFor(kind) : [], _provider.Id, pickers);
+            var preset = _dialogs.ShowPresets(context);
+            if (preset is not null) ApplyPreset(preset);
+        }
+        finally
+        {
+            foreach (var release in detach) release();
+        }
     }
 
     // AI proponuje nazwę i opis zestawu na podstawie promptu, modelem tekstowym wybranym w ulepszaniu
@@ -195,6 +218,7 @@ public sealed partial class MainViewModel
         Prompt = CurrentPromptForTab(),
         SystemPrompt = ActiveTab == 1 ? EditSystemPrompt : GenerateSystemPrompt,
         Model = ActiveTab == 1 ? SelectedEditModel?.Id : SelectedModel?.Id,
+        Provider = _provider.Id,
         Width = Width,
         Height = Height,
         SeedText = SeedText,
