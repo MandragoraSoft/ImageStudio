@@ -38,6 +38,10 @@ dotnet publish ImageStudio -p:PublishProfile=SelfHosted  # publish\selfhosted\Im
 - **Klucze API** są szyfrowane przez `SecretStore` (DPAPI); nie zapisuj ich do plików ustawień ani logów.
 - **Testy:** nowy kod = testy w `ImageStudio.Tests` na `TestApp` z atrapami (bez sieci i UI); widoki WPF przez `WpfHost.Run`. Szczegóły i pułapki w [docs/dev/testing.md](docs/dev/testing.md).
 
+## Tok pracy z subagentami
+
+Przy nowych funkcjach i większych zmianach: (1) rozpoznanie kodu zleć subagentowi na modelu Haiku (tylko odczyt), (2) dopiero po raporcie zadawaj pytania, konkretne i oparte na kodzie, (3) plan implementacji pisze główna sesja w `docs/superpowers/plans/`, (4) implementację wykonują subagenci Haiku według planu, etap po etapie (nie równolegle w jednym katalogu roboczym), a główna sesja sprawdza build, testy i diff.
+
 ## Gdzie czytać dalej
 
 Pliki w `docs/dev/` czytaj na żądanie, gdy zadanie dotyka danego obszaru (to zwykłe odnośniki, nie importy `@`, więc nie zajmują kontekstu, dopóki ich nie otworzysz).
