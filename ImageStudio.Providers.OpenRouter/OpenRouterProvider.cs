@@ -7,12 +7,13 @@ using System.Text.Json;
 namespace ImageStudio.Services;
 
 // Drugi provider: OpenRouter (openrouter.ai). Obrazy przez chat/completions z modalities ["image","text"],
-// odpowiedź z obrazami w message.images. Brak wideo i brak cennika obrazów w API: koszt z usage.cost.
+// odpowiedź z obrazami w message.images; modele obsługiwane tylko przez Image API idą na /api/v1/images. Brak wideo i brak cennika obrazów w API: koszt z usage.cost.
 public sealed class OpenRouterProvider : IAiProvider
 {
     public const string Identifier = "openrouter";
 
     private const string ChatPath = "/api/v1/chat/completions";
+    private const string ImagesPath = "/api/v1/images";
     private const string ModelsPath = "/api/v1/models?output_modalities=all";
 
     private readonly HttpClient _http;
@@ -23,17 +24,21 @@ public sealed class OpenRouterProvider : IAiProvider
     // Modele zwracające wyłącznie obraz (FLUX, Recraft...): wymagają modalities ["image"], bez "text"
     private readonly HashSet<string> _imageOnly = [];
 
+    // Modele, które chat/completions odrzuca z odesłaniem do Image API (np. meta/muse-image): zapamiętane na czas sesji
+    private readonly HashSet<string> _imagesApi = [];
+
     private string[] Modalities(string model) => _imageOnly.Contains(model) ? ["image"] : ["image", "text"];
 
     private sealed record RawModel(string Id, IReadOnlyList<string> Input, IReadOnlyList<string> Output,
                                    IReadOnlyList<string> Supported, string? Description = null, decimal? ImageTokenUsd = null,
                                    decimal? PromptUsd = null, decimal? CompletionUsd = null);
 
-    public OpenRouterProvider(string apiKey)
+    // baseUrl podmieniają tylko testy (lokalny serwer zamiast openrouter.ai)
+    public OpenRouterProvider(string apiKey, string baseUrl = "https://openrouter.ai")
     {
         _http = new HttpClient
         {
-            BaseAddress = new Uri("https://openrouter.ai"),
+            BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromMinutes(5),
         };
         if (!string.IsNullOrWhiteSpace(apiKey))
@@ -114,7 +119,8 @@ public sealed class OpenRouterProvider : IAiProvider
         };
         if (options?.Seed is int seed) body["seed"] = seed;
 
-        return SendImageRequestAsync(body, ct);
+        var negative = string.IsNullOrWhiteSpace(options?.NegativePrompt) ? "" : $" Avoid: {options.NegativePrompt}.";
+        return SendImageRequestAsync(body, () => ImagesBody(model, prompt + negative, size, options?.Seed, []), ct);
     }
 
     public Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths,
@@ -130,7 +136,7 @@ public sealed class OpenRouterProvider : IAiProvider
             ["modalities"] = Modalities(model),
             ["messages"] = new[] { new { role = "user", content } },
         };
-        return SendImageRequestAsync(body, ct);
+        return SendImageRequestAsync(body, () => ImagesBody(model, prompt, null, null, imagePaths), ct);
     }
 
     // Wideo: POST /videos tworzy zadanie, potem odpytywanie polling_url i pobranie MP4 z /videos/{id}/content.
@@ -248,10 +254,66 @@ public sealed class OpenRouterProvider : IAiProvider
         _files.Dispose();
     }
 
-    private async Task<ImageResult> SendImageRequestAsync(Dictionary<string, object> body, CancellationToken ct)
+    // Żądanie Image API (POST /api/v1/images): prompt wprost, rozmiar w pikselach, obrazy wejściowe jako input_references
+    private static Dictionary<string, object> ImagesBody(string model, string prompt, string? size, int? seed, IReadOnlyList<string> imagePaths)
     {
+        var body = new Dictionary<string, object> { ["model"] = model, ["prompt"] = prompt };
+        if (!string.IsNullOrWhiteSpace(size)) body["size"] = size;
+        if (seed is int value) body["seed"] = value;
+        if (imagePaths.Count > 0)
+            body["input_references"] = imagePaths.Select(path => new { type = "image_url", image_url = new { url = DataUri(path) } }).ToArray();
+        return body;
+    }
+
+    // Odpowiedź Image API: data[0].b64_json i koszt w usage.cost. Część dostawców odrzuca rozmiar w pikselach:
+    // wtedy jedno ponowienie bez rozmiaru (model wybiera domyślny)
+    private async Task<ImageResult> SendImagesApiRequestAsync(Dictionary<string, object> body, CancellationToken ct)
+    {
+        var response = await _http.PostAsJsonAsync(ImagesPath, body, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode && body.ContainsKey("size") && text.Contains("size", StringComparison.OrdinalIgnoreCase))
+        {
+            body.Remove("size");
+            response.Dispose();
+            response = await _http.PostAsJsonAsync(ImagesPath, body, ct);
+            text = await response.Content.ReadAsStringAsync(ct);
+        }
+
+        using var final = response;
+        if (!response.IsSuccessStatusCode)
+            throw ApiErrors.Failure(response.StatusCode, text);
+
+        using var doc = JsonDocument.Parse(text);
+        var root = doc.RootElement;
+        decimal? cost = root.TryGetProperty("usage", out var usage)
+                        && usage.TryGetProperty("cost", out var c) && c.ValueKind == JsonValueKind.Number
+            ? c.GetDecimal()
+            : null;
+        if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array && data.GetArrayLength() > 0
+            && data[0].TryGetProperty("b64_json", out var image) && image.GetString() is { Length: > 0 } base64)
+            return new ImageResult(Convert.FromBase64String(base64), cost);
+
+        throw new InvalidOperationException("Model nie zwrócił obrazu.");
+    }
+
+    // chat/completions odsyła model do Image API ("... Use the /api/v1/images endpoint instead")
+    private static bool NeedsImagesApi(string error) => error.Contains(ImagesPath, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<ImageResult> SendImageRequestAsync(Dictionary<string, object> body, Func<Dictionary<string, object>> imagesBody,
+                                                          CancellationToken ct)
+    {
+        if (body["model"] is string known && _imagesApi.Contains(known)) return await SendImagesApiRequestAsync(imagesBody(), ct);
+
         var response = await _http.PostAsJsonAsync(ChatPath, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode && NeedsImagesApi(text) && body["model"] is string imagesModel)
+        {
+            response.Dispose();
+            var result = await SendImagesApiRequestAsync(imagesBody(), ct);
+            _imagesApi.Add(imagesModel);
+            return result;
+        }
+
         // Katalog bywa niedokładny co do modalności wyjścia: błąd endpointu ("No endpoints found ... modalities")
         // leczymy jednorazowym ponowieniem z drugim zestawem i zapamiętujemy go dla modelu
         if (!response.IsSuccessStatusCode && IsEndpointMismatch(text) && body["model"] is string model)

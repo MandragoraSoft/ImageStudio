@@ -10,18 +10,19 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="{loc:T common.clear}" Width="80" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T common.clear}" Padding="12,6" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding ClearResultCommand}" ToolTip="{loc:T out.clear.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T voice.saveAs}" Width="110" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T voice.saveAs}" Padding="12,6" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding SaveImageAsCommand}" ToolTip="{loc:T out.saveAs.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T out.copy}" Width="90" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T out.copy}" Padding="12,6" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding CopyImageCommand}" ToolTip="{loc:T out.copy.tip}"/>
-            <Button DockPanel.Dock="Right" Content="100%" Width="60" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="100%" Padding="12,6" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding ResetZoomCommand}" ToolTip="{loc:T out.actualSize.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T out.fit}" Width="80" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+            <Button DockPanel.Dock="Right" Content="{loc:T out.fit}" Padding="12,6" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding FitImageCommand}" ToolTip="{loc:T out.fit.tip}"/>
-            <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" Margin="0,0,12,0" Width="170"/>
-            <Slider Minimum="0.1" Maximum="4" Value="{Binding Zoom}" VerticalAlignment="Center"/>
+            <!-- Etykieta i suwak ustępują miejsca przyciskom, gdy okno jest wąskie -->
+            <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="170" TextTrimming="CharacterEllipsis"/>
+            <Slider Minimum="0.1" Maximum="4" Value="{Binding Zoom}" VerticalAlignment="Center" MinWidth="60"/>
         </DockPanel>
 
         <Border Grid.Row="1" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1" CornerRadius="6"

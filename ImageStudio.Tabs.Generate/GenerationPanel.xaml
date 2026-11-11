@@ -6,6 +6,31 @@
     <!-- Główna akcja jest przypięta pod przewijanym formularzem: zawsze widoczna, bez przewijania na dół -->
     <DockPanel>
         <Button Content="{loc:T gen.generate}" Height="34" DockPanel.Dock="Bottom" Margin="10,6,10,10" Command="{Binding GenerateCommand}" ToolTip="Ctrl+Enter"/>
+        <!-- Czemu akcja jest wyłączona: brak modelu, promptu albo obrazu wejściowego -->
+        <TextBlock DockPanel.Dock="Bottom" Margin="10,0,10,0" Text="{loc:T hint.noPrompt}" TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding GeneratePrompt}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <TextBlock DockPanel.Dock="Bottom" Margin="10,0,10,0" Text="{loc:T hint.noModel}" TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedModel}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <!-- Układ każdej zakładki: Model, Prompt, Wejście, Parametry, Rozmiar, Akcja -->

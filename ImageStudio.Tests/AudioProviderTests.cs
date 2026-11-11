@@ -285,6 +285,27 @@ public sealed class AudioProviderTests
         Assert.Equal("Bearer sk-test", api.Requests.Single().Authorization);
     }
 
+    // Model tylko z Image API: chat/completions odsyła 404, dostawca ponawia na /api/v1/images i pamięta to dla modelu
+    [Fact]
+    public async Task OpenRouter_falls_back_to_the_image_api_when_chat_completions_refuses_the_model()
+    {
+        using var api = new Api((_, path) => path == "/api/v1/chat/completions"
+            ? Reply.Json("""{"error":{"message":"meta/muse-image is an image generation model and cannot be used with the chat/completions endpoint. Use the /api/v1/images endpoint instead.","code":404}}""", 404)
+            : Reply.Json("""{"created":1,"data":[{"b64_json":"AQID"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"cost":0.02}}"""));
+        using var provider = new OpenRouterProvider("k", api.Url);
+
+        var first = await provider.GenerateImageAsync("meta/muse-image", "kot", "1024x1024", new ImageOptions(7, null, null));
+        var second = await provider.GenerateImageAsync("meta/muse-image", "pies", "1024x1024", null);
+
+        Assert.Equal([1, 2, 3], first.Bytes);
+        Assert.Equal(0.02m, first.CostUsd);
+        Assert.Equal([1, 2, 3], second.Bytes);
+        Assert.Equal(["/api/v1/chat/completions", "/api/v1/images", "/api/v1/images"], api.Requests.Select(r => r.Path));
+        Assert.Contains("prompt\":\"kot", api.Requests[1].Text);
+        Assert.Contains("size\":\"1024x1024", api.Requests[1].Text);
+        Assert.Contains("seed\":7", api.Requests[1].Text);
+    }
+
     [Fact]
     public async Task A_provider_without_audio_returns_empty_lists_and_refuses_to_synthesize()
     {

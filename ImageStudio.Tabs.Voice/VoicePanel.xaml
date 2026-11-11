@@ -26,23 +26,7 @@
                     <TextBlock Text="{loc:T voice.voice}" Style="{StaticResource SectionHeader}"/>
                     <ComboBox ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}"/>
 
-                    <TextBlock Margin="0,8,0,0"><Run Text="{loc:T voice.speed}"/><Run Text="{Binding Speed, Mode=OneWay, StringFormat='{}{0:0.0}×'}"/></TextBlock>
-                    <Slider Minimum="0.5" Maximum="2" Value="{Binding Speed}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
-
-                    <TextBlock Text="{loc:T voice.language}" Style="{StaticResource SectionHeader}"/>
-                    <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedSpeechLanguage}"
-                              ItemTemplate="{StaticResource LanguageTemplate}"
-                              ToolTip="{loc:T voice.language.tip}"/>
-                    <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Text="{loc:T voice.language.note}"/>
-
-                    <TextBlock Text="{loc:T voice.format}" Style="{StaticResource SectionHeader}"/>
-                    <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}"/>
-
-                    <TextBlock Text="{loc:T voice.output}" Style="{StaticResource SectionHeader}"/>
-                    <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}"
-                              ToolTip="{loc:T voice.output.tip}"/>
-
+                    <!-- Akcja zaraz pod tekstem i głosem; rzadziej zmieniane ustawienia są zwinięte -->
                     <TextBlock Text="{Binding SpeechEstimateLabel}" Style="{StaticResource MutedTextBlock}"
                                TextWrapping="Wrap" Margin="0,10,0,10"/>
                     <Grid>
@@ -54,6 +38,27 @@
                         <Button Grid.Column="1" Content="{loc:T common.cancel}" Height="34" Margin="6,0,0,0" Padding="14,0"
                                 Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"/>
                     </Grid>
+                    <Expander Header="{loc:T voice.speechOptions}" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Margin="0,8,0,0"><Run Text="{loc:T voice.speed}"/><Run Text="{Binding Speed, Mode=OneWay, StringFormat='{}{0:0.0}×'}"/></TextBlock>
+                            <Slider Minimum="0.5" Maximum="2" Value="{Binding Speed}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+
+                            <TextBlock Text="{loc:T voice.language}" Style="{StaticResource SectionHeader}"/>
+                            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedSpeechLanguage}"
+                                      ItemTemplate="{StaticResource LanguageTemplate}"
+                                      ToolTip="{loc:T voice.language.tip}"/>
+                            <TextBlock Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="{loc:T voice.language.note}"/>
+
+                            <TextBlock Text="{loc:T voice.format}" Style="{StaticResource SectionHeader}"/>
+                            <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}"/>
+
+                            <TextBlock Text="{loc:T voice.output}" Style="{StaticResource SectionHeader}"/>
+                            <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" ItemTemplate="{StaticResource AudioDeviceTemplate}"
+                                      ToolTip="{loc:T voice.output.tip}"/>
+
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Expander>
 
@@ -69,9 +74,6 @@
                                  Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"/>
                     <TextBlock Style="{StaticResource MutedTextBlock}" Margin="0,4,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"><Run Text="{loc:T voice.recordingFor}"/><Run Text="{Binding RecordSeconds, Mode=OneWay}"/><Run Text=" s"/></TextBlock>
 
-                    <TextBlock Text="{loc:T voice.mic}" Style="{StaticResource SectionHeader}"/>
-                    <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
-
                     <TextBlock Text="{loc:T voice.orFile}" Style="{StaticResource SectionHeader}"/>
                     <DockPanel>
                         <Button DockPanel.Dock="Right" Content="{loc:T common.choose}" Padding="12,6" Margin="6,0,0,0"
@@ -80,15 +82,22 @@
                                    ToolTip="{Binding AudioPath}"/>
                     </DockPanel>
 
-                    <TextBlock Text="{loc:T voice.sttLanguage}" Style="{StaticResource SectionHeader}"/>
-                    <TextBox Text="{Binding Language, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Text="{loc:T voice.sttHint}" Style="{StaticResource SectionHeader}"/>
-                    <TextBox Text="{Binding TranscriptionHint, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MinHeight="44"
-                             AcceptsReturn="True"/>
-
                     <TextBlock Text="{Binding TranscriptionPriceLabel}" Style="{StaticResource MutedTextBlock}"
                                TextWrapping="Wrap" Margin="0,10,0,10"/>
                     <Button Content="{loc:T voice.transcribe}" Height="34" Command="{Binding TranscribeCommand}"/>
+                    <Expander Header="{loc:T voice.sttOptions}" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{loc:T voice.mic}" Style="{StaticResource SectionHeader}"/>
+                            <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" ItemTemplate="{StaticResource AudioDeviceTemplate}"/>
+
+                            <TextBlock Text="{loc:T voice.sttLanguage}" Style="{StaticResource SectionHeader}"/>
+                            <TextBox Text="{Binding Language, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="{loc:T voice.sttHint}" Style="{StaticResource SectionHeader}"/>
+                            <TextBox Text="{Binding TranscriptionHint, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MinHeight="44"
+                                     AcceptsReturn="True"/>
+
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Expander>
         </StackPanel>
