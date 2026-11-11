@@ -186,11 +186,32 @@ public sealed partial class ChatViewModel : ObservableObject
 
     public int ContextUsed => LastUsage is { Input: { } input } usage ? input + (usage.Output ?? 0) : EstimateContext();
 
-    // Instrukcja systemowa bez notatki o załącznikach (ta zapisuje pliki, a wskaźnik odświeża się przy każdej zmianie)
-    private int EstimateContext() =>
-        TokenEstimator.Estimate(SystemPrompt) + TokenEstimator.Estimate(Tools?.SystemNote)
-        + (Tools is { } host ? host.Tools.Sum(t => TokenEstimator.Estimate(t)) : 0)
-        + Messages.Sum(m => TokenEstimator.Estimate(m.Content));
+    // Składniki szacunku. Instrukcja systemowa bez notatki o załącznikach (ta zapisuje pliki, a wskaźnik odświeża się przy każdej zmianie)
+    private (int Instructions, int Definitions, int History, int Results) EstimateParts() =>
+        (TokenEstimator.Estimate(SystemPrompt) + TokenEstimator.Estimate(Tools?.SystemNote),
+         Tools is { } host ? host.Tools.Sum(t => TokenEstimator.Estimate(t)) : 0,
+         Messages.Where(m => m.Role != "tool").Sum(m => TokenEstimator.Estimate(m.Content)),
+         Messages.Where(m => m.Role == "tool").Sum(m => TokenEstimator.Estimate(m.Content)));
+
+    private int EstimateContext()
+    {
+        var parts = EstimateParts();
+        return parts.Instructions + parts.Definitions + parts.History + parts.Results;
+    }
+
+    // Rozbicie szacunku na składniki (tooltip wskaźnika); każdy z "~", bo to szacunek
+    public string ContextBreakdown
+    {
+        get
+        {
+            var parts = EstimateParts();
+            return string.Join("\n",
+                Loc.T("chat.context.system", "~" + TokenEstimator.Short(parts.Instructions)),
+                Loc.T("chat.context.tools", "~" + TokenEstimator.Short(parts.Definitions)),
+                Loc.T("chat.context.history", "~" + TokenEstimator.Short(parts.History)),
+                Loc.T("chat.context.toolResults", "~" + TokenEstimator.Short(parts.Results)));
+        }
+    }
 
     // Rozmiar okna z katalogu modelu; null = katalog nie podaje
     public int? ContextLimit => SelectedModel is { } model && _modelInfo?.Invoke(model) is { ContextLength: { } limit } ? limit : null;
@@ -226,6 +247,7 @@ public sealed partial class ChatViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextBarValue));
         OnPropertyChanged(nameof(ContextLevel));
         OnPropertyChanged(nameof(ContextText));
+        OnPropertyChanged(nameof(ContextBreakdown));
     }
 
     private ChatOptions? BuildOptions() =>

@@ -54,11 +54,12 @@ public sealed partial class ToolItem : ObservableObject
     private readonly Action<ToolItem> _toggled;
     private bool _silent;
 
-    public ToolItem(string name, string title, string description, bool enabled, Action<ToolItem> toggled)
+    public ToolItem(string name, string title, string description, int tokens, bool enabled, Action<ToolItem> toggled)
     {
         Name = name;
         Title = title;
         Description = description;
+        Tokens = tokens;
         _isEnabled = enabled;
         _toggled = toggled;
     }
@@ -67,8 +68,16 @@ public sealed partial class ToolItem : ObservableObject
     public string Title { get; }
     public string Description { get; }
 
+    // Szacunek tokenów opisu i schematu: tyle narzędzie kosztuje w każdym żądaniu, gdy jest włączone
+    public int Tokens { get; }
+    public string TokensText => "~" + TokenEstimator.Short(Tokens);
+
     [ObservableProperty]
     private bool _isEnabled;
+
+    // Ukrycie przez wyszukiwanie w panelu; nie wpływa na to, czy narzędzie jest wysyłane do modelu
+    [ObservableProperty]
+    private bool _isVisible = true;
 
     // Zmiana zbiorcza z grupy nie zgłasza każdego narzędzia osobno
     public void SetSilently(bool value)
@@ -103,6 +112,15 @@ public sealed partial class ToolGroupItem : ObservableObject
         };
     }
 
+    // Grupa ukryta, gdy wyszukiwanie nie pasuje do żadnego jej narzędzia (ustawia ToolsViewModel)
+    [ObservableProperty]
+    private bool _isVisible = true;
+
+    // Tokeny włączonych narzędzi (tyle grupa dokłada do każdego żądania) i wszystkich (do sortowania)
+    public int Tokens => Tools.Where(t => t.IsEnabled).Sum(t => t.Tokens);
+    public int TotalTokens => Tools.Sum(t => t.Tokens);
+    public string TokensText => "~" + TokenEstimator.Short(Tokens);
+
     public string Title { get; }
     public string Description { get; }
     public IReadOnlyList<ToolItem> Tools { get; }
@@ -133,6 +151,8 @@ public sealed partial class ToolGroupItem : ObservableObject
     {
         OnPropertyChanged(nameof(IsChecked));
         OnPropertyChanged(nameof(Counter));
+        OnPropertyChanged(nameof(Tokens));
+        OnPropertyChanged(nameof(TokensText));
     }
 }
 
@@ -158,13 +178,16 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // Nazwy (widoczne dla modelu) narzędzi wyłączonych przez użytkownika; nowe narzędzia są domyślnie włączone
     private readonly HashSet<string> _disabled;
 
+    // Profile: nazwa -> nazwy wyłączonych narzędzi w chwili zapisu (zapis w state.json przez MainViewModel)
+    private readonly Dictionary<string, List<string>> _profiles;
+
     // disabledTools null = pierwsze uruchomienie po wprowadzeniu listy: stan wynika z dawnych przełączników grup
     // (sterowanie aplikacją było domyślnie wyłączone, wbudowane domyślnie włączone)
     public ToolsViewModel(McpToolHost host, bool useTools, bool requireApproval, IEnumerable<string> enabledServers,
                           string? configPath = null, IMcpToolSet? appTools = null, bool appControlEnabled = false,
                           AppServerViewModel? server = null, BuiltinTools? builtin = null, bool builtinEnabled = true,
                           IMemoryStore? memory = null, IEnumerable<string>? disabledTools = null, McpLimits? limits = null,
-                          ISkillStore? skills = null)
+                          ISkillStore? skills = null, IReadOnlyDictionary<string, List<string>>? profiles = null)
     {
         _limits = limits ?? new McpLimits();
         _limits.Changed += () =>
@@ -190,6 +213,8 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
             if (!builtinEnabled) _disabled.UnionWith(BuiltinToolNames());
         }
 
+        _profiles = profiles is null ? [] : profiles.ToDictionary(p => p.Key, p => new List<string>(p.Value));
+        RefreshProfileNames();
         RebuildGroups();
     }
 
@@ -244,7 +269,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     // Narzędzia wysyłane do modelu: z włączonych grup, bez wyłączonych pojedynczo
     public IReadOnlyList<ToolDefinition> Tools => !UseTools
         ? []
-        : [.. _host.Tools, .. AppToolDefinitions(), .. BuiltinToolDefinitions()];
+        : [.. _host.Tools.Where(d => !_disabled.Contains(d.Name)), .. AppToolDefinitions(), .. BuiltinToolDefinitions()];
 
     // Zapamiętane informacje trafiają do instrukcji systemowej, gdy któreś narzędzie ich grupy jest włączone
     public string? SystemNote => UseTools ? _builtin?.SystemNoteFor(name => !_disabled.Contains(name)) : null;
@@ -253,6 +278,92 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     public string LimitWarning => UseTools && _limits.ExceedsTools(Tools.Count) ? Loc.T("tools.warn.limit", Tools.Count, _limits.MaxTools) : "";
 
     public string Summary => UseTools ? Loc.T("tools.summary.on", Tools.Count) : Loc.T("tools.summary.off");
+
+    // Koszt narzędzi w każdym żądaniu (szacunek, bo modele liczą tokeny po swojemu)
+    public int ToolTokens => Tools.Sum(t => TokenEstimator.Estimate(t));
+
+    public string TokensSummary => UseTools ? Loc.T("tools.tokens.summary", TokenEstimator.Short(ToolTokens)) : "";
+
+    // Wyszukiwanie po nazwie i opisie (bez rozróżniania wielkości liter); puste = wszystkie narzędzia widoczne
+    [ObservableProperty]
+    private string _toolSearch = "";
+
+    partial void OnToolSearchChanged(string value) => ApplySearch();
+
+    // Sortowanie grup malejąco po rozmiarze (tokenach wszystkich narzędzi grupy) zamiast kolejności domyślnej
+    [ObservableProperty]
+    private bool _sortBySize;
+
+    partial void OnSortBySizeChanged(bool value) => RebuildGroups();
+
+    public ObservableCollection<string> ProfileNames { get; } = [];
+
+    public IReadOnlyDictionary<string, List<string>> Profiles => _profiles;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyProfileCommand), nameof(DeleteProfileCommand))]
+    private string? _selectedProfile;
+
+    [ObservableProperty]
+    private string _profileName = "";
+
+    private bool HasSelectedProfile => SelectedProfile is not null;
+
+    // Zapis zestawu wyłączonych narzędzi; ta sama nazwa nadpisuje profil
+    [RelayCommand]
+    private void SaveProfile()
+    {
+        var name = ProfileName.Trim();
+        if (name.Length == 0) return;
+
+        _profiles[name] = _disabled.ToList();
+        RefreshProfileNames();
+        SelectedProfile = name;
+        OnPropertyChanged(nameof(Profiles));
+    }
+
+    // Przywraca zapisany zestaw: wszystko poza nim jest włączone; nazwy, których już nie ma, są pomijane
+    [RelayCommand(CanExecute = nameof(HasSelectedProfile))]
+    private void ApplyProfile()
+    {
+        if (SelectedProfile is not { } name || !_profiles.TryGetValue(name, out var names)) return;
+
+        _disabled.Clear();
+        _disabled.UnionWith(names);
+        RebuildGroups();
+        OnToolsChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelectedProfile))]
+    private void DeleteProfile()
+    {
+        if (SelectedProfile is not { } name) return;
+
+        _profiles.Remove(name);
+        SelectedProfile = null;
+        RefreshProfileNames();
+        OnPropertyChanged(nameof(Profiles));
+    }
+
+    private void RefreshProfileNames()
+    {
+        ProfileNames.Clear();
+        foreach (var name in _profiles.Keys.Order()) ProfileNames.Add(name);
+    }
+
+    // Ukrywa narzędzia i grupy, których nazwa ani opis nie pasują do wyszukiwania
+    private void ApplySearch()
+    {
+        var query = ToolSearch.Trim();
+        foreach (var group in ToolGroups)
+        {
+            foreach (var tool in group.Tools)
+                tool.IsVisible = query.Length == 0
+                                 || tool.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                 || tool.Description.Contains(query, StringComparison.OrdinalIgnoreCase);
+            group.IsVisible = query.Length == 0 || group.Tools.Any(t => t.IsVisible);
+        }
+    }
 
     private IEnumerable<ToolDefinition> AppToolDefinitions() =>
         _appTools is null
@@ -307,6 +418,8 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     {
         OnPropertyChanged(nameof(Tools));
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(ToolTokens));
+        OnPropertyChanged(nameof(TokensSummary));
         OnPropertyChanged(nameof(LimitWarning));
         OnPropertyChanged(nameof(SystemNote));
         OnPropertyChanged(nameof(AppControlEnabled));
@@ -318,32 +431,53 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private void RebuildGroups()
     {
         var expanded = ToolGroups.Where(g => g.IsExpanded).Select(g => g.Title).ToHashSet();
-        ToolGroups.Clear();
+        var definitions = DefinitionsByName();
+        var groups = new List<ToolGroupItem>();
 
         ToolItem Item(string name, string title, string description) =>
-            new(name, title, description, !_disabled.Contains(name), OnToolToggled);
+            new(name, title, description, definitions.TryGetValue(name, out var definition) ? TokenEstimator.Estimate(definition) : 0,
+                !_disabled.Contains(name), OnToolToggled);
 
         ToolGroupItem Group(string title, string description, IEnumerable<ToolItem> tools) =>
             new(title, description, tools.ToList(), expanded.Contains(title), OnGroupToggled);
 
         if (_builtin is not null)
             foreach (var group in _builtin.Groups)
-                ToolGroups.Add(Group(BuiltinGroupTitle(group.Id), "",
-                                     group.Tools.Select(t => Item(BuiltinTools.ChatPrefix + t.Name, t.Name, t.Description))));
+                groups.Add(Group(BuiltinGroupTitle(group.Id), "",
+                                 group.Tools.Select(t => Item(BuiltinTools.ChatPrefix + t.Name, t.Name, t.Description))));
 
         // Narzędzia imagestudio__* podzielone według przeznaczenia (obrazy, wideo, głos...), każda grupa włączana osobno
         if (_appTools is not null)
             foreach (var category in ToolCategories.Order)
             {
-                var definitions = _appTools.AllDefinitions.Where(d => ToolCategories.For(d.Name) == category).ToList();
-                if (definitions.Count > 0)
-                    ToolGroups.Add(Group(AppGroupTitle(category), Loc.T("tools.control.tip"),
-                                         definitions.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
+                var tools = _appTools.AllDefinitions.Where(d => ToolCategories.For(d.Name) == category).ToList();
+                if (tools.Count > 0)
+                    groups.Add(Group(AppGroupTitle(category), Loc.T("tools.control.tip"),
+                                     tools.Select(d => Item(AppControlTools.ChatPrefix + d.Name, d.Name, d.Description))));
             }
 
-        foreach (var (server, definitions) in _host.ServerTools.OrderBy(s => s.Key, StringComparer.OrdinalIgnoreCase))
-            ToolGroups.Add(Group(server, Loc.T("tools.group.mcp"),
-                                 definitions.Select(d => Item(d.Name, d.Name.Contains("__") ? d.Name[(d.Name.IndexOf("__", StringComparison.Ordinal) + 2)..] : d.Name, d.Description))));
+        foreach (var (server, tools) in _host.ServerTools.OrderBy(s => s.Key, StringComparer.OrdinalIgnoreCase))
+            groups.Add(Group(server, Loc.T("tools.group.mcp"),
+                             tools.Select(d => Item(d.Name, d.Name.Contains("__") ? d.Name[(d.Name.IndexOf("__", StringComparison.Ordinal) + 2)..] : d.Name, d.Description))));
+
+        if (SortBySize) groups = groups.OrderByDescending(g => g.TotalTokens).ToList();
+
+        ToolGroups.Clear();
+        foreach (var group in groups) ToolGroups.Add(group);
+        ApplySearch();
+    }
+
+    // Pełne definicje wszystkich narzędzi (także wyłączonych) pod nazwami widocznymi dla modelu: do szacunku tokenów w panelu
+    private Dictionary<string, ToolDefinition> DefinitionsByName()
+    {
+        var all = new Dictionary<string, ToolDefinition>();
+        if (_builtin is not null)
+            foreach (var d in _builtin.Definitions) all[BuiltinTools.ChatPrefix + d.Name] = d with { Name = BuiltinTools.ChatPrefix + d.Name };
+        if (_appTools is not null)
+            foreach (var d in _appTools.AllDefinitions) all[AppControlTools.ChatPrefix + d.Name] = d with { Name = AppControlTools.ChatPrefix + d.Name };
+        foreach (var server in _host.ServerTools.Values)
+            foreach (var d in server) all[d.Name] = d;
+        return all;
     }
 
     private static string AppGroupTitle(string id) => id switch
@@ -449,7 +583,7 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         await _host.DisposeAsync();
         LoadServers();
         RebuildGroups();
-        OnPropertyChanged(nameof(Summary));
+        OnToolsChanged();
         await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
     }
 

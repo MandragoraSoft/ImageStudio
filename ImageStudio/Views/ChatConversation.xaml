@@ -232,7 +232,13 @@
             <TextBlock Text="{Binding ToolsWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
             <!-- Zajętość okna kontekstowego: pasek (gdy katalog podaje limit) i tekst; od 75% ostrzegawczo, od 90% mocniej -->
-            <Grid Margin="0,2,0,4" ToolTip="{loc:T chat.context.tip}" Visibility="{Binding HasContext, Converter={StaticResource BoolToVis}}">
+            <Grid Margin="0,2,0,4" Visibility="{Binding HasContext, Converter={StaticResource BoolToVis}}">
+                <Grid.ToolTip>
+                    <StackPanel>
+                        <TextBlock Text="{loc:T chat.context.tip}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding ContextBreakdown}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid.ToolTip>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
