@@ -83,7 +83,7 @@ public sealed class ModelBrowserViewModelTests : IDisposable
         vm.AcceptsImageOnly = true;
         Assert.Equal(["adult", "with-image"], Visible(vm));
 
-        vm.HideNsfw = true;
+        vm.Nsfw = TriState.Exclude;
         Assert.Equal(["with-image"], Visible(vm));
     }
 

@@ -25,7 +25,7 @@ public sealed partial class ModelFilter(bool imageFilter, Func<ProviderModelPref
     private bool _inputImageOnly;
 
     [ObservableProperty]
-    private bool _hideNsfw;
+    private TriState _nsfw = TriState.Any;
 
     [ObservableProperty]
     private bool _preferredOnly;
@@ -59,7 +59,7 @@ public sealed partial class ModelFilter(bool imageFilter, Func<ProviderModelPref
 
     partial void OnSearchTextChanged(string value) => Refresh();
     partial void OnInputImageOnlyChanged(bool value) => Refresh();
-    partial void OnHideNsfwChanged(bool value) => Refresh();
+    partial void OnNsfwChanged(TriState value) => Refresh();
 
     partial void OnPreferredOnlyChanged(bool value)
     {
@@ -70,7 +70,8 @@ public sealed partial class ModelFilter(bool imageFilter, Func<ProviderModelPref
     public bool Matches(object item)
     {
         if (item is not ModelOption m) return false;
-        if (HideNsfw && m.Nsfw) return false;
+        if (Nsfw == TriState.Only && !m.Nsfw) return false;
+        if (Nsfw == TriState.Exclude && m.Nsfw) return false;
         // Modele dźwięku nie mają wejścia obrazowego: filtr obrazu ukryłby je wszystkie
         if (imageFilter && InputImageOnly && !m.AcceptsImage) return false;
         if (SelectedProvider != AllProviders && !string.Equals(m.OwnedBy, SelectedProvider, StringComparison.OrdinalIgnoreCase)) return false;
