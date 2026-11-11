@@ -231,6 +231,45 @@
             <TextBlock Text="{Binding ImageWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
             <TextBlock Text="{Binding ToolsWarning}" TextWrapping="Wrap" Foreground="OrangeRed"/>
 
+            <!-- Zajętość okna kontekstowego: pasek (gdy katalog podaje limit) i tekst; od 75% ostrzegawczo, od 90% mocniej -->
+            <Grid Margin="0,2,0,4" ToolTip="{loc:T chat.context.tip}" Visibility="{Binding HasContext, Converter={StaticResource BoolToVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ProgressBar Height="4" Maximum="100" Value="{Binding ContextBarValue, Mode=OneWay}" VerticalAlignment="Center"
+                             Visibility="{Binding HasContextLimit, Converter={StaticResource BoolToVis}}">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContextLevel}" Value="warn">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ContextLevel}" Value="critical">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+                <TextBlock Grid.Column="1" Text="{Binding ContextText}" Margin="8,0,0,0" FontSize="11" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextBlock}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContextLevel}" Value="warn">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ContextLevel}" Value="critical">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

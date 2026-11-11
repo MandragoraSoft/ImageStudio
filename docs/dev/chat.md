@@ -14,6 +14,8 @@ Każda rozmowa to sesja zapisywana po każdej odpowiedzi przez `IChatSessionStor
 
 `ChatReply.Usage` (`TokenUsage`: wejście, wyjście, z cache) czyta `OpenAiCompat` z `usage` w kilku formatach (`prompt_tokens_details.cached_tokens`, `prompt_cache_hit_tokens`, `cache_read_input_tokens`); trafia do `ChatMessage.Usage` i jest pokazywane pod odpowiedzią (`UsageText`). Aplikacja sama niczego nie cachuje: wysyła pełną historię, a cache działa po stronie dostawcy.
 
+Wskaźnik zużycia kontekstu nad polem wpisywania (`ChatViewModel.ContextUsed`, `ContextText`, `ContextLevel`): zajętość okna z ostatniej odpowiedzi z `usage` (wejście + wyjście). Bez takiej odpowiedzi szacunek `TokenEstimator` (znaki/4) z prefiksem `~`. Limit to `ContextLength` z `ChatModelInfo`, czytany z katalogu przez `OpenAiCompat.ReadContextLength`; dostawcy, którzy go nie podają, zostają z `null` i wskaźnik pokazuje same tokeny. Pasek ucina się na 100%, tekst nie. Ostrzeżenie od 75%, mocniejsze od 90%.
+
 ## Rozumowanie w czacie
 
 `IAiProvider.ChatAsync(..., ChatOptions? options)`; `ChatOptions.Parameter` to parametr, który model deklaruje w `supported_parameters` (`ReasoningSupport.ParameterFor`: `reasoning_effort` > `reasoning` > `include_reasoning`), a `OpenAiCompat` wysyła go wg stylu i czyta `reasoning_content`/`reasoning`/`reasoning_details` do `ChatReply.Reasoning` (`ChatMessage.Reasoning`, tylko podgląd, nie wraca do API). `ChatViewModel.SupportsReasoning` pokazuje sterowanie (włącz/wyłącz, poziom low/medium/high) tylko dla takich modeli; wybór jest w `UserState`.

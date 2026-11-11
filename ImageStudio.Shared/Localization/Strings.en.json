@@ -36,6 +36,8 @@
   "chat.approval.session": "For this chat",
   "chat.approval.session.tip": "Allow this tool until the end of this chat (no more questions)",
   "chat.approval.title": "The model wants to call the tool:",
+  "chat.context.tip": "Context window usage of the model. ~ means an estimate.",
+  "chat.context.tokens": "{0} tokens",
   "chat.deleteSession": "Delete session",
   "chat.deleteSession.tip": "Deletes the selected session from disk",
   "chat.empty": "Type a message below to start the conversation. You can add images with the button, paste them (Ctrl+V) or drag them onto the panel.",

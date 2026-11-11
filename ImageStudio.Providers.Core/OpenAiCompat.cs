@@ -48,6 +48,20 @@ public static class OpenAiCompat
         return new ChatReply(content, calls, ReadReasoning(message), ReadUsage(doc.RootElement));
     }
 
+    // Rozmiar okna kontekstowego z elementu JSON modelu w katalogu: pierwsza dodatnia liczba z pól znanych dostawcom; inaczej null
+    public static int? ReadContextLength(JsonElement model)
+    {
+        if (model.ValueKind != JsonValueKind.Object) return null;
+
+        static int? Positive(JsonElement e) => e.ValueKind == JsonValueKind.Number && e.TryGetInt32(out var n) && n > 0 ? n : null;
+
+        foreach (var name in new[] { "context_length", "max_context_length", "context_window" })
+            if (model.TryGetProperty(name, out var value) && Positive(value) is { } found) return found;
+
+        return model.TryGetProperty("top_provider", out var top) && top.ValueKind == JsonValueKind.Object
+               && top.TryGetProperty("context_length", out var nested) ? Positive(nested) : null;
+    }
+
     // Zużycie z pola usage; tokeny z cache raportują różne API: prompt_tokens_details.cached_tokens (OpenAI, OpenRouter, Venice),
     // prompt_cache_hit_tokens (DeepSeek), cache_read_input_tokens (styl Anthropic) lub cached_tokens
     private static TokenUsage? ReadUsage(JsonElement root)

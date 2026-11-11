@@ -66,12 +66,18 @@ public sealed partial class ChatViewModel : ObservableObject
         Tools = tools;
         _confirm = confirm;
         _images = images;
-        if (tools is INotifyPropertyChanged observable) observable.PropertyChanged += (_, _) => OnPropertyChanged(nameof(ToolsWarning));
+        if (tools is INotifyPropertyChanged observable)
+            observable.PropertyChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(ToolsWarning));
+                RefreshContext();
+            };
         Attachments.CollectionChanged += (_, _) =>
         {
             SendCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(ImageWarning));
         };
+        Messages.CollectionChanged += (_, _) => RefreshContext();
     }
 
     // Wspólna z ulepszaniem promptu lista modeli czatu aktywnego dostawcy
@@ -146,6 +152,8 @@ public sealed partial class ChatViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(ToolsWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
     private string? _selectedModel;
 
+    partial void OnSelectedModelChanged(string? value) => RefreshContext();
+
     // Rozumowanie: sterowanie pojawia się tylko dla modeli, które je deklarują (supported_parameters z katalogu)
     public IReadOnlyList<string> ReasoningEfforts => ReasoningSupport.Levels;
 
@@ -161,13 +169,72 @@ public sealed partial class ChatViewModel : ObservableObject
     public bool SupportsReasoning => ReasoningParameter is not null;
 
     // Katalog modeli mógł się właśnie wczytać: widoczność sterowania liczy się od nowa
-    public void RefreshReasoningSupport() => OnPropertyChanged(nameof(SupportsReasoning));
+    public void RefreshReasoningSupport()
+    {
+        OnPropertyChanged(nameof(SupportsReasoning));
+        RefreshContext();
+    }
+
+    // --- Wskaźnik zużycia kontekstu ---
+    // Zajętość okna modelu: tokeny z ostatniej odpowiedzi (API podaje usage), a gdy jej nie ma, szacunek (oznaczony "~")
+
+    public bool HasContext => Messages.Count > 0;
+
+    private TokenUsage? LastUsage => Messages.LastOrDefault(m => m.Role == "assistant" && m.Usage?.Input is not null)?.Usage;
+
+    public bool ContextEstimated => LastUsage is null;
+
+    public int ContextUsed => LastUsage is { Input: { } input } usage ? input + (usage.Output ?? 0) : EstimateContext();
+
+    // Instrukcja systemowa bez notatki o załącznikach (ta zapisuje pliki, a wskaźnik odświeża się przy każdej zmianie)
+    private int EstimateContext() =>
+        TokenEstimator.Estimate(SystemPrompt) + TokenEstimator.Estimate(Tools?.SystemNote)
+        + (Tools is { } host ? host.Tools.Sum(t => TokenEstimator.Estimate(t)) : 0)
+        + Messages.Sum(m => TokenEstimator.Estimate(m.Content));
+
+    // Rozmiar okna z katalogu modelu; null = katalog nie podaje
+    public int? ContextLimit => SelectedModel is { } model && _modelInfo?.Invoke(model) is { ContextLength: { } limit } ? limit : null;
+
+    public bool HasContextLimit => ContextLimit is > 0;
+
+    public double ContextPercent => ContextLimit is { } limit && limit > 0 ? 100.0 * ContextUsed / limit : 0;
+
+    // Pasek nie przekracza 100%, tekst pokazuje prawdziwy procent
+    public double ContextBarValue => Math.Min(100, ContextPercent);
+
+    public string ContextLevel => ContextPercent >= 90 ? "critical" : ContextPercent >= 75 ? "warn" : "normal";
+
+    public string ContextText
+    {
+        get
+        {
+            var used = (ContextEstimated ? "~" : "") + TokenEstimator.Short(ContextUsed);
+            return HasContextLimit
+                ? $"{Math.Round(ContextPercent):0}% · {used} / {TokenEstimator.Short(ContextLimit!.Value)}"
+                : Loc.T("chat.context.tokens", used);
+        }
+    }
+
+    public void RefreshContext()
+    {
+        OnPropertyChanged(nameof(HasContext));
+        OnPropertyChanged(nameof(ContextEstimated));
+        OnPropertyChanged(nameof(ContextUsed));
+        OnPropertyChanged(nameof(ContextLimit));
+        OnPropertyChanged(nameof(HasContextLimit));
+        OnPropertyChanged(nameof(ContextPercent));
+        OnPropertyChanged(nameof(ContextBarValue));
+        OnPropertyChanged(nameof(ContextLevel));
+        OnPropertyChanged(nameof(ContextText));
+    }
 
     private ChatOptions? BuildOptions() =>
         ReasoningParameter is { } parameter ? new ChatOptions(parameter, ReasoningEnabled, SelectedReasoningEffort) : null;
 
     [ObservableProperty]
     private string _systemPrompt;
+
+    partial void OnSystemPromptChanged(string value) => RefreshContext();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
@@ -348,6 +415,7 @@ public sealed partial class ChatViewModel : ObservableObject
         target.Usage = reply.Usage;
         if (fresh.HasToolCalls) target.ToolCalls = fresh.ToolCalls;
         if (live is null) Messages.Add(target);
+        RefreshContext();
         MessageUpdated?.Invoke();
     }
 

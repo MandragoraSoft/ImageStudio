@@ -36,6 +36,8 @@
   "chat.approval.session": "W tej rozmowie",
   "chat.approval.session.tip": "Zezwól na to narzędzie do końca tej rozmowy (bez pytania)",
   "chat.approval.title": "Model chce wywołać narzędzie:",
+  "chat.context.tip": "Zajętość okna kontekstowego modelu. ~ oznacza szacunek.",
+  "chat.context.tokens": "{0} tok.",
   "chat.deleteSession": "Usuń sesję",
   "chat.deleteSession.tip": "Usuwa zaznaczoną sesję z dysku",
   "chat.empty": "Napisz wiadomość poniżej, aby zacząć rozmowę. Obrazy możesz dodać przyciskiem, wkleić (Ctrl+V) albo przeciągnąć na panel.",

@@ -80,6 +80,6 @@ public sealed class KiloProvider : OpenAiChatProvider
             ? list.EnumerateArray().Select(p => p.GetString()).OfType<string>().ToList()
             : [];
         var description = model.TryGetProperty("description", out var d) ? d.GetString() : null;
-        return new ChatModelInfo(id, supported, input.Contains("image"), id.Split('/')[0], input, description);
+        return new ChatModelInfo(id, supported, input.Contains("image"), id.Split('/')[0], input, description, OpenAiCompat.ReadContextLength(model));
     }
 }

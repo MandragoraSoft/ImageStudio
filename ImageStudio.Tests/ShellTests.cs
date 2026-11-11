@@ -108,10 +108,11 @@ public sealed class ShellTests
             app.Vm.Status = "Gotowe do pracy";
             Flush(window.Dispatcher);
 
-            var texts = FindAll<TextBlock>(FindAll<StatusBar>(window).Single()).Select(t => t.Text).ToList();
+            var footer = FindAll<StatusBar>(window).Single();
+            var texts = FindAll<TextBlock>(footer).Select(t => t.Text).ToList();
             Assert.Contains("Gotowe do pracy", texts);
             Assert.Contains("Dostawca: Fake", texts);
-            Assert.Empty(FindAll<ProgressBar>(window));
+            Assert.Empty(FindAll<ProgressBar>(footer)); // pasek zużycia kontekstu w czacie to osobny, dozwolony ProgressBar
             window.Close();
         });
     }

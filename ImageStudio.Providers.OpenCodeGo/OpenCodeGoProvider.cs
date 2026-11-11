@@ -85,7 +85,7 @@ public sealed class OpenCodeGoProvider : OpenAiChatProvider
         var canonical = model.TryGetProperty("canonical_id", out var cid) ? cid.GetString() : null;
         var owner = canonical is { Length: > 0 } && canonical.Contains('/') ? canonical.Split('/')[0] : "opencode";
         var description = model.TryGetProperty("description", out var d) ? d.GetString() : null;
-        return new ChatModelInfo(id, supported, input.Contains("image"), owner, input, description);
+        return new ChatModelInfo(id, supported, input.Contains("image"), owner, input, description, OpenAiCompat.ReadContextLength(model));
     }
 
     private static string? KindOf(string mime) => mime switch
