@@ -106,6 +106,7 @@ public sealed class StudioApiTests : IDisposable
         Assert.Equal(new ImageOptions(7, "rozmycie", "high"), _provider.LastImage.Value.Options);
         Assert.True(File.Exists(entry.FilePath));
         Assert.Equal(0.04m, entry.CostUsd);
+        Assert.Equal("Fake", entry.Provider);  // dostawca trafia do wpisu (dymek galerii)
         Assert.NotNull(result.Bytes);
         Assert.Same(entry, Assert.Single(_library.MediaItems));
     }

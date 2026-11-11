@@ -97,6 +97,22 @@
                                 <StackPanel.ToolTip>
                                     <StackPanel MaxWidth="360">
                                         <TextBlock Text="{Binding Prompt}" TextWrapping="Wrap"/>
+                                        <!-- Model i dostawca, którym powstał wynik; starsze wpisy nie mają dostawcy -->
+                                        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap">
+                                            <Run Text="{loc:T common.model}"/><Run Text=": "/><Run Text="{Binding Model, Mode=OneWay}"/>
+                                        </TextBlock>
+                                        <TextBlock TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Provider}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                            <Run Text="{loc:T common.provider}"/><Run Text=": "/><Run Text="{Binding Provider, Mode=OneWay}"/>
+                                        </TextBlock>
                                         <TextBlock Margin="0,6,0,0" Style="{StaticResource MutedTextBlock}">
                                             <Run Text="{Binding KindLabel, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CostLabel, Mode=OneWay}"/>
                                         </TextBlock>

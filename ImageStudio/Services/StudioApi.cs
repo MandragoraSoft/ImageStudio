@@ -105,7 +105,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var path = await storage.WriteAsync(MediaKind.Audio, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}", result.Bytes, ct);
         var entry = new GalleryEntry
         {
-            Kind = "speech", Prompt = text, Model = id, Size = note ?? "", FilePath = path, CostUsd = result.CostUsd ?? estimate,
+            Kind = "speech", Prompt = text, Model = id, Provider = provider().DisplayName, Size = note ?? "", FilePath = path, CostUsd = result.CostUsd ?? estimate,
             Params = Params(("voice", request.Voice), ("speed", speed), ("format", request.Format)),
             CostEstimated = result.CostUsd is null && estimate is not null,
         };
@@ -123,7 +123,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var result = await provider().TranscribeAsync(id, request.Path, request.Language, request.Hint, ct);
         var entry = new GalleryEntry
         {
-            Kind = "transcript", Prompt = result.Text.Trim(), Model = id, FilePath = request.Path, CostUsd = result.CostUsd,
+            Kind = "transcript", Prompt = result.Text.Trim(), Model = id, Provider = provider().DisplayName, FilePath = request.Path, CostUsd = result.CostUsd,
             Params = Params(("language", request.Language), ("hint", request.Hint)),
         };
         if (request.Publish) library.AddVoice(entry);
@@ -197,7 +197,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var path = await storage.WriteAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes, ct);
         var entry = new GalleryEntry
         {
-            Kind = "video", Prompt = request.Prompt, Model = id, FilePath = path,
+            Kind = "video", Prompt = request.Prompt, Model = id, Provider = provider().DisplayName, FilePath = path,
             Size = $"{request.AspectRatio} · {request.Duration} s" + (files.Count > 0 ? $" · {files.Count} zał." : ""),
             Inputs = request.Attachments is { Count: > 0 } attachments ? attachments.ToList() : null,
             Params = Params(("duration", request.Duration), ("aspect", request.AspectRatio)),
@@ -215,7 +215,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var estimate = Catalog?.Pricing.GetValueOrDefault(model)?.PerResult;
         var entry = new GalleryEntry
         {
-            Kind = kind, Prompt = prompt, Model = model, Size = size, FilePath = path, Inputs = inputs, Params = parameters,
+            Kind = kind, Prompt = prompt, Model = model, Provider = provider().DisplayName, Size = size, FilePath = path, Inputs = inputs, Params = parameters,
             CostUsd = result.CostUsd ?? estimate, CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (publish) library.AddMedia(entry);

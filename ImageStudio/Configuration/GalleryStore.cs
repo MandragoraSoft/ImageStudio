@@ -12,6 +12,9 @@ public sealed class GalleryEntry
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public string Prompt { get; set; } = "";
     public string Model { get; set; } = "";
+
+    // Dostawca AI, który wykonał operację (nazwa wyświetlana); null w starszych wpisach
+    public string? Provider { get; set; }
     public string Kind { get; set; } = "generate";
     public string Size { get; set; } = "";
 
