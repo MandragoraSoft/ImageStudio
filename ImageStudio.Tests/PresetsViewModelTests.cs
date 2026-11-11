@@ -3,6 +3,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Localization;
+using ImageStudio.Services;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
 
@@ -526,6 +527,496 @@ public sealed class PromptEditorPresetStateTests
             vm.EditGeneratePromptCommand.Execute(null);
 
             Assert.True(vm.PresetDirty);
+        });
+    }
+}
+
+// Wspomaganie AI nazwy i opisu, model wspomagania, proporcje, autozapis i edytor promptu w oknie zestawów
+public sealed class PresetAssistTests
+{
+    private static ModelOption Model(string id) => new(id, null, false, ["text"], null);
+
+    private static Preset Generate(string name, string prompt = "p") => new() { Name = name, Kind = "generate", Prompt = prompt, Width = 1024, Height = 1024 };
+
+    private static (TestApp App, PresetsViewModel Vm) Open(Preset preset, PresetsContext? context = null)
+    {
+        var app = TestApp.Create();
+        app.Presets.Create(preset);
+        var vm = app.NewPresetsViewModel(context);
+        vm.SelectedPreset = vm.Presets.First(p => p.Name == preset.Name);
+        return (app, vm);
+    }
+
+    // Kontekst z modelami tekstowymi wspomagania (enhancers) i opcjonalnymi wywołaniami
+    private static PresetsContext Context(Func<PresetSuggestRequest, Task<PresetDraft>>? suggest = null,
+                                          IReadOnlyList<ModelOption>? enhancers = null,
+                                          Func<PresetPromptEditRequest, PromptEdit?>? edit = null,
+                                          bool autoSave = false, Action<bool>? autoSaveChanged = null) =>
+        new(kind => kind == "enhancer" ? enhancers ?? [] : [Model("a/x")], "fake", null, suggest, edit, autoSave, autoSaveChanged);
+
+    // Atrapa wspomagania: zapamiętuje żądanie i zwraca stałą propozycję (albo rzuca, gdy Error ustawiony)
+    private sealed class SuggestSpy
+    {
+        public PresetSuggestRequest? Request { get; private set; }
+        public Exception? Error { get; set; }
+
+        public Task<PresetDraft> Suggest(PresetSuggestRequest request)
+        {
+            Request = request;
+            return Error is { } error ? Task.FromException<PresetDraft>(error) : Task.FromResult(new PresetDraft("Nowa nazwa", "Nowy opis"));
+        }
+    }
+
+    [Fact]
+    public void Suggest_name_fills_only_name()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy();
+            var (app, vm) = Open(Generate("a"), Context(spy.Suggest));
+            using var _ = app;
+            vm.EditDescription = "stary opis";
+
+            vm.SuggestNameCommand.Execute(null);
+
+            Assert.Equal("Nowa nazwa", vm.EditName);
+            Assert.Equal("stary opis", vm.EditDescription);
+        });
+    }
+
+    [Fact]
+    public void Suggest_description_fills_only_description()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy();
+            var (app, vm) = Open(Generate("a"), Context(spy.Suggest));
+            using var _ = app;
+
+            vm.SuggestDescriptionCommand.Execute(null);
+
+            Assert.Equal("Nowy opis", vm.EditDescription);
+            Assert.Equal("a", vm.EditName);
+        });
+    }
+
+    [Fact]
+    public void Suggest_sends_prompt_system_and_preset_model()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy();
+            var (app, vm) = Open(Generate("a", "kot"), Context(spy.Suggest));
+            using var _ = app;
+            vm.EditSystemPrompt = "sys";
+            vm.EditEnhancerModel = "a/x";
+
+            vm.SuggestNameCommand.Execute(null);
+
+            Assert.Equal("kot", spy.Request!.Prompt);
+            Assert.Equal("sys", spy.Request.SystemPrompt);
+            Assert.Equal("a/x", spy.Request.Model);
+        });
+    }
+
+    [Fact]
+    public void Suggest_failure_sets_status_and_clears_busy()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy { Error = new InvalidOperationException("brak sieci") };
+            var (app, vm) = Open(Generate("a"), Context(spy.Suggest));
+            using var _ = app;
+
+            vm.SuggestNameCommand.Execute(null);
+
+            Assert.NotEmpty(vm.Status);
+            Assert.False(vm.IsSuggesting);
+            Assert.Equal("a", vm.EditName);
+        });
+    }
+
+    [Fact]
+    public void Suggest_is_unavailable_without_context()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+
+            Assert.False(vm.CanSuggest);
+            Assert.False(vm.SuggestNameCommand.CanExecute(null));
+            Assert.False(vm.SuggestDescriptionCommand.CanExecute(null));
+        });
+    }
+
+    [Fact]
+    public void Suggest_needs_prompt()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy();
+            var (app, vm) = Open(Generate("a"), Context(spy.Suggest));
+            using var _ = app;
+
+            vm.EditPrompt = "  ";
+
+            Assert.False(vm.SuggestNameCommand.CanExecute(null));
+        });
+    }
+
+    [Fact]
+    public void Suggested_name_marks_dirty_but_does_not_save()
+    {
+        Sta.Run(() =>
+        {
+            var spy = new SuggestSpy();
+            var (app, vm) = Open(Generate("a"), Context(spy.Suggest));
+            using var _ = app;
+
+            vm.SuggestNameCommand.Execute(null);
+
+            Assert.True(vm.IsDirty);
+            Assert.Equal("a", Assert.Single(app.Presets.Presets).Name);
+        });
+    }
+
+    [Fact]
+    public void Preset_suggestion_uses_requested_model_when_available()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Provider.ChatCatalog = [new ChatModelInfo("req/model", []), new ChatModelInfo("sel/model", [])];
+            app.Provider.OnChat = (_, _) => "{\"name\": \"N\", \"description\": \"D\"}";
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            app.Vm.SelectedEnhancerModel = "sel/model";
+            PresetsContext? captured = null;
+            app.Dialogs.OnShowPresets = context => { captured = context; return null; };
+            app.Vm.OpenPresetsCommand.Execute(null);
+
+            var draft = captured!.Suggest!(new PresetSuggestRequest("p", null, "req/model")).GetAwaiter().GetResult();
+
+            Assert.Equal("req/model", app.Provider.LastModel);
+            Assert.Equal("N", draft.Name);
+        });
+    }
+
+    [Fact]
+    public void Preset_suggestion_falls_back_to_selected_enhancer_model()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Provider.ChatCatalog = [new ChatModelInfo("sel/model", [])];
+            app.Provider.OnChat = (_, _) => "{\"name\": \"N\", \"description\": \"D\"}";
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            PresetsContext? captured = null;
+            app.Dialogs.OnShowPresets = context => { captured = context; return null; };
+            app.Vm.OpenPresetsCommand.Execute(null);
+
+            captured!.Suggest!(new PresetSuggestRequest("p", null, "nieznany/model")).GetAwaiter().GetResult();
+
+            Assert.Equal("sel/model", app.Provider.LastModel);
+        });
+    }
+
+    [Fact]
+    public void Changing_enhancer_model_is_saved()
+    {
+        Sta.Run(() =>
+        {
+            var preset = Generate("a");
+            preset.EnhancerModel = "e/1";
+            var (app, vm) = Open(preset, Context(enhancers: [Model("e/1"), Model("e/2")]));
+            using var _ = app;
+
+            vm.EditEnhancerModel = "e/2";
+            vm.SaveDetailsCommand.Execute(null);
+
+            Assert.Equal("e/2", Assert.Single(app.Presets.Presets).EnhancerModel);
+        });
+    }
+
+    [Fact]
+    public void Missing_enhancer_model_warns_and_is_kept()
+    {
+        Sta.Run(() =>
+        {
+            var preset = Generate("a");
+            preset.EnhancerModel = "stary/e";
+            var (app, vm) = Open(preset, Context(enhancers: [Model("e/1")]));
+            using var _ = app;
+
+            Assert.NotEmpty(vm.EnhancerWarning);
+
+            vm.EditPrompt = "inny";
+            vm.SaveDetailsCommand.Execute(null);
+
+            Assert.Equal("stary/e", Assert.Single(app.Presets.Presets).EnhancerModel);
+        });
+    }
+
+    [Fact]
+    public void Enhancer_instruction_is_saved()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(enhancers: [Model("e/1")]));
+            using var _ = app;
+
+            vm.EditEnhancerInstruction = "instrukcja";
+            vm.SaveDetailsCommand.Execute(null);
+
+            Assert.Equal("instrukcja", Assert.Single(app.Presets.Presets).EnhancerInstruction);
+        });
+    }
+
+    [Fact]
+    public void Selected_aspect_reflects_size()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+
+            Assert.Equal("1:1", vm.SelectedAspect);
+        });
+    }
+
+    [Fact]
+    public void Choosing_aspect_sets_height()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+
+            vm.SelectedAspect = "16:9";
+
+            Assert.Equal(576, vm.EditHeight);
+            Assert.Equal("16:9", vm.SelectedAspect);
+        });
+    }
+
+    [Fact]
+    public void Custom_size_has_no_aspect()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+
+            vm.EditWidth = 1000;
+            vm.EditHeight = 333;
+
+            Assert.Null(vm.SelectedAspect);
+        });
+    }
+
+    [Fact]
+    public void Details_summary_changes_with_size()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+            Assert.Equal("1024 × 1024 · ziarno: losowy · auto", vm.DetailsSummary);
+
+            vm.EditWidth = 768;
+
+            Assert.Equal("768 × 1024 · ziarno: losowy · auto", vm.DetailsSummary);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_switching_saves_without_asking()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Presets.Create(Generate("a"));
+            app.Presets.Create(Generate("b", "pb"));
+            var vm = app.NewPresetsViewModel(Context(autoSave: true));
+            vm.SelectedPreset = vm.Presets.First(p => p.Name == "a");
+            vm.EditPrompt = "zmiana";
+
+            vm.SelectedPreset = vm.Presets.First(p => p.Name == "b");
+
+            Assert.Equal("zmiana", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+            Assert.Equal(0, app.Dialogs.ConfirmCount);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_close_saves_without_asking()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(autoSave: true));
+            using var _ = app;
+            vm.EditPrompt = "zmiana";
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal("zmiana", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+            Assert.Equal(0, app.Dialogs.ConfirmCount);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_invalid_close_stays_open()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(autoSave: true));
+            using var _ = app;
+            vm.EditName = "";
+            vm.EditPrompt = "zmiana";
+
+            Assert.False(vm.ConfirmClose());
+            Assert.Equal("p", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+            Assert.Equal(Loc.T("presets.msg.emptyName"), vm.Status);
+            Assert.Equal(0, app.Dialogs.ConfirmCount);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_off_still_asks()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(autoSave: false));
+            using var _ = app;
+            vm.EditPrompt = "zmiana";
+            app.Dialogs.ConfirmAnswer = false;
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal(1, app.Dialogs.ConfirmCount);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_change_is_reported_to_context()
+    {
+        Sta.Run(() =>
+        {
+            bool? reported = null;
+            var (app, vm) = Open(Generate("a"), Context(autoSaveChanged: value => reported = value));
+            using var _ = app;
+
+            vm.AutoSave = true;
+
+            Assert.True(reported);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_is_persisted_in_state()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            PresetsContext? captured = null;
+            app.Dialogs.OnShowPresets = context => { captured = context; return null; };
+            app.Vm.OpenPresetsCommand.Execute(null);
+
+            captured!.AutoSaveChanged!(true);
+
+            Assert.True(app.State.State.PresetsAutoSave);
+        });
+    }
+
+    [Fact]
+    public void Auto_save_is_read_from_state_when_opening()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.State.State.PresetsAutoSave = true;
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            PresetsContext? captured = null;
+            app.Dialogs.OnShowPresets = context => { captured = context; return null; };
+
+            app.Vm.OpenPresetsCommand.Execute(null);
+
+            Assert.True(captured!.AutoSave);
+        });
+    }
+
+    [Fact]
+    public void Edit_in_editor_writes_result_to_fields()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(edit: _ => new PromptEdit("sys2", "nowy", "instr2")));
+            using var _ = app;
+
+            vm.EditInEditorCommand.Execute(null);
+
+            Assert.Equal("nowy", vm.EditPrompt);
+            Assert.Equal("sys2", vm.EditSystemPrompt);
+            Assert.Equal("instr2", vm.EditEnhancerInstruction);
+            Assert.Equal("p", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+        });
+    }
+
+    [Fact]
+    public void Edit_in_editor_cancel_changes_nothing()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), Context(edit: _ => null));
+            using var _ = app;
+
+            vm.EditInEditorCommand.Execute(null);
+
+            Assert.Equal("p", vm.EditPrompt);
+            Assert.False(vm.IsDirty);
+        });
+    }
+
+    [Fact]
+    public void Edit_in_editor_passes_preset_model_and_parameters()
+    {
+        Sta.Run(() =>
+        {
+            PresetPromptEditRequest? request = null;
+            var preset = Generate("a");
+            preset.Parameters["steps"] = new ParamState { Enabled = true, Value = 5 };
+            var (app, vm) = Open(preset, Context(edit: r => { request = r; return null; }));
+            using var _ = app;
+            vm.EditEnhancerModel = "e/1";
+
+            vm.EditInEditorCommand.Execute(null);
+
+            Assert.Equal("e/1", request!.Model);
+            Assert.Equal(Loc.T("presets.editor.title", "a"), request.Title);
+            Assert.Equal(5, request.Parameters["steps"].Value);
+            Assert.True(request.Parameters["steps"].Enabled);
+        });
+    }
+
+    [Fact]
+    public void Editor_from_presets_does_not_touch_main_prompts()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            app.Vm.GeneratePrompt = "glowny";
+            var dirty = app.Vm.PresetDirty;
+            PresetsContext? captured = null;
+            app.Dialogs.OnShowPresets = context => { captured = context; return null; };
+            app.Vm.OpenPresetsCommand.Execute(null);
+            app.Dialogs.PromptEditResult = new PromptEdit("sys", "z edytora");
+
+            var result = captured!.EditPrompt!(new PresetPromptEditRequest("t", new PromptEdit("", "p", null, []), null,
+                                                                          new Dictionary<string, ParamState>()));
+
+            Assert.Equal("z edytora", result!.Prompt);
+            Assert.Equal("glowny", app.Vm.GeneratePrompt);
+            Assert.Equal(dirty, app.Vm.PresetDirty);
         });
     }
 }

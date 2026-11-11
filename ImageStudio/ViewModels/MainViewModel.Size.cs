@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
 using System.IO;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
@@ -37,8 +36,8 @@ public sealed partial class MainViewModel
         {
             if (KeepAspect)
             {
-                if (widthChanged) Height = Snap(Width / _aspect);
-                else Width = Snap(Height * _aspect);
+                if (widthChanged) Height = ImageAspect.Snap(Width / _aspect);
+                else Width = ImageAspect.Snap(Height * _aspect);
             }
             else if (Height > 0)
             {
@@ -54,18 +53,13 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void SetAspect(string? ratio)
     {
-        var parts = ratio?.Split(':');
-        if (parts is not { Length: 2 }
-            || !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
-            || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var h)
-            || h <= 0)
-            return;
+        if (ImageAspect.Ratio(ratio) is not { } value) return;
 
-        _aspect = w / h;
+        _aspect = value;
         _syncing = true;
         try
         {
-            Height = Snap(Width / _aspect);
+            Height = ImageAspect.Snap(Width / _aspect);
         }
         finally
         {
@@ -87,8 +81,8 @@ public sealed partial class MainViewModel
         _syncing = true;
         try
         {
-            Width = Snap(pixelWidth * scale);
-            Height = Snap(pixelHeight * scale);
+            Width = ImageAspect.Snap(pixelWidth * scale);
+            Height = ImageAspect.Snap(pixelHeight * scale);
         }
         finally
         {
@@ -96,7 +90,4 @@ public sealed partial class MainViewModel
         }
         _aspect = (double)pixelWidth / pixelHeight;
     }
-
-    // Wielokrotność 8, minimum 8
-    private static int Snap(double value) => Math.Max(8, (int)Math.Round(value / 8.0) * 8);
 }

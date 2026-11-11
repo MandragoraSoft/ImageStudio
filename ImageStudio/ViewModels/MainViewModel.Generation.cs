@@ -81,7 +81,7 @@ public sealed partial class MainViewModel
     {
         var wasDirty = PresetDirty;
         Preset? saved = null;
-        var edit = _dialogs.ShowPromptEditor(title, initial, RebuildPromptAsync, this, PresetsOfKind(kind),
+        var edit = _dialogs.ShowPromptEditor(title, initial, current => RebuildPromptAsync(current), this, PresetsOfKind(kind),
                                              preset => { _presetStore.Save(preset); saved = preset; }, describe);
         if (edit is null) return;
 
@@ -94,6 +94,26 @@ public sealed partial class MainViewModel
             PresetDirty = wasDirty;
     }
 
+    // Edytor z okna zestawów: bez paska zestawów i panelu parametrów; model i parametry przebudowy z zestawu.
+    // Nie zmienia promptów, historii ani wyboru modelu w głównym oknie (wynik wraca tylko do pól zestawu)
+    private PromptEdit? EditPresetPrompt(PresetPromptEditRequest request) =>
+        _dialogs.ShowPromptEditor(request.Title, request.Initial,
+                                  current => RebuildPromptAsync(current, request.Model, ApiParameters(request.Parameters)),
+                                  describeImages: () => DescribeImagesAsync([], request.Model));
+
+    // Wartości włączonych parametrów w kształcie żądania API (całkowite jako int), jak w ModelParameter.ToApiValue
+    private static Dictionary<string, object> ApiParameters(IReadOnlyDictionary<string, ParamState> parameters)
+    {
+        var values = new Dictionary<string, object>();
+        foreach (var spec in ModelParameter.Catalog)
+        {
+            if (!parameters.TryGetValue(spec.Key, out var state) || !state.Enabled) continue;
+            values[spec.Key] = spec.IsInteger ? (object)(int)Math.Round(state.Value) : state.Value;
+        }
+
+        return values;
+    }
+
     [RelayCommand]
     private void EditVideoPrompt()
     {
@@ -103,9 +123,14 @@ public sealed partial class MainViewModel
 
     // Opis obrazów wybranym modelem tekstowym (musi przyjmować obrazy). Obrazy z zakładki (referencje, załączniki wideo),
     // a gdy ich brak, z wyboru plików; pusty wynik = anulowano
-    private async Task<string> DescribeImagesAsync(IReadOnlyList<ReferenceItem> tabImages)
+    // Model opisu/przebudowy: z żądania (np. zestawu), jeśli jest na liście ulepszania; inaczej wybrany w głównym oknie
+    private string EnhancerModelOrThrow(string? requested) =>
+        requested is not null && EnhancerModels.Contains(requested) ? requested
+        : SelectedEnhancerModel ?? throw new InvalidOperationException(Loc.T("gen.err.noEnhancer"));
+
+    private async Task<string> DescribeImagesAsync(IReadOnlyList<ReferenceItem> tabImages, string? requestedModel = null)
     {
-        var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model w „Ustawieniach ulepszania AI”.");
+        var model = EnhancerModelOrThrow(requestedModel);
         if (_chatModels.TryGetValue(model, out var info) && info.AcceptsImage == false)
             throw new InvalidOperationException(Loc.T("gen.err.noImages", model));
 
@@ -115,13 +140,15 @@ public sealed partial class MainViewModel
         return await Studio.DescribeImagesAsync(new DescribeRequest(paths, model, _settings.MaxSide));
     }
 
-    // Przebudowa z okna edytora: bieżące pola i prompt techniczny z okna, bez zmiany stanu aplikacji (zapis dopiero po Zastosuj)
-    private async Task<PromptEdit> RebuildPromptAsync(PromptEdit current)
+    // Przebudowa z okna edytora: bieżące pola i prompt techniczny z okna, bez zmiany stanu aplikacji (zapis dopiero po Zastosuj).
+    // Model i parametry domyślnie z głównego okna; zestawy podają własne
+    private async Task<PromptEdit> RebuildPromptAsync(PromptEdit current, string? requestedModel = null,
+                                                      IReadOnlyDictionary<string, object>? parameters = null)
     {
-        var model = SelectedEnhancerModel ?? throw new InvalidOperationException("Wybierz model ulepszania w „Ustawieniach ulepszania AI”.");
         var instruction = string.IsNullOrWhiteSpace(current.Instruction) ? DefaultInstruction : current.Instruction;
-        var parts = await Studio.RebuildPromptAsync(new PromptRebuildRequest(current.Prompt, current.System, instruction, model,
-                                                                              EnhancerParameterValues(), current.History));
+        var parts = await Studio.RebuildPromptAsync(new PromptRebuildRequest(current.Prompt, current.System, instruction,
+                                                                              EnhancerModelOrThrow(requestedModel),
+                                                                              parameters ?? EnhancerParameterValues(), current.History));
         var step = new PromptRevision(current.System ?? "", current.Prompt, parts.System, parts.Concept, instruction, parts.Changes);
         var history = (current.History ?? []).Append(step).TakeLast(OpenAiCompat.MaxHistory).ToList();
         return current with { System = parts.System, Prompt = parts.Concept, History = history };

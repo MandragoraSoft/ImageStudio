@@ -65,6 +65,8 @@ public sealed class UserState
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
     public string? Quality { get; set; }
+    // Okno zestawów: zapisywanie zmian bez pytania przy zmianie zestawu i zamykaniu okna
+    public bool PresetsAutoSave { get; set; }
     public Dictionary<string, ParamState> EnhancerParams { get; set; } = [];
 
     private static string FilePath => Path.Combine(AppPaths.UserDataDir, "state.json");

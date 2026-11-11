@@ -22,11 +22,6 @@ public sealed partial class MainViewModel : ObservableObject
     private const string DefaultGeneration = "venice/z-image-turbo";
     private const string DefaultEdit = "venice/grok-imagine-edit";
 
-    private static readonly (string Label, double Ratio)[] AspectRatios =
-    [
-        ("1:1", 1.0), ("4:3", 4.0 / 3), ("3:2", 1.5), ("16:9", 16.0 / 9), ("9:16", 9.0 / 16),
-    ];
-
     private static readonly ILogger Log = AppLog.For<MainViewModel>();
 
     private IAiProvider _provider;
@@ -284,8 +279,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<string> EnhancerModels { get; } = [];
     public ObservableCollection<ModelParameter> EnhancerParameters { get; } = [];
 
-    public IReadOnlyList<string> QualityOptions { get; } = ["auto", "low", "medium", "high"];
-    public IReadOnlyList<string> AspectPresets { get; } = ["1:1", "4:3", "3:2", "16:9", "9:16"];
+    public IReadOnlyList<string> QualityOptions { get; } = StudioDefaults.Qualities;
+    public IReadOnlyList<string> AspectPresets { get; } = StudioDefaults.ImageAspects;
 
     // Obrazy referencyjne; pierwszy jest podstawowy
     public ObservableCollection<ReferenceItem> References { get; } = [];
@@ -330,13 +325,7 @@ public sealed partial class MainViewModel : ObservableObject
     // Nazwa proporcji, jeśli W:H pasuje do jednego z presetów (null = dowolna); używana do podświetlania
     public string? AspectLabel
     {
-        get
-        {
-            if (Height == 0) return null;
-            var ratio = Width / (double)Height;
-            var match = AspectRatios.FirstOrDefault(p => Math.Abs(ratio - p.Ratio) < 0.02);
-            return match.Label;
-        }
+        get => ImageAspect.LabelFor(Width, Height);
         set
         {
             if (value is not null) SetAspect(value);

@@ -153,7 +153,8 @@ public sealed partial class MainViewModel
             : $"Zestaw {DateTime.Now:dd.MM HH:mm}";
 
         var draft = _dialogs.ShowSavePreset(defaultName, CurrentPromptForTab(),
-                                           SelectedEnhancerModel is null ? null : SuggestPresetDraftAsync);
+                                           SelectedEnhancerModel is null ? null
+                                           : () => SuggestPresetDraftAsync(CurrentPromptForTab(), ActiveTab == 1 ? EditSystemPrompt : GenerateSystemPrompt, null));
         if (draft is null) return;
 
         _presetStore.Create(CapturePreset(draft));
@@ -169,9 +170,12 @@ public sealed partial class MainViewModel
     {
         var detach = new List<Action>();
         var pickers = new Dictionary<string, PresetModelPicker>();
-        foreach (var (kind, filter) in new[] { ("generate", GenerateFilter), ("edit", EditFilter) })
+        foreach (var (kind, source, filter) in new (string, ObservableCollection<ModelOption>, ModelFilter)[]
+                 {
+                     ("generate", Models, GenerateFilter), ("edit", EditModels, EditFilter), ("enhancer", ChatModelOptions, EnhancerFilter),
+                 })
         {
-            var view = new ListCollectionView(ModelsFor(kind));
+            var view = new ListCollectionView(source);
             view.Filter = filter.Matches;
             void Refresh() => view.Refresh();
             filter.Changed += Refresh;
@@ -181,7 +185,17 @@ public sealed partial class MainViewModel
 
         try
         {
-            var context = new PresetsContext(kind => kind is "generate" or "edit" ? ModelsFor(kind) : [], _provider.Id, pickers);
+            var context = new PresetsContext(
+                kind => kind switch { "enhancer" => ChatModelOptions, "generate" or "edit" => ModelsFor(kind), _ => [] },
+                _provider.Id, pickers,
+                Suggest: request => SuggestPresetDraftAsync(request.Prompt, request.SystemPrompt, request.Model),
+                EditPrompt: EditPresetPrompt,
+                AutoSave: _state.PresetsAutoSave,
+                AutoSaveChanged: value =>
+                {
+                    _state.PresetsAutoSave = value;
+                    SaveState();
+                });
             var preset = _dialogs.ShowPresets(context);
             if (preset is not null) ApplyPreset(preset);
         }
@@ -192,10 +206,9 @@ public sealed partial class MainViewModel
     }
 
     // AI proponuje nazwę i opis zestawu na podstawie promptu, modelem tekstowym wybranym w ulepszaniu
-    private async Task<PresetDraft> SuggestPresetDraftAsync()
+    // Model: z żądania, jeśli jest na liście ulepszania, inaczej wybrany w głównym oknie
+    private async Task<PresetDraft> SuggestPresetDraftAsync(string prompt, string? system, string? model)
     {
-        var prompt = CurrentPromptForTab();
-        var system = ActiveTab == 1 ? EditSystemPrompt : GenerateSystemPrompt;
         var messages = new List<ChatMessage>
         {
             new("system", "You name saved presets of an image generation app. Reply with JSON only, no code fences: " +
@@ -203,7 +216,7 @@ public sealed partial class MainViewModel
                           "Use the language of the prompt."),
             new("user", string.IsNullOrWhiteSpace(system) ? prompt : $"CONFIG:\n{system}\n\nPROMPT:\n{prompt}"),
         };
-        var reply = await _provider.ChatAsync(SelectedEnhancerModel!, messages);
+        var reply = await _provider.ChatAsync(EnhancerModelOrThrow(model), messages);
         return PresetSaveViewModel.ParseDraft(reply.Content);
     }
 

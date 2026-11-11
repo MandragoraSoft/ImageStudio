@@ -25,6 +25,10 @@ public static class StudioDefaults
     public const double MaxSpeed = 4.0;
 
     public static readonly IReadOnlyList<string> VideoAspects = ["16:9", "9:16", "1:1", "4:3"];
+
+    // Predefiniowane proporcje obrazu i jakości; wspólne dla głównego okna i okna zestawów
+    public static readonly IReadOnlyList<string> ImageAspects = ["1:1", "4:3", "3:2", "16:9", "9:16"];
+    public static readonly IReadOnlyList<string> Qualities = ["auto", "low", "medium", "high"];
     public static readonly IReadOnlyList<string> AudioFormats = ["mp3", "wav"];
 
     // Kolejność jak na liście języków w zakładce Głos; wartość trafia do polecenia tłumaczenia

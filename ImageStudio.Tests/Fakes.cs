@@ -222,7 +222,10 @@ internal sealed class FakeDialogs : IDialogService
         }
         return PromptEditResult;
     }
-    public ImageStudio.Configuration.Preset? ShowPresets(ImageStudio.ViewModels.PresetsContext? context = null) => throw new NotSupportedException();
+    // Okno zestawów: test podgląda kontekst z głównego okna (OnShowPresets) i zwraca wynik; bez hooka rzuca wyjątek
+    public Func<ImageStudio.ViewModels.PresetsContext, ImageStudio.Configuration.Preset?>? OnShowPresets { get; set; }
+    public ImageStudio.Configuration.Preset? ShowPresets(ImageStudio.ViewModels.PresetsContext? context = null) =>
+        (OnShowPresets ?? throw new NotSupportedException())(context!);
     public bool ConfirmToolCall(ToolCall call) => true;
     public bool ConfirmAnswer { get; set; } = true;
     public int ConfirmCount { get; private set; }

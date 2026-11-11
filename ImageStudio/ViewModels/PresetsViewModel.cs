@@ -11,11 +11,22 @@ namespace ImageStudio.ViewModels;
 // Selektor modelu w oknie zestawów: widok modeli rodzaju (osobny od głównego okna) i filtr zakładki z MainViewModel
 public sealed record PresetModelPicker(ICollectionView View, ModelFilter Filter);
 
-// Dane z głównego okna: modele każdego rodzaju, id aktywnego dostawcy (zapisywane przy zmianie modelu) i selektory modeli
+// Zapytanie o nazwę i opis zestawu: prompt i konfiguracja z edycji oraz model wspomagania zestawu (null = domyślny)
+public sealed record PresetSuggestRequest(string Prompt, string? SystemPrompt, string? Model);
+
+// Otwarcie edytora promptu dla zestawu: tytuł okna, wejście, model i parametry przebudowy zestawu
+public sealed record PresetPromptEditRequest(string Title, PromptEdit Initial, string? Model, IReadOnlyDictionary<string, ParamState> Parameters);
+
+// Dane z głównego okna: modele każdego rodzaju, id aktywnego dostawcy (zapisywane przy zmianie modelu) i selektory modeli.
+// Suggest, EditPrompt i autozapis są opcjonalne: bez nich przyciski i ustawienia są ukryte albo wyłączone
 public sealed record PresetsContext(
     Func<string, IReadOnlyList<ModelOption>> ModelsFor,
     string? ProviderId,
-    IReadOnlyDictionary<string, PresetModelPicker>? Pickers = null);
+    IReadOnlyDictionary<string, PresetModelPicker>? Pickers = null,
+    Func<PresetSuggestRequest, Task<PresetDraft>>? Suggest = null,
+    Func<PresetPromptEditRequest, PromptEdit?>? EditPrompt = null,
+    bool AutoSave = false,
+    Action<bool>? AutoSaveChanged = null);
 
 // Parametr ulepszania promptu w edytorze: klucz jest stały, włączenie i wartość można zmienić
 public sealed partial class PresetParamItem(string key, bool enabled, double value) : ObservableObject
@@ -44,13 +55,19 @@ public sealed partial class PresetsViewModel : ObservableObject
 
     public IReadOnlyList<string> KindFilters { get; } = ["all", "generate", "edit"];
 
-    public IReadOnlyList<string> QualityOptions { get; } = ["auto", "low", "medium", "high"];
+    public IReadOnlyList<string> QualityOptions { get; } = StudioDefaults.Qualities;
+
+    // Kafelki proporcji w sekcji rozmiaru (te same co w głównym oknie)
+    public IReadOnlyList<string> AspectPresets { get; } = StudioDefaults.ImageAspects;
 
     public ObservableCollection<PresetParamItem> EditParameters { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadPresetCommand), nameof(DeletePresetCommand), nameof(DuplicatePresetCommand), nameof(SaveDetailsCommand))]
-    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(PickerView), nameof(PickerFilter), nameof(SelectedModelOption), nameof(ModelWarning))]
+    [NotifyCanExecuteChangedFor(nameof(LoadPresetCommand), nameof(DeletePresetCommand), nameof(DuplicatePresetCommand), nameof(SaveDetailsCommand),
+                                nameof(SuggestNameCommand), nameof(SuggestDescriptionCommand), nameof(EditInEditorCommand))]
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(PickerView), nameof(PickerFilter), nameof(SelectedModelOption), nameof(ModelWarning),
+                              nameof(EnhancerPickerView), nameof(EnhancerPickerFilter), nameof(SelectedEnhancerOption), nameof(EnhancerWarning),
+                              nameof(CanEditInEditor))]
     private Preset? _selectedPreset;
 
     [ObservableProperty]
@@ -62,7 +79,7 @@ public sealed partial class PresetsViewModel : ObservableObject
     private string _editDescription = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand), nameof(SuggestNameCommand), nameof(SuggestDescriptionCommand))]
     private string _editPrompt = "";
 
     [ObservableProperty]
@@ -75,19 +92,39 @@ public sealed partial class PresetsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(DetailsSummary))]
     private string _editSeedText = "";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(DetailsSummary))]
     private string _editQuality = "auto";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedAspect), nameof(DetailsSummary))]
     private int _editWidth;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedAspect), nameof(DetailsSummary))]
     private int _editHeight;
+
+    // Proporcja z predefiniowanej listy pasującej do wymiarów (null = własny rozmiar)
+    public string? SelectedAspect
+    {
+        get => ImageAspect.LabelFor(EditWidth, EditHeight);
+        set
+        {
+            // Wybór proporcji zmienia wysokość przy zachowanej szerokości
+            if (value is null || ImageAspect.Ratio(value) is not { } ratio || EditWidth <= 0) return;
+            EditHeight = ImageAspect.Snap(EditWidth / ratio);
+        }
+    }
+
+    // Jednowierszowy opis rozmiaru, seeda i jakości do nagłówka zwijanej sekcji
+    public string DetailsSummary => Loc.T("presets.details.summary", EditWidth, EditHeight,
+        Norm(EditSeedText) is { Length: > 0 } seed ? seed : Loc.T("presets.details.seedRandom"), EditQuality);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
@@ -103,6 +140,12 @@ public sealed partial class PresetsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _status = "";
+
+    // Zapis bez pytania przy zmianie zestawu i zamykaniu; zapamiętywany w stanie aplikacji przez kontekst
+    [ObservableProperty]
+    private bool _autoSave;
+
+    partial void OnAutoSaveChanged(bool value) => _context?.AutoSaveChanged?.Invoke(value);
 
     // Zestaw wybrany do wczytania; odczytywany przez WpfDialogService po zamknięciu okna
     public Preset? ChosenPreset { get; private set; }
@@ -120,6 +163,8 @@ public sealed partial class PresetsViewModel : ObservableObject
         _presets = presets;
         _importer = importer;
         _context = context;
+        // Pole, nie właściwość: wartość startowa nie wywołuje zapisu stanu
+        _autoSave = context?.AutoSave ?? false;
         Reload(null);
     }
 
@@ -131,7 +176,8 @@ public sealed partial class PresetsViewModel : ObservableObject
             || EditPrompt != (p.Prompt ?? "") || EditSystemPrompt != (p.SystemPrompt ?? "")
             || Norm(EditNegativePrompt) != Norm(p.NegativePrompt) || Norm(EditSeedText) != Norm(p.SeedText)
             || EditQuality != (p.Quality ?? "auto") || EditWidth != p.Width || EditHeight != p.Height
-            || EditModel != p.Model || ParametersChanged(p));
+            || EditModel != p.Model || EditEnhancerModel != p.EnhancerModel
+            || Norm(EditEnhancerInstruction) != Norm(p.EnhancerInstruction) || ParametersChanged(p));
 
     // Selektor modelu i jego filtr dla rodzaju zaznaczonego zestawu (null bez kontekstu)
     private PresetModelPicker? CurrentPicker =>
@@ -158,6 +204,99 @@ public sealed partial class PresetsViewModel : ObservableObject
         : "";
 
     private bool HasSelectedPreset => SelectedPreset is not null;
+
+    // --- Edytor promptu z okna zestawów ---
+
+    public bool CanEditInEditor => HasSelectedPreset && _context?.EditPrompt is not null;
+
+    // Wynik edytora wpisuje tylko pola edycji; zapis dopiero przez przycisk, pytanie albo autozapis
+    [RelayCommand(CanExecute = nameof(CanEditInEditor))]
+    private void EditInEditor()
+    {
+        if (_context?.EditPrompt is not { } edit || SelectedPreset is null) return;
+
+        var parameters = EditParameters.ToDictionary(p => p.Key, p => new ParamState { Enabled = p.Enabled, Value = p.Value });
+        var result = edit(new PresetPromptEditRequest(Loc.T("presets.editor.title", EditName),
+                                                     new PromptEdit(EditSystemPrompt, EditPrompt, EditEnhancerInstruction, []),
+                                                     EditEnhancerModel, parameters));
+        if (result is null) return;
+
+        EditSystemPrompt = result.System ?? "";
+        EditPrompt = result.Prompt;
+        EditEnhancerInstruction = result.Instruction ?? EditEnhancerInstruction;
+    }
+
+    // --- Model wspomagania (tekstowy, do ulepszania promptu zestawu) ---
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand), nameof(SuggestNameCommand), nameof(SuggestDescriptionCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedEnhancerOption), nameof(EnhancerWarning))]
+    private string? _editEnhancerModel;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveDetailsCommand))]
+    private string _editEnhancerInstruction = "";
+
+    private IReadOnlyList<ModelOption> EnhancerModelsOf() => _context?.ModelsFor("enhancer") ?? [];
+
+    public ICollectionView? EnhancerPickerView => _context?.Pickers?.GetValueOrDefault("enhancer")?.View;
+
+    public ModelFilter? EnhancerPickerFilter => _context?.Pickers?.GetValueOrDefault("enhancer")?.Filter;
+
+    // Zaznaczenie w ModelPicker wspomagania: tylko wybór użytkownika zmienia EditEnhancerModel
+    public ModelOption? SelectedEnhancerOption
+    {
+        get => SelectedPreset is not null ? EnhancerModelsOf().FirstOrDefault(m => m.Id == EditEnhancerModel) : null;
+        set
+        {
+            if (value is not null) EditEnhancerModel = value.Id;
+        }
+    }
+
+    // Ostrzeżenie, gdy zapisany model wspomagania nie jest na niepustej liście (model zostaje w zestawie)
+    public string EnhancerWarning => SelectedPreset is not null && !string.IsNullOrEmpty(EditEnhancerModel)
+        && EnhancerModelsOf() is { Count: > 0 } models && !models.Any(m => m.Id == EditEnhancerModel)
+        ? Loc.T("presets.msg.modelMissing", EditEnhancerModel)
+        : "";
+
+    // --- Wspomaganie AI nazwy i opisu ---
+
+    public bool CanSuggest => _context?.Suggest is not null;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SuggestNameCommand), nameof(SuggestDescriptionCommand))]
+    private bool _isSuggesting;
+
+    private bool CanSuggestNow => CanSuggest && HasSelectedPreset && !IsSuggesting && !string.IsNullOrWhiteSpace(EditPrompt);
+
+    // Każdy przycisk wpisuje tylko swoje pole; wynik niczego nie zapisuje (zestaw staje się zmieniony)
+    [RelayCommand(CanExecute = nameof(CanSuggestNow))]
+    private Task SuggestNameAsync() => SuggestAsync(draft => EditName = draft.Name);
+
+    [RelayCommand(CanExecute = nameof(CanSuggestNow))]
+    private Task SuggestDescriptionAsync() => SuggestAsync(draft => EditDescription = draft.Description);
+
+    private async Task SuggestAsync(Action<PresetDraft> apply)
+    {
+        if (_context?.Suggest is not { } suggest) return;
+
+        IsSuggesting = true;
+        Status = Loc.T("presetSave.msg.thinking");
+        try
+        {
+            var system = string.IsNullOrWhiteSpace(EditSystemPrompt) ? null : EditSystemPrompt;
+            apply(await suggest(new PresetSuggestRequest(EditPrompt, system, EditEnhancerModel)));
+            Status = "";
+        }
+        catch (Exception ex)
+        {
+            Status = Loc.T("presetSave.msg.failed", ex.Message);
+        }
+        finally
+        {
+            IsSuggesting = false;
+        }
+    }
 
     private IReadOnlyList<ModelOption> ModelsOf(string kind) => _context?.ModelsFor(kind) ?? [];
 
@@ -187,6 +326,8 @@ public sealed partial class PresetsViewModel : ObservableObject
         EditWidth = p?.Width ?? 0;
         EditHeight = p?.Height ?? 0;
         EditModel = p?.Model;
+        EditEnhancerModel = p?.EnhancerModel;
+        EditEnhancerInstruction = p?.EnhancerInstruction ?? "";
 
         EditParameters.Clear();
         if (p is null) return;
@@ -245,7 +386,8 @@ public sealed partial class PresetsViewModel : ObservableObject
     private bool ResolveUnsaved()
     {
         if (_busy || SelectedPreset is not { } current || !IsDirty) return true;
-        if (!_dialogs.Confirm(Loc.T("presets.confirmUnsaved", current.Name), Loc.T("presets.confirmUnsaved.title"))) return true;
+        // Autozapis: bez pytania; błąd walidacji zostawia Status z powodem (jak odpowiedź „tak” przy błędzie)
+        if (!AutoSave && !_dialogs.Confirm(Loc.T("presets.confirmUnsaved", current.Name), Loc.T("presets.confirmUnsaved.title"))) return true;
         if (!TrySaveDetails()) return false;
         ApplyFilter(current.FilePath);
         return true;
@@ -283,6 +425,10 @@ public sealed partial class PresetsViewModel : ObservableObject
         preset.Width = EditWidth;
         preset.Height = EditHeight;
         preset.Model = EditModel;
+        // Model spoza listy zostaje jak jest (okno pokazuje ostrzeżenie); pusta instrukcja = domyślna z głównego okna
+        preset.EnhancerModel = EditEnhancerModel;
+        var instruction = Norm(EditEnhancerInstruction);
+        preset.EnhancerInstruction = instruction.Length == 0 ? null : instruction;
         foreach (var item in EditParameters)
             preset.Parameters[item.Key] = new ParamState { Enabled = item.Enabled, Value = item.Value };
 
