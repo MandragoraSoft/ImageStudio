@@ -14,8 +14,6 @@ public partial class PresetsWindow : Window
         Closing += (_, e) => e.Cancel = DataContext is PresetsViewModel vm && !vm.ConfirmClose();
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e) => Close();
-
     // Dwuklik na wierszu wczytuje zestaw, tak samo jak przycisk "Wczytaj"
     private void Grid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {

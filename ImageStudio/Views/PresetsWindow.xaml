@@ -132,6 +132,6 @@
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0" Style="{StaticResource MutedTextBlock}"/>
         </StackPanel>
         <Button Grid.Row="2" Grid.Column="2" Content="{loc:T common.close}" Width="110" IsCancel="True" HorizontalAlignment="Right" Margin="0,12,0,0"
-                Style="{StaticResource SecondaryButton}" Click="Close_Click"/>
+                Style="{StaticResource SecondaryButton}"/>
     </Grid>
 </Window>
