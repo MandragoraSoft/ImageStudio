@@ -222,7 +222,9 @@ public sealed partial class MainViewModel : ObservableObject
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
         VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
         // Selektor ulepszania ma własny widok tych samych modeli (widok domyślny należy do czatu)
-        ChatModelsView = new CollectionViewSource { Source = ChatModelOptions }.View;
+        // Widok tworzony wprost, nie przez tymczasowy CollectionViewSource: gdy ten zostaje zebrany przez GC, WPF odłącza
+        // jego widok od kolekcji i następne Refresh() rzuca NullReferenceException (ListCollectionView.PrepareLocalArray)
+        ChatModelsView = new ListCollectionView(ChatModelOptions);
         GenerateFilter = BindFilter(true, ModelsView);
         EditFilter = BindFilter(true, EditModelsView);
         VideoFilter = BindFilter(true, VideoModelsView);
