@@ -238,3 +238,46 @@ Decyzje:
 - [ ] **Step 3:** Przebuduj XAML i code-behind według decyzji; testy przechodzą.
 - [ ] **Step 4:** Przenieś teksty do tłumaczeń; `pwsh tools/Check-Translations.ps1` bez błędów oraz `pwsh tools/Check-Translations.ps1 -Pending` nie wypisuje `PromptEditorWindow`.
 - [ ] **Step 5:** Build i cały zestaw testów; aktualizacja `docs/dev/prompts-and-presets.md`; commit „Przebuduj edytor promptów na układ dwukolumnowy ze wspólnym paskiem statusu, przenieś teksty do tłumaczeń, testy”.
+
+---
+
+### Task 5: Trójstanowy filtr NSFW jako kontrolka wielokrotnego użytku
+
+Dodane 2026-11-11 na prośbę użytkownika: dzisiejsze pole „Ukryj NSFW” (włącz/wyłącz) ma się stać filtrem trójstanowym: **tylko pokaż** – **brak filtra** – **tylko ukryj**, zrealizowanym jako osobna kontrolka trójstanowa.
+
+**Files:**
+- Create: `ImageStudio.Shared/TriState.cs` (enum), `ImageStudio.Shared/Views/TriStateToggle.xaml` + `.xaml.cs` (kontrolka)
+- Modify: `ImageStudio/ViewModels/ModelFilter.cs` (pole `_hideNsfw`, linia 28; `Matches`, linia 73)
+- Modify: `ImageStudio/ViewModels/ModelBrowserViewModel.cs` (linie ~75, ~105, ~112)
+- Modify: `ImageStudio.Shared/Views/ModelFilterBar.xaml:26`, `ImageStudio/Views/ModelBrowserWindow.xaml:38`
+- Modify: `Strings.pl.json`, `Strings.en.json` (klucz `filter.nsfw`, linia 133), `docs/dev/ui-shell.md` (akapit o filtrach i o nowej kontrolce)
+- Test: `ImageStudio.Tests/NsfwFilterTests.cs` (nowy); popraw `ImageStudio.Tests/ModelBrowserViewModelTests.cs:86` (`vm.HideNsfw = true`)
+
+**Interfaces:**
+- Produces:
+  - `public enum TriState { Only, Any, Exclude }` w przestrzeni `ImageStudio` (projekt `ImageStudio.Shared`): `Only` = tylko elementy z cechą, `Any` = brak filtra, `Exclude` = tylko elementy bez cechy
+  - `TriStateToggle : UserControl` w `ImageStudio.Views` (assembly `ImageStudio.Shared`) z właściwościami zależności: `TriState Value` (wiązanie dwukierunkowe domyślnie, domyślna wartość `Any`), `string Label`, `string OnlyText`, `string AnyText`, `string ExcludeText`. Kontrolka nie wie nic o NSFW: teksty przychodzą z zewnątrz.
+  - `ModelFilter.Nsfw` (`TriState`, `[ObservableProperty]`, domyślnie `TriState.Any`) zamiast `HideNsfw`; zmiana woła `Refresh()`
+  - `ModelBrowserViewModel.Nsfw` (`TriState`) zamiast `HideNsfw`; zmiana woła `View.Refresh()`
+
+Decyzje:
+- Właściwość `HideNsfw` znika z obu klas (bez zgodności wstecz: nie jest zapisywana w stanie ani w ustawieniach; potwierdź grepem, że nic poza wymienionymi plikami jej nie używa).
+- Dopasowanie: `Only` przepuszcza wyłącznie modele z `Nsfw == true`, `Exclude` wyłącznie z `Nsfw == false`, `Any` wszystkie. Pozostałe filtry działają jak dotąd i łączą się z tym spójnikiem „i”.
+- Wygląd kontrolki: etykieta i trzy przylegające przyciski-segmenty w jednym rzędzie (`RadioButton` w stylu `ToggleButton` albo trzy `ToggleButton`), kolejność od lewej: `OnlyText`, `AnyText`, `ExcludeText`; dokładnie jeden zaznaczony. Kolory wyłącznie z istniejących pędzli motywu (`DynamicResource`), obsługa klawiatury (Tab, strzałki, spacja) jak w zwykłych `RadioButton`. Kontrolka ma się mieścić w wąskim panelu filtrów (`ModelFilterBar`), więc segmenty mają krótkie teksty i `ToolTip` z pełnym opisem.
+- Użycie w obu miejscach: `<views:TriStateToggle Value="{Binding Nsfw}" Label="{loc:T filter.nsfw}" OnlyText="{loc:T filter.tri.only}" AnyText="{loc:T filter.tri.any}" ExcludeText="{loc:T filter.tri.exclude}"/>`; XAML między projektami wymaga `;assembly=ImageStudio.Shared`.
+- Klucze: `filter.nsfw` zmienia treść na „NSFW” (PL i EN; to ten sam tekst w obu językach, więc sprawdź w `docs/dev/localization.md`, jak projekt oznacza celowo identyczne tłumaczenia, żeby `Check-Translations -Strict` nie zgłaszał ostrzeżenia); nowe `filter.tri.only` („Tylko” / „Only”), `filter.tri.any` („Wszystkie” / „All”), `filter.tri.exclude` („Ukryj” / „Hide”) oraz podpowiedzi `filter.tri.only.tip`, `filter.tri.any.tip`, `filter.tri.exclude.tip`.
+- Wybór „tylko preferowane” przy starcie (`ApplyPreferredOnly`) i `ModelFilter.Reset()` zostają bez zmian; `Reset()` nie zmienia `Nsfw` (tak jak dziś nie zmienia `HideNsfw`).
+
+- [ ] **Step 1: Testy filtra** (`NsfwFilterTests`; `ModelFilter` tworzony wprost, modele jako `ModelOption` z `Nsfw` true i false):
+  - `Any_shows_all_models` (domyślny stan: oba modele przechodzą `Matches`)
+  - `Exclude_hides_nsfw_models` (przechodzi tylko model z `Nsfw == false`)
+  - `Only_shows_only_nsfw_models` (przechodzi tylko model z `Nsfw == true`)
+  - `Changing_nsfw_raises_changed` (zdarzenie `Changed` po każdej zmianie wartości)
+  - `Nsfw_combines_with_search` (`Only` + `SearchText` niepasujący do modelu NSFW → nic nie przechodzi)
+  - `Reset_keeps_nsfw_choice`
+  - odpowiednie trzy testy dla `ModelBrowserViewModel.Nsfw` (wzór: istniejący test w `ModelBrowserViewModelTests.cs` okolice linii 86)
+- [ ] **Step 2:** Uruchom, potwierdź błąd kompilacji (brak `TriState` / `Nsfw`).
+- [ ] **Step 3:** Dodaj `TriState`, zamień `HideNsfw` na `Nsfw` w obu ViewModelach; testy przechodzą.
+- [ ] **Step 4: Testy kontrolki** przez `WpfHost.Run`: `Toggle_defaults_to_any` (środkowy segment zaznaczony), `Clicking_segment_updates_value` (zaznaczenie pierwszego segmentu ustawia `Value == TriState.Only`, trzeciego `TriState.Exclude`), `Setting_value_updates_segments` (ustawienie `Value = TriState.Exclude` zaznacza trzeci segment i odznacza pozostałe), `Texts_come_from_properties` (segmenty pokazują `OnlyText`, `AnyText`, `ExcludeText`).
+- [ ] **Step 5:** Zaimplementuj `TriStateToggle`, podmień `CheckBox` w `ModelFilterBar.xaml` i `ModelBrowserWindow.xaml`, dodaj klucze; `pwsh tools/Check-Translations.ps1 -Strict` bez błędów.
+- [ ] **Step 6:** Build i cały zestaw testów; aktualizacja `docs/dev/ui-shell.md`; commit „Zamień filtr NSFW na trójstanowy (tylko, wszystkie, ukryj) z kontrolką TriStateToggle, testy”.
