@@ -93,38 +93,38 @@ public sealed partial class MainViewModel : ObservableObject
         if (FitToWindow) FitToWindow = false;
     }
 
-    // --- Filtry modeli (wspólne dla obu zakładek) ---
-    [ObservableProperty]
-    private string _searchText = "";
+    // --- Filtry modeli: osobne dla każdego selektora, więc zakładki nie wpływają na siebie ---
+    public ModelFilter GenerateFilter { get; }
+    public ModelFilter EditFilter { get; }
+    public ModelFilter VideoFilter { get; }
+    public ModelFilter ChatFilter { get; }
+    public ModelFilter EnhancerFilter { get; }
+    public ModelFilter SpeechFilter { get; }
+    public ModelFilter TranscriptionFilter { get; }
 
-    private string _selectedProvider = AllProviders;
+    private IEnumerable<ModelFilter> AllFilters =>
+        [GenerateFilter, EditFilter, VideoFilter, ChatFilter, EnhancerFilter, SpeechFilter, TranscriptionFilter];
 
-    // Wybrany dostawca modeli w filtrze. Lista w filtrze zależy od zakładki i odświeża się po przeładowaniu katalogu,
-    // a ComboBox przy wymianie pozycji zgłasza null: to nie jest decyzja użytkownika, więc wybór zostaje (jak w SelectedEnhancerModelOption)
-    public string SelectedProvider
+    // Filtr z widokami, które odświeża; "preferowane" zapisuje się jako ostatni wybór dostawcy
+    private ModelFilter BindFilter(bool imageFilter, params ICollectionView[] views)
     {
-        get => _selectedProvider;
-        set
+        var filter = new ModelFilter(imageFilter, () => _prefs.For(_provider.Id), OpenModelBrowserCommand);
+        foreach (var view in views) view.Filter = filter.Matches;
+        filter.Changed += () => { foreach (var view in views) view.Refresh(); };
+        filter.PreferredOnlyToggled += value =>
         {
-            if (value is null)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            if (SetProperty(ref _selectedProvider, value)) RefreshFilters();
-        }
+            _prefs.For(_provider.Id).PreferredOnly = value;
+            _prefs.Save();
+        };
+        return filter;
     }
 
-    [ObservableProperty]
-    private bool _inputImageOnly;
-
-    [ObservableProperty]
-    private bool _hideNsfw;
-
-    // Lista modeli: wszystkie albo tylko preferowane aktywnego dostawcy (zapis w models.json)
-    [ObservableProperty]
-    private bool _preferredOnly;
+    // Tryb "tylko preferowane" dostawcy jest wartością startową każdego filtru
+    private void ApplyPreferredOnly()
+    {
+        var value = _prefs.For(_provider.Id).PreferredOnly;
+        foreach (var filter in AllFilters) filter.PreferredOnly = value;
+    }
 
     private readonly MediaStorageHost _storage;
 
@@ -202,7 +202,7 @@ public sealed partial class MainViewModel : ObservableObject
         Voice = new VoiceViewModel(() => _provider, _dialogs, audioPlayer, audioRecorder, ReportChat,
                                    () => _ = InitializeAsync(),
                                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ImageStudio"), _state,
-                                   () => SelectedEnhancerModel, FilterAudioModel, voiceGallery, Studio);
+                                   () => SelectedEnhancerModel, null, voiceGallery, Studio);
         SyncVoiceFolder();
         Voice.PropertyChanged += (_, e) =>
         {
@@ -211,7 +211,6 @@ public sealed partial class MainViewModel : ObservableObject
                 or nameof(VoiceViewModel.Language) or nameof(VoiceViewModel.SelectedMicrophone) or nameof(VoiceViewModel.SelectedSpeaker)
                 or nameof(VoiceViewModel.SelectedSpeechLanguage)) SaveState();
         };
-        Chat.ModelOptionsView.Filter = FilterModel;
         ChatModelOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectedEnhancerModelOption));
         // Wybór poziomu rozumowania jest zapamiętywany od razu (bez oznaczania zestawu jako zmienionego)
         Chat.PropertyChanged += (_, e) =>
@@ -221,11 +220,18 @@ public sealed partial class MainViewModel : ObservableObject
 
         ModelsView = CollectionViewSource.GetDefaultView(Models);
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
-        ModelsView.Filter = FilterModel;
-        EditModelsView.Filter = FilterModel;
         VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
-        VideoModelsView.Filter = FilterModel;
-        Loc.LanguageChanged += RefreshLanguageTexts;
+        // Selektor ulepszania ma własny widok tych samych modeli (widok domyślny należy do czatu)
+        ChatModelsView = new CollectionViewSource { Source = ChatModelOptions }.View;
+        GenerateFilter = BindFilter(true, ModelsView);
+        EditFilter = BindFilter(true, EditModelsView);
+        VideoFilter = BindFilter(true, VideoModelsView);
+        ChatFilter = BindFilter(true, Chat.ModelOptionsView);
+        EnhancerFilter = BindFilter(true, ChatModelsView);
+        SpeechFilter = BindFilter(false, Voice.SpeechModelsView);
+        TranscriptionFilter = BindFilter(false, Voice.TranscriptionModelsView);
+        Loc.LanguageChanged += RefreshLanguageTexts;
+
 
         References.CollectionChanged += (_, _) => EditCommand.NotifyCanExecuteChanged();
         VideoAttachments.CollectionChanged += (_, _) =>
@@ -246,7 +252,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Modele czatu z opisem (wspólne dla czatu i ulepszania promptów); filtrowane jak modele obrazów
     public ObservableCollection<ModelOption> ChatModelOptions { get; } = [];
-    public ICollectionView ChatModelsView => Chat.ModelOptionsView;
+    public ICollectionView ChatModelsView { get; }
 
     // Wybór w selektorze ulepszania promptów; null z selektora (filtr ukrył pozycję) nie zmienia wyboru
     public ModelOption? SelectedEnhancerModelOption
@@ -342,42 +348,9 @@ public sealed partial class MainViewModel : ObservableObject
     private bool HasImage => Image is not null;
     private bool HasSource => SourceImage is not null;
 
-    partial void OnSearchTextChanged(string value) => RefreshFilters();
-    partial void OnInputImageOnlyChanged(bool value) => RefreshFilters();
-    partial void OnHideNsfwChanged(bool value) => RefreshFilters();
-
-    partial void OnPreferredOnlyChanged(bool value)
-    {
-        _prefs.For(_provider.Id).PreferredOnly = value;
-        _prefs.Save();
-        RefreshFilters();
-    }
-
     private void RefreshFilters()
     {
-        ModelsView.Refresh();
-        EditModelsView.Refresh();
-        VideoModelsView.Refresh();
-        ChatModelsView.Refresh();
-        Voice.RefreshFilters();
-    }
-
-    private bool FilterModel(object item) => Matches(item, imageFilter: true);
-
-    // Modele dźwięku: te same filtry, ale bez "Przyjmuje obraz" (nie mają wejścia obrazowego, więc ukryłoby je wszystkie)
-    private bool FilterAudioModel(object item) => Matches(item, imageFilter: false);
-
-    private bool Matches(object item, bool imageFilter)
-    {
-        if (item is not ModelOption m) return false;
-        if (HideNsfw && m.Nsfw) return false;
-        if (imageFilter && InputImageOnly && !m.AcceptsImage) return false;
-        if (SelectedProvider != AllProviders && !string.Equals(m.OwnedBy, SelectedProvider, StringComparison.OrdinalIgnoreCase)) return false;
-        // Pusta lista preferowanych nie ukrywa wszystkiego: filtr działa dopiero po dodaniu pierwszego modelu
-        if (PreferredOnly && _prefs.For(_provider.Id) is { Preferred.Count: > 0 } prefs && !prefs.Preferred.Contains(m.Id))
-            return false;
-        return string.IsNullOrWhiteSpace(SearchText)
-               || m.Id.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+        foreach (var filter in AllFilters) filter.Refresh();
     }
 
     // Start, zmiana dostawcy i ręczne odświeżenie (ReloadModelsCommand): katalog dostawcy ładuje IAiProvider.ReloadAsync,
@@ -387,7 +360,7 @@ public sealed partial class MainViewModel : ObservableObject
         // Zajętość na czas ładowania: pasek postępu i zablokowane akcje (także po zmianie dostawcy w Ustawieniach)
         IsBusy = true;
         Status = Loc.T("models.msg.loading");
-        PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
+        ApplyPreferredOnly();
         var keepVideo = SelectedVideoModel?.Id;
         try
         {

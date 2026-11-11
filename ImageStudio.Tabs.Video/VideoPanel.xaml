@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True"
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" FiltersContext="{Binding VideoFilter}"
                                ReloadCommand="{Binding ReloadModelsCommand}" ItemsSource="{Binding VideoModelsView}" SelectedItem="{Binding SelectedVideoModel}"/>
 
             <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,8" Command="{Binding EditVideoPromptCommand}"

@@ -142,15 +142,10 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     public ObservableCollection<ModelOption> SpeechModels { get; } = [];
 
-    // Listy z filtrami modeli (szukaj, dostawca, preferowane) wspólnymi z resztą aplikacji; ModelPicker pokazuje te widoki
+    // Listy z osobnymi filtrami (SpeechFilter, TranscriptionFilter w MainViewModel); ModelPicker pokazuje te widoki
     public ICollectionView SpeechModelsView { get; }
     public ICollectionView TranscriptionModelsView { get; }
 
-    public void RefreshFilters()
-    {
-        SpeechModelsView.Refresh();
-        TranscriptionModelsView.Refresh();
-    }
     public ObservableCollection<string> Voices { get; } = [];
     public IReadOnlyList<string> Formats { get; } = ["mp3", "wav"];
 

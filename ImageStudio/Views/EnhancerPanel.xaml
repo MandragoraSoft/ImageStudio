@@ -6,7 +6,7 @@
              xmlns:vm="clr-namespace:ImageStudio.ViewModels">
     <Border Style="{StaticResource Panel}">
         <StackPanel>
-            <views:ModelPicker Header="{loc:T enh.model}" ReloadCommand="{Binding ReloadModelsCommand}" HasFilters="True" ItemsSource="{Binding ChatModelsView}"
+            <views:ModelPicker Header="{loc:T enh.model}" ReloadCommand="{Binding ReloadModelsCommand}" HasFilters="True" FiltersContext="{Binding EnhancerFilter}" ItemsSource="{Binding ChatModelsView}"
                                SelectedItem="{Binding SelectedEnhancerModelOption}"/>
 
             <TextBlock Text="{loc:T enh.params}" Style="{StaticResource SectionHeader}"/>

@@ -35,14 +35,13 @@ public partial class ModelPicker : UserControl
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public object? SelectedItem { get => GetValue(SelectedItemProperty); set => SetValue(SelectedItemProperty, value); }
     public string? Header { get => (string?)GetValue(HeaderProperty); set => SetValue(HeaderProperty, value); }
-    // Pokazuje przycisk panelu filtrów (filtry działają na DataContext rodzica, czyli MainViewModel)
+    // Pokazuje przycisk panelu filtrów (filtry bierze z FiltersContext albo z DataContext rodzica)
     public bool HasFilters { get => (bool)GetValue(HasFiltersProperty); set => SetValue(HasFiltersProperty, value); }
 
     // Ukrywa w panelu filtrów pole "Przyjmuje obraz" (selektory modeli dźwięku)
     public bool ShowImageFilter { get => (bool)GetValue(ShowImageFilterProperty); set => SetValue(ShowImageFilterProperty, value); }
 
-    // Obiekt z właściwościami filtrów (SearchText, SelectedProvider, ...); domyślnie DataContext rodzica.
-    // Panel czatu ma DataContext = ChatViewModel, więc filtry (wspólne z obrazami) podaje stąd MainViewModel
+    // Obiekt z właściwościami filtrów tego selektora (ModelFilter: SearchText, SelectedProvider, ...); domyślnie DataContext rodzica
     public object? FiltersContext { get => GetValue(FiltersContextProperty); set => SetValue(FiltersContextProperty, value); }
 
     // Odświeża listy modeli z dostawcy (IAiProvider.ReloadAsync); bez komendy przycisk jest ukryty

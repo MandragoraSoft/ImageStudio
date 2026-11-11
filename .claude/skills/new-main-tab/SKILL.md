@@ -17,8 +17,8 @@ Przejdź całą listę, nie tylko to, o co poproszono. Zakładka Głos pominęł
    - Referencja w `ImageStudio.Tests/ImageStudio.Tests.csproj` i wpis w `ImageStudio.slnx`.
    - Rejestracja `IMainTab` w `Composition/ServiceCollectionExtensions` i `DataTemplate` w `ImageStudio/MainWindow.xaml` (z `xmlns` zawierającym `;assembly=ImageStudio.Tabs.<Nazwa>`). Brak szablonu = wyjątek przy tworzeniu okna.
 2. **Każdy selektor modeli = `ModelPicker` z `HasFilters="True"`.**
-   - Ustaw `FiltersContext` na `DataContext` okna, gdy panel nie ma `MainViewModel` jako DataContext, oraz `ReloadCommand`.
-   - `ItemsSource` musi być `ICollectionView` z filtrem z `MainViewModel` (`FilterModel`, albo `FilterAudioModel` dla modeli bez wejścia obrazowego; wtedy też `ShowImageFilter="False"`).
+   - Ustaw `FiltersContext` na filtr tego selektora (`DataContext.<Nazwa>Filter` okna, gdy panel nie ma `MainViewModel` jako DataContext) oraz `ReloadCommand`.
+   - `ItemsSource` musi być `ICollectionView` z własnym `ModelFilter` w `MainViewModel` (`BindFilter(imageFilter, widoki)`; `imageFilter: false` dla modeli bez wejścia obrazowego, wtedy też `ShowImageFilter="False"`), podanym w `FiltersContext`.
    - Widok odświeżaj w `MainViewModel.RefreshFilters`, a modele uwzględnij w `RefreshOwners` (lista dostawców) i w `OpenModelBrowser` (+ rodzaj w `ModelBrowserViewModel.Kinds`).
    - Pilnuje tego test `Every_model_picker_in_the_main_window_tabs_has_filters`: nie omijaj go.
 2a. **Układ panelu jak w pozostałych zakładkach:** Model (`ModelPicker`, nagłówek `common.model`, pierwszy), Prompt, Wejście, Parametry, Rozmiar, Akcja (przycisk na końcu). Test: `TabLayoutTests`.

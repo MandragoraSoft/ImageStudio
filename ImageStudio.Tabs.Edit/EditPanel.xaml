@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
-            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}"
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" FiltersContext="{Binding EditFilter}" ReloadCommand="{Binding ReloadModelsCommand}"
                                ItemsSource="{Binding EditModelsView}" SelectedItem="{Binding SelectedEditModel}"/>
 
             <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditEditPromptCommand}"

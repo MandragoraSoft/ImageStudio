@@ -39,15 +39,15 @@ public sealed class VideoFiltersTests
             var vm = app.Vm;
             Assert.Equal(3, Visible(vm).Count());
 
-            vm.SearchText = "seedance";
+            vm.VideoFilter.SearchText = "seedance";
             Assert.Equal(["bytedance/seedance-image"], Visible(vm));
 
-            vm.SearchText = "";
-            vm.SelectedProvider = "wan";
+            vm.VideoFilter.SearchText = "";
+            vm.VideoFilter.SelectedProvider = "wan";
             Assert.Equal(["wan/wan-image", "wan/wan-text"], Visible(vm).Order());
 
-            vm.SelectedProvider = MainViewModel.AllProviders;
-            vm.InputImageOnly = true;
+            vm.VideoFilter.SelectedProvider = ModelFilter.AllProviders;
+            vm.VideoFilter.InputImageOnly = true;
             Assert.Equal(["bytedance/seedance-image", "wan/wan-image"], Visible(vm).Order());
         });
     }
@@ -61,7 +61,7 @@ public sealed class VideoFiltersTests
             var vm = app.Vm;
             app.Get<ImageStudio.Configuration.ModelPreferences>().For("fake").Preferred.Add("wan/wan-text");
 
-            vm.PreferredOnly = true;
+            vm.VideoFilter.PreferredOnly = true;
 
             Assert.Equal(["wan/wan-text"], Visible(vm));
             Assert.Contains("bytedance", vm.Providers);
@@ -77,7 +77,7 @@ public sealed class VideoFiltersTests
             var vm = app.Vm;
             vm.SelectedVideoModel = vm.VideoModels.Single(m => m.Id == "wan/wan-text");
 
-            vm.SearchText = "seedance";  // ukrywa wybrany model
+            vm.VideoFilter.SearchText = "seedance";  // ukrywa wybrany model
 
             Assert.Equal("wan/wan-text", vm.SelectedVideoModel!.Id);
         });
@@ -119,7 +119,7 @@ public sealed class VideoFiltersTests
             // filtr ukrywa wybrany model: lista traci zaznaczenie, ale wybór (i nagłówek) zostają
             vm.SelectedVideoModel = vm.VideoModels.Single(m => m.Id == "wan/wan-text");
             Flush(window.Dispatcher);
-            vm.SearchText = "seedance";
+            vm.VideoFilter.SearchText = "seedance";
             Flush(window.Dispatcher);
             Assert.Equal("wan/wan-text", vm.SelectedVideoModel!.Id);
             Assert.Same(vm.SelectedVideoModel, picker.SelectedItem);

@@ -83,7 +83,7 @@ public sealed partial class MainViewModel
         // Zmiana samego motywu lub preferencji nie wymaga nowego providera ani ponownego pobierania list modeli
         if (_settings with { Theme = "", UseStreaming = true, Language = "" } == previous with { Theme = "", UseStreaming = true, Language = "" })
         {
-            PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
+            ApplyPreferredOnly();
             Status = Loc.T("settings.msg.saved");
             return;
         }
@@ -128,8 +128,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(ProviderId));
         OnPropertyChanged(nameof(ProviderName));
 
-        SearchText = "";
-        SelectedProvider = AllProviders;
+        foreach (var filter in AllFilters) filter.Reset();
         SelectedModel = null;
         SelectedEditModel = null;
         SelectedVideoModel = null;

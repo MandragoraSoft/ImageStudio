@@ -36,7 +36,7 @@ public partial class ModelFilterBar : UserControl
 
     private string? _active;
 
-    // Wybrany dostawca (filtr jest wspólny dla zakładek): zostaje na liście, żeby pole nie robiło się puste.
+    // Wybrany dostawca (filtr należy do jednego selektora): zostaje na liście, żeby pole nie robiło się puste.
     // Pole listy jest związane z tą właściwością, a ona z filtrem modeli (SelectedProvider)
     public string? ActiveProvider { get => (string?)GetValue(ActiveProviderProperty); set => SetValue(ActiveProviderProperty, value); }
 

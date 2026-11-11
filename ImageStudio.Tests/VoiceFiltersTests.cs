@@ -28,7 +28,7 @@ public sealed class VoiceFiltersTests
     private static List<string> Stt(MainViewModel vm) => vm.Voice.TranscriptionModelsView.Cast<ModelOption>().Select(m => m.Id).ToList();
 
     [Fact]
-    public void Search_and_provider_filters_apply_to_both_voice_lists()
+    public void Search_and_provider_filters_apply_to_each_voice_list()
     {
         Sta.Run(() =>
         {
@@ -36,12 +36,15 @@ public sealed class VoiceFiltersTests
             var vm = app.Vm;
             Assert.Equal(3, Speech(vm).Count);
 
-            vm.SearchText = "kokoro";
+            vm.SpeechFilter.SearchText = "kokoro";
+            vm.TranscriptionFilter.SearchText = "kokoro";
             Assert.Equal(["venice/kokoro"], Speech(vm));
             Assert.Empty(Stt(vm));
 
-            vm.SearchText = "";
-            vm.SelectedProvider = "Venice AI";
+            vm.SpeechFilter.SearchText = "";
+            vm.TranscriptionFilter.SearchText = "";
+            vm.SpeechFilter.SelectedProvider = "Venice AI";
+            vm.TranscriptionFilter.SelectedProvider = "Venice AI";
             Assert.Equal(["venice/kokoro"], Speech(vm));
             Assert.Equal(["venice/whisper"], Stt(vm));
         });
@@ -66,7 +69,7 @@ public sealed class VoiceFiltersTests
         {
             using var app = Loaded();
 
-            app.Vm.InputImageOnly = true;  // modele dźwięku nie mają wejścia obrazowego, ale to ich nie dotyczy
+            app.Vm.SpeechFilter.InputImageOnly = true;  // modele dźwięku nie mają wejścia obrazowego, ale to ich nie dotyczy
 
             Assert.Equal(3, Speech(app.Vm).Count);
             Assert.Equal(2, Stt(app.Vm).Count);
@@ -81,7 +84,7 @@ public sealed class VoiceFiltersTests
             using var app = Loaded();
             app.Get<ModelPreferences>().For("fake").Preferred.Add("x-ai/tts");
 
-            app.Vm.PreferredOnly = true;
+            app.Vm.SpeechFilter.PreferredOnly = true;
 
             Assert.Equal(["x-ai/tts"], Speech(app.Vm));
         });
@@ -96,7 +99,7 @@ public sealed class VoiceFiltersTests
             var voice = app.Vm.Voice;
             voice.SelectedSpeechModel = voice.SpeechModels.Single(m => m.Id == "google/tts-gemini");
 
-            app.Vm.SearchText = "kokoro";
+            app.Vm.SpeechFilter.SearchText = "kokoro";
 
             Assert.Equal("google/tts-gemini", voice.SelectedSpeechModel!.Id);
         });
@@ -155,9 +158,10 @@ public sealed class VoiceFiltersTests
             Assert.All(pickers, p =>
             {
                 Assert.True(p.HasFilters);
-                Assert.Same(vm, p.FiltersContext);
-                Assert.False(p.ShowImageFilter);
+                                Assert.False(p.ShowImageFilter);
             });
+            Assert.Same(vm.SpeechFilter, pickers[0].FiltersContext);
+            Assert.Same(vm.TranscriptionFilter, pickers[1].FiltersContext);
             Assert.Same(vm.Voice.SpeechModelsView, pickers[0].ItemsSource);
             Assert.Same(vm.Voice.TranscriptionModelsView, pickers[1].ItemsSource);
 
@@ -177,7 +181,8 @@ public sealed class VoiceFiltersTests
             window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             System.Threading.Thread.Sleep(400);  // pole ma opóźnienie wiązania (Delay=250)
             Flush(window.Dispatcher);
-            Assert.Equal("kokoro", vm.SearchText);
+            Assert.Equal("kokoro", vm.SpeechFilter.SearchText);
+            Assert.Equal("", vm.TranscriptionFilter.SearchText);
             Assert.Equal(["venice/kokoro"], Speech(vm));
             window.Close();
         });

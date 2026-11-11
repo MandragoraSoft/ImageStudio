@@ -250,8 +250,22 @@ public sealed class OpenRouterProvider : IAiProvider
 
     private async Task<ImageResult> SendImageRequestAsync(Dictionary<string, object> body, CancellationToken ct)
     {
-        using var response = await _http.PostAsJsonAsync(ChatPath, body, ct);
+        var response = await _http.PostAsJsonAsync(ChatPath, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
+        // Katalog bywa niedokładny co do modalności wyjścia: błąd endpointu ("No endpoints found ... modalities")
+        // leczymy jednorazowym ponowieniem z drugim zestawem i zapamiętujemy go dla modelu
+        if (!response.IsSuccessStatusCode && IsEndpointMismatch(text) && body["model"] is string model)
+        {
+            var imageOnly = !_imageOnly.Contains(model);
+            body["modalities"] = imageOnly ? new[] { "image" } : new[] { "image", "text" };
+            response.Dispose();
+            response = await _http.PostAsJsonAsync(ChatPath, body, ct);
+            text = await response.Content.ReadAsStringAsync(ct);
+            if (response.IsSuccessStatusCode)
+                _ = imageOnly ? _imageOnly.Add(model) : _imageOnly.Remove(model);
+        }
+
+        using var final = response;
         if (!response.IsSuccessStatusCode)
             throw ApiErrors.Failure(response.StatusCode, text);
 
@@ -279,6 +293,10 @@ public sealed class OpenRouterProvider : IAiProvider
             : null;
         throw new InvalidOperationException($"Model nie zwrócił obrazu. {reply}".Trim());
     }
+
+    private static bool IsEndpointMismatch(string error) =>
+        error.Contains("No endpoints found", StringComparison.OrdinalIgnoreCase)
+        || error.Contains("modalit", StringComparison.OrdinalIgnoreCase);
 
     // Jedno pobranie katalogu na providera (modele obrazów, ceny i modele czatu korzystają z tej samej listy)
     private Task<List<RawModel>>? _modelsTask;

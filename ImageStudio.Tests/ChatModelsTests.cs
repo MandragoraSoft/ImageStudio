@@ -67,18 +67,18 @@ public sealed class ChatModelsTests
         {
             using var app = Loaded();
             var vm = app.Vm;
-            IEnumerable<string> Visible() => vm.ChatModelsView.Cast<ModelOption>().Select(m => m.Id).ToList();
+            IEnumerable<string> Visible() => vm.Chat.ModelOptionsView.Cast<ModelOption>().Select(m => m.Id).ToList();
             Assert.Equal(3, Visible().Count());
 
-            vm.SearchText = "claude";
+            vm.ChatFilter.SearchText = "claude";
             Assert.Equal(["anthropic/claude-text"], Visible());
 
-            vm.SearchText = "";
-            vm.SelectedProvider = "openai";
+            vm.ChatFilter.SearchText = "";
+            vm.ChatFilter.SelectedProvider = "openai";
             Assert.Equal(["openai/gpt-vision"], Visible());
 
-            vm.SelectedProvider = MainViewModel.AllProviders;
-            vm.InputImageOnly = true;
+            vm.ChatFilter.SelectedProvider = ModelFilter.AllProviders;
+            vm.ChatFilter.InputImageOnly = true;
             Assert.Equal(["openai/gpt-vision"], Visible());
         });
     }
@@ -92,9 +92,9 @@ public sealed class ChatModelsTests
             var vm = app.Vm;
             app.Get<ImageStudio.Configuration.ModelPreferences>().For("fake").Preferred.Add("anthropic/claude-text");
 
-            vm.PreferredOnly = true;
+            vm.ChatFilter.PreferredOnly = true;
 
-            Assert.Equal(["anthropic/claude-text"], vm.ChatModelsView.Cast<ModelOption>().Select(m => m.Id));
+            Assert.Equal(["anthropic/claude-text"], vm.Chat.ModelOptionsView.Cast<ModelOption>().Select(m => m.Id));
         });
     }
 
@@ -107,7 +107,7 @@ public sealed class ChatModelsTests
 
             Assert.Contains("anthropic", app.Vm.Providers);
             Assert.Contains("venice", app.Vm.Providers);
-            Assert.Equal(MainViewModel.AllProviders, app.Vm.Providers[0]);
+            Assert.Equal(ModelFilter.AllProviders, app.Vm.Providers[0]);
         });
     }
 
@@ -178,12 +178,12 @@ public sealed class ChatModelsTests
             var chatPanel = FindAll<System.Windows.Controls.UserControl>(window).First(c => c.GetType().Name == "ChatPanel");
             var picker = FindAll<ModelPicker>(chatPanel).First();
             Assert.True(picker.HasFilters);
-            Assert.Same(vm, picker.FiltersContext);
+            Assert.Same(vm.ChatFilter, picker.FiltersContext);
 
             FindAll<System.Windows.Controls.Expander>(picker).First().IsExpanded = true;  // treść akordeonu powstaje po rozwinięciu
             window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             var bar = FindAll<ModelFilterBar>(picker).Single();
-            Assert.Same(vm, bar.DataContext);  // filtry działają na MainViewModel, mimo że panel czatu ma DataContext = ChatViewModel
+            Assert.Same(vm.ChatFilter, bar.DataContext);  // filtry czatu leżą w MainViewModel, mimo że panel ma DataContext = ChatViewModel
             Assert.Same(vm.Chat.ModelOptionsView, picker.ItemsSource);
             window.Close();
         });

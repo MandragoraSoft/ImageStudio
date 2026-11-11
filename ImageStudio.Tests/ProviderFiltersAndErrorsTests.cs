@@ -85,11 +85,11 @@ public sealed class ModelOwnerFilterTests
         {
             using var app = TestApp.Create();
             app.Vm.InitializeAsync().GetAwaiter().GetResult();
-            app.Vm.SelectedProvider = "openai";
+            app.Vm.GenerateFilter.SelectedProvider = "openai";
 
-            app.Vm.SelectedProvider = null!;
+            app.Vm.GenerateFilter.SelectedProvider = null!;
 
-            Assert.Equal("openai", app.Vm.SelectedProvider);
+            Assert.Equal("openai", app.Vm.GenerateFilter.SelectedProvider);
         });
     }
 
@@ -102,7 +102,7 @@ public sealed class ModelOwnerFilterTests
             app.Vm.InitializeAsync().GetAwaiter().GetResult();
             app.Vm.Models.Clear();
             app.Vm.Models.Add(Option("img", "OpenAI"));
-            app.Vm.SelectedProvider = "openai";
+            app.Vm.GenerateFilter.SelectedProvider = "openai";
 
             Assert.Single(app.Vm.ModelsView.Cast<ModelOption>());
         });

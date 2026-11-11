@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Uruchom ImageStudio",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "ImageStudio"],
+      "isBackground": true,
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

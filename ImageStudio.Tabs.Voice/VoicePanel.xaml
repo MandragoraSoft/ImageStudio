@@ -16,7 +16,7 @@
             <Expander Header="{loc:T voice.speech}" IsExpanded="True">
                 <StackPanel Margin="0,4,0,0">
                     <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ShowImageFilter="False"
-                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FiltersContext="{Binding DataContext.SpeechFilter, RelativeSource={RelativeSource AncestorType=Window}}"
                                        ReloadCommand="{Binding ReloadModelsCommand}"
                                        ItemsSource="{Binding SpeechModelsView}" SelectedItem="{Binding SelectedSpeechModel}"/>
 
@@ -60,7 +60,7 @@
             <Expander Header="{loc:T voice.recognition}" IsExpanded="True" Margin="0,10,0,0">
                 <StackPanel Margin="0,4,0,0">
                     <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ShowImageFilter="False"
-                                       FiltersContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FiltersContext="{Binding DataContext.TranscriptionFilter, RelativeSource={RelativeSource AncestorType=Window}}"
                                        ReloadCommand="{Binding ReloadModelsCommand}"
                                        ItemsSource="{Binding TranscriptionModelsView}" SelectedItem="{Binding SelectedTranscriptionModel}"/>
 

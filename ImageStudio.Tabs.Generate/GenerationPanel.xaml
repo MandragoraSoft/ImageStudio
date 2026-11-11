@@ -6,7 +6,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
         <StackPanel>
             <!-- Układ każdej zakładki: Model, Prompt, Wejście, Parametry, Rozmiar, Akcja -->
-            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" ReloadCommand="{Binding ReloadModelsCommand}"
+            <views:ModelPicker Header="{loc:T common.model}" HasFilters="True" FiltersContext="{Binding GenerateFilter}" ReloadCommand="{Binding ReloadModelsCommand}"
                                ItemsSource="{Binding ModelsView}" SelectedItem="{Binding SelectedModel}"/>
 
             <Button Content="{loc:T common.editPrompt}" Height="34" Margin="0,4,0,0" Command="{Binding EditGeneratePromptCommand}"
