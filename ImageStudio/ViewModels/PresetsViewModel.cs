@@ -251,6 +251,10 @@ public sealed partial class PresetsViewModel : ObservableObject
         return true;
     }
 
+    // Zamknięcie okna (X, Esc, Zamknij) pyta o niezapisane zmiany tak samo jak zmiana zaznaczenia.
+    // Po wczytaniu zestawu (ChosenPreset) pytanie już padło, więc nie pytamy drugi raz
+    public bool ConfirmClose() => ChosenPreset is not null || ResolveUnsaved();
+
     // Walidacja i zapis wszystkich pól zaznaczonego zestawu; błąd ustawia Status i niczego nie zapisuje
     private bool TrySaveDetails()
     {

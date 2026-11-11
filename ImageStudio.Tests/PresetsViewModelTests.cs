@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
+using ImageStudio.Localization;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
 
@@ -291,6 +292,85 @@ public sealed class PresetEditingTests
 
             Assert.Equal("p", app.Presets.Presets.First(p => p.Name == "a").Prompt);
             Assert.Equal("pb", vm.EditPrompt);
+        });
+    }
+
+    [Fact]
+    public void Close_without_changes_does_not_ask()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal(0, app.Dialogs.ConfirmCount);
+        });
+    }
+
+    [Fact]
+    public void Close_with_changes_and_yes_saves()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+            vm.EditPrompt = "zmiana";
+            app.Dialogs.ConfirmAnswer = true;
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal("zmiana", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+        });
+    }
+
+    [Fact]
+    public void Close_with_changes_and_no_discards()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+            vm.EditPrompt = "zmiana";
+            app.Dialogs.ConfirmAnswer = false;
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal("p", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+        });
+    }
+
+    [Fact]
+    public void Close_with_invalid_changes_and_yes_stays_open()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"));
+            using var _ = app;
+            vm.EditName = "";
+            vm.EditPrompt = "zmiana";
+            app.Dialogs.ConfirmAnswer = true;
+
+            Assert.False(vm.ConfirmClose());
+            Assert.Equal("p", app.Presets.Presets.First(p => p.Name == "a").Prompt);
+            Assert.Equal("a", app.Presets.Presets.First(p => p.Name == "a").Name);
+            Assert.Equal(Loc.T("presets.msg.emptyName"), vm.Status);
+        });
+    }
+
+    [Fact]
+    public void Loading_preset_does_not_ask_twice()
+    {
+        Sta.Run(() =>
+        {
+            var (app, vm) = Open(Generate("a"), others: [Generate("b", "pb")]);
+            using var _ = app;
+            vm.EditPrompt = "zmiana";
+            app.Dialogs.ConfirmAnswer = false;
+
+            vm.LoadPresetCommand.Execute(null);
+            Assert.Equal(1, app.Dialogs.ConfirmCount);
+
+            Assert.True(vm.ConfirmClose());
+            Assert.Equal(1, app.Dialogs.ConfirmCount);
         });
     }
 

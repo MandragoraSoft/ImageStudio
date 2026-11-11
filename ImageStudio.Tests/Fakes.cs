@@ -225,7 +225,8 @@ internal sealed class FakeDialogs : IDialogService
     public ImageStudio.Configuration.Preset? ShowPresets(ImageStudio.ViewModels.PresetsContext? context = null) => throw new NotSupportedException();
     public bool ConfirmToolCall(ToolCall call) => true;
     public bool ConfirmAnswer { get; set; } = true;
-    public bool Confirm(string text, string title) => ConfirmAnswer;
+    public int ConfirmCount { get; private set; }
+    public bool Confirm(string text, string title) { ConfirmCount++; return ConfirmAnswer; }
     public Action<ModelBrowserViewModel>? OnShowModelBrowser { get; set; }
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         (OnShowModelBrowser ?? throw new NotSupportedException()).Invoke(viewModel);
