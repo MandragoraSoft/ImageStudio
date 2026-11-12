@@ -11,10 +11,10 @@ public sealed class DescribeImagesTests : IDisposable
     public DescribeImagesTests() => Directory.CreateDirectory(_dir);
     public void Dispose() => Directory.Delete(_dir, true);
 
-    private string Png(string name)
+    private string Png(string name, int size = 8)
     {
         var path = Path.Combine(_dir, name);
-        File.WriteAllBytes(path, TestImages.Png(8, 8));
+        File.WriteAllBytes(path, TestImages.Png(size, size));
         return path;
     }
 
@@ -91,20 +91,77 @@ public sealed class DescribeImagesTests : IDisposable
             chat.SelectedModel = "model-rozmowy";
             var duplicate = new ChatImage(File.ReadAllBytes(path), "image/png");
             chat.Attachments.Add(duplicate);
-            chat.Messages.Add(new ChatMessage("user", "wcześniej", Images: [new ChatImage(TestImages.Png(9, 9), "image/png")]));
+            var pending = new ChatImage(TestImages.Png(10, 10), "image/png");
+            chat.Attachments.Add(pending);
+            var historical = new ChatImage(TestImages.Png(9, 9), "image/png");
+            chat.Messages.Add(new ChatMessage("user", "wcześniej", Images: [historical]));
             chat.Input = "niewysłana wiadomość";
 
             chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
 
             Assert.Equal("model-rozmowy", provider.LastModel);
-            Assert.Equal(2, provider.LastMessages.Last().Images!.Count);
+            var analyzed = provider.LastMessages.Last().Images!;
+            Assert.Equal(2, analyzed.Count);
+            Assert.DoesNotContain(analyzed, image => image.Bytes.SequenceEqual(historical.Bytes));
+            Assert.Contains(analyzed, image => image.Bytes.SequenceEqual(pending.Bytes));
             Assert.Equal("niewysłana wiadomość", chat.Input);
-            Assert.Same(duplicate, Assert.Single(chat.Attachments));
+            Assert.Equal([duplicate, pending], chat.Attachments);
             Assert.Equal("oryginalny prompt", vm.EditPrompt);
             Assert.Contains(chat.Messages, m => m.Role == "assistant" && m.Content.Contains("Kot siedzi"));
 
             chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
             Assert.Contains(provider.LastMessages, m => m.Role == "assistant" && m.Content.Contains("Kot siedzi"));
+        });
+    }
+
+    [Fact]
+    public void Repeated_analysis_uses_only_current_edit_references()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            var first = Png("first.png");
+            var second = Png("second.png", 9);
+            vm.References.Add(new ReferenceItem(first, "a", "a"));
+            vm.EditEditPromptCommand.Execute(null);
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(File.ReadAllBytes(first), Assert.Single(provider.LastMessages.Last().Images!).Bytes);
+            vm.References.Clear();
+            vm.References.Add(new ReferenceItem(second, "b", "b"));
+            vm.EditEditPromptCommand.Execute(null);
+            chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+
+            Assert.Equal(File.ReadAllBytes(second), Assert.Single(provider.LastMessages.Last().Images!).Bytes);
+            Assert.Contains(chat.Messages, m => m.Images?.Any(i => i.Bytes.SequenceEqual(File.ReadAllBytes(first))) == true);
+            Assert.Single(provider.LastMessages, m => m.HasImages);
+        });
+    }
+
+    [Fact]
+    public void Analysis_with_only_historical_images_asks_for_new_files()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            vm.References.Add(new ReferenceItem(Png("first.png"), "a", "a"));
+            vm.EditEditPromptCommand.Execute(null);
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            vm.References.Clear();
+
+            dialogs.PickResult = null;
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(1, provider.ChatCalls);
+
+            var selected = Png("selected.png", 9);
+            dialogs.PickResult = [selected];
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(2, provider.ChatCalls);
+            Assert.Equal(File.ReadAllBytes(selected), Assert.Single(provider.LastMessages.Last().Images!).Bytes);
         });
     }
 

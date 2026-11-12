@@ -329,8 +329,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
 
         var paths = _analysisImagePaths!();
-        var chatImages = Messages.Where(m => m.Role == "user").SelectMany(m => m.Images ?? []).Concat(Attachments).ToList();
-        if (paths.Count == 0 && chatImages.Count == 0)
+        if (paths.Count == 0 && Attachments.Count == 0)
         {
             var selected = _images.Dialogs.PickImageFiles();
             if (selected is not { Length: > 0 }) return;
@@ -358,7 +357,7 @@ public sealed partial class ChatViewModel : ObservableObject
                 return;
             }
         }
-        foreach (var image in chatImages) Add(image);
+        foreach (var image in Attachments) Add(image);
 
         await SendMessageAsync(Loc.T("prompt.chatAnalyzeQuestion"), images, fromInput: false);
     }
