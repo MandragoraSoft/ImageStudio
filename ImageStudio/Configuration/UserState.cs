@@ -17,6 +17,10 @@ public sealed class UserState
 
     // Ostatnio wpisane prompty (przywracane po starcie); zestawy zapisane osobno jako Preset
     public string? GeneratePrompt { get; set; }
+    // Tryb zapamiętywania rozmowy z edytora promptu (domyślnie na dysku)
+    public PromptChatHistoryMode PromptChatHistory { get; set; } = PromptChatHistoryMode.Disk;
+    // Id ostatniej rozmowy edytora dla każdego trybu (klucz: generate, edit, video); używane tylko w trybie Disk
+    public Dictionary<string, string> PromptChatSessions { get; set; } = [];
     public string? EditPrompt { get; set; }
     public string? GenerateSystemPrompt { get; set; }
     public string? EditSystemPrompt { get; set; }

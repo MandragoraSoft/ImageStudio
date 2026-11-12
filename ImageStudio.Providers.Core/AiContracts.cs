@@ -35,7 +35,13 @@ public sealed record TokenUsage(int? Input, int? Output, int? Cached);
 
 // Rozumowanie w żądaniu czatu. Parameter to parametr, który model deklaruje w supported_parameters
 // ("reasoning_effort", "reasoning" albo "include_reasoning"); Enabled włącza lub wyłącza, Effort ustawia poziom
-public sealed record ChatOptions(string Parameter, bool Enabled, string? Effort = null);
+public sealed record ChatOptions(string Parameter, bool Enabled, string? Effort = null)
+{
+    // Losowy identyfikator rozmowy do optymalizacji routingu cache, bez treści użytkownika.
+    public string? CacheSessionId { get; init; }
+}
+
+public enum PromptCacheRouting { None, OpenAi, OpenRouter }
 
 public static class ReasoningSupport
 {

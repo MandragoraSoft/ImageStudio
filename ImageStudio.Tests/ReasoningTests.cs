@@ -150,7 +150,9 @@ public sealed class ReasoningTests
 
             chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
 
-            Assert.Equal(new ChatOptions("reasoning", true, "high"), app.Provider.LastOptions);
+            Assert.Equal("reasoning", app.Provider.LastOptions!.Parameter);
+            Assert.True(app.Provider.LastOptions.Enabled);
+            Assert.Equal("high", app.Provider.LastOptions.Effort);
             var answer = chat.Messages.Last();
             Assert.Equal("najpierw pomyślałem", answer.Reasoning);
             Assert.True(answer.HasReasoning);
@@ -174,7 +176,7 @@ public sealed class ReasoningTests
             app.Vm.ReloadModelsCommand.ExecuteAsync(null).GetAwaiter().GetResult();
             chat.Input = "b";
             chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
-            Assert.Null(app.Provider.LastOptions);
+            Assert.Equal("", app.Provider.LastOptions!.Parameter);
         });
     }
 

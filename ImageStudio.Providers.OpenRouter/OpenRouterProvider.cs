@@ -17,6 +17,7 @@ public sealed class OpenRouterProvider : IAiProvider
     private const string ModelsPath = "/api/v1/models?output_modalities=all";
 
     private readonly HttpClient _http;
+    private readonly bool _officialApi;
 
     // Obrazy zwrócone jako URL: pobierane bez klucza OpenRouter (nie wysyłamy go na obce hosty)
     private readonly HttpClient _files;
@@ -39,6 +40,8 @@ public sealed class OpenRouterProvider : IAiProvider
 
     public OpenRouterProvider(string apiKey, string baseUrl, Func<HttpMessageHandler>? handlerFactory)
     {
+        _officialApi = Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+                       && uri.Scheme == Uri.UriSchemeHttps && uri.Host.Equals("openrouter.ai", StringComparison.OrdinalIgnoreCase);
         _files = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         _http = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler())
         {
@@ -241,11 +244,13 @@ public sealed class OpenRouterProvider : IAiProvider
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
-        OpenAiCompat.ChatAsync(_http, ChatPath, model, messages, tools, ct, options);
+        OpenAiCompat.ChatAsync(_http, ChatPath, model, messages, tools, ct, options,
+                               _officialApi ? PromptCacheRouting.OpenRouter : PromptCacheRouting.None);
     public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
                                            IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
                                            CancellationToken ct = default, ChatOptions? options = null) =>
-        OpenAiCompat.ChatStreamAsync(_http, ChatPath, model, messages, tools, onDelta, ct, options);
+        OpenAiCompat.ChatStreamAsync(_http, ChatPath, model, messages, tools, onDelta, ct, options,
+                                     _officialApi ? PromptCacheRouting.OpenRouter : PromptCacheRouting.None);
 
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,

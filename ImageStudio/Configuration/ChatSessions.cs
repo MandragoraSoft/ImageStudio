@@ -36,21 +36,23 @@ public sealed class ChatSessionData
 
 // Sesje czatu w %LOCALAPPDATA%\ImageStudio\sessions: <id>.json (rozmowa) i <id>.meta.json (tytuł i czas, do listy).
 // Uszkodzone pliki są pomijane; błąd zapisu nie przerywa pracy czatu
-public sealed class FileChatSessionStore : IChatSessionStore
+public class FileChatSessionStore : IChatSessionStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = false };
 
-    private static string Dir => Path.Combine(AppPaths.UserDataDir, "sessions");
+    private readonly string _dir;
+
+    public FileChatSessionStore(string folder = "sessions") => _dir = Path.Combine(AppPaths.UserDataDir, folder);
 
     // Id trafia do nazwy pliku: tylko znaki szesnastkowe (nie da się wyjść poza katalog sesji)
     private static bool ValidId(string id) => id.Length is > 0 and <= 64 && id.All(Uri.IsHexDigit);
 
     public IReadOnlyList<ChatSessionInfo> List()
     {
-        if (!Directory.Exists(Dir)) return [];
+        if (!Directory.Exists(_dir)) return [];
 
         var result = new List<ChatSessionInfo>();
-        foreach (var file in Directory.EnumerateFiles(Dir, "*.meta.json"))
+        foreach (var file in Directory.EnumerateFiles(_dir, "*.meta.json"))
         {
             try
             {
@@ -68,7 +70,7 @@ public sealed class FileChatSessionStore : IChatSessionStore
     public ChatSessionData? Load(string id)
     {
         if (!ValidId(id)) return null;
-        var path = Path.Combine(Dir, id + ".json");
+        var path = Path.Combine(_dir, id + ".json");
         if (!File.Exists(path)) return null;
 
         try
@@ -87,9 +89,9 @@ public sealed class FileChatSessionStore : IChatSessionStore
 
         try
         {
-            Directory.CreateDirectory(Dir);
-            File.WriteAllText(Path.Combine(Dir, session.Id + ".json"), JsonSerializer.Serialize(session, Options));
-            File.WriteAllText(Path.Combine(Dir, session.Id + ".meta.json"),
+            Directory.CreateDirectory(_dir);
+            File.WriteAllText(Path.Combine(_dir, session.Id + ".json"), JsonSerializer.Serialize(session, Options));
+            File.WriteAllText(Path.Combine(_dir, session.Id + ".meta.json"),
                               JsonSerializer.Serialize(new ChatSessionInfo(session.Id, session.Title, session.UpdatedUtc), Options));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -106,7 +108,7 @@ public sealed class FileChatSessionStore : IChatSessionStore
         {
             foreach (var name in new[] { id + ".json", id + ".meta.json" })
             {
-                var path = Path.Combine(Dir, name);
+                var path = Path.Combine(_dir, name);
                 if (File.Exists(path)) File.Delete(path);
             }
         }
@@ -116,3 +118,6 @@ public sealed class FileChatSessionStore : IChatSessionStore
         }
     }
 }
+
+// Rozmowy z edytora promptu (osobny katalog, żeby nie mieszały się z listą zwykłych czatów)
+public sealed class FilePromptChatSessionStore() : FileChatSessionStore("prompt-chats"), IPromptChatSessionStore;

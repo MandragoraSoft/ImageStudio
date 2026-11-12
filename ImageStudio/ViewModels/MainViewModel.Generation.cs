@@ -92,7 +92,7 @@ public sealed partial class MainViewModel
         Preset? saved = null;
         var edit = _dialogs.ShowPromptEditor(title, initial, current => RebuildPromptAsync(current), this, PresetsOfKind(kind),
                                              preset => { _presetStore.Save(preset); saved = preset; }, describe,
-                                             (current, report) => CreatePromptConversation(current, report, imagePaths: imagePaths));
+                                             (current, report) => CreatePromptConversation(current, report, imagePaths: imagePaths, historyKey: kind));
         if (edit is null) return;
 
         apply(edit);
@@ -132,7 +132,7 @@ public sealed partial class MainViewModel
         if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(VideoSystemPrompt, VideoPrompt, History: _videoHistory, NegativePrompt: VideoNegativePrompt),
                                       describeImages: () => DescribeImagesAsync(VideoAttachments),
                                       createConversation: (current, report) => CreatePromptConversation(current, report,
-                                          imagePaths: () => VideoAttachments.Select(item => item.Path).ToArray())) is not { } edit) return;
+                                          imagePaths: () => VideoAttachments.Select(item => item.Path).ToArray(), historyKey: "video")) is not { } edit) return;
 
         VideoSystemPrompt = edit.System ?? "";
         VideoPrompt = edit.Prompt;

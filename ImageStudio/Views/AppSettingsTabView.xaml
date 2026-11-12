@@ -30,6 +30,16 @@
             <CheckBox Content="{loc:T settings.streaming}" IsChecked="{Binding UseStreaming}"
                       ToolTip="{loc:T settings.streaming.tip}"/>
 
+            <TextBlock Text="{loc:T settings.promptChat}" Style="{StaticResource SectionHeader}"/>
+            <ComboBox ItemsSource="{Binding PromptChatModes}" SelectedValuePath="Mode" SelectedValue="{Binding SelectedPromptChatHistory}"
+                      ToolTip="{loc:T settings.promptChat.tip}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Label}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
             <TextBlock Text="{loc:T settings.theme}" Style="{StaticResource SectionHeader}"/>
             <ComboBox ItemsSource="{Binding Themes}" SelectedValuePath="Code" SelectedValue="{Binding SelectedTheme}">
                 <ComboBox.ItemTemplate>

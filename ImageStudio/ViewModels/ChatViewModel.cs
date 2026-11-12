@@ -41,6 +41,12 @@ public sealed partial class ChatViewModel : ObservableObject
     // Treść ostatniej wiadomości zmieniła się w trakcie strumienia (widok przewija rozmowę na dół)
     public event Action? MessageUpdated;
 
+    // Zmieniła się bieżąca sesja: id zapisanej rozmowy (pusty, gdy nowa rozmowa nie została jeszcze zapisana)
+    public event Action<string>? SessionChanged;
+
+    // Rozmowa z edytora promptu: przerwana lub nieudana odpowiedź nie zostaje w historii (rozmowa wraca do stanu sprzed wysłania)
+    public bool DiscardIncompleteTurns { get; set; }
+
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
     public ChatViewModel(Func<IAiProvider> provider, ObservableCollection<string> models,
@@ -391,7 +397,7 @@ public sealed partial class ChatViewModel : ObservableObject
         var provider = _provider();
         var model = SelectedModel!;
         var supportsTools = SupportsTools;
-        var options = BuildOptions();
+        var options = (BuildOptions() ?? new ChatOptions("", false)) with { CacheSessionId = _sessionId };
         try
         {
             var definitions = fromInput && supportsTools ? Tools?.Tools ?? [] : [];
@@ -497,9 +503,25 @@ public sealed partial class ChatViewModel : ObservableObject
             if (stopped) Log.LogInformation("Czat: przerwano przez użytkownika ({Provider}/{Model})", provider.Id, SelectedModel);
             else Log.LogError(ex, "Czat: błąd przy {Provider}/{Model} (wiadomości w rozmowie {Count})", provider.Id, SelectedModel, Messages.Count);
 
-            if (!fromInput)
+            if (!fromInput || DiscardIncompleteTurns)
             {
-                while (Messages.Count > start) Messages.RemoveAt(Messages.Count - 1);
+                // Narzędzia, które już się wykonały, zostają w historii: ich skutki nastąpiły, więc ponowienie nie może ich powtórzyć
+                var executed = fromInput && Messages.Skip(start).Any(m => m.Role == "tool" || m.HasToolCalls);
+                if (executed)
+                {
+                    if (live is not null && !live.HasToolCalls) Messages.Remove(live);
+                    CloseOpenToolCalls(start);
+                }
+                else
+                {
+                    while (Messages.Count > start) Messages.RemoveAt(Messages.Count - 1);
+                    // Draft wraca do pól, jeśli użytkownik nie zdążył nic nowego wpisać
+                    if (fromInput && Input.Length == 0)
+                    {
+                        Input = question;
+                        if (Attachments.Count == 0) foreach (var image in images) Attachments.Add(image);
+                    }
+                }
             }
             else
             {
@@ -529,6 +551,21 @@ public sealed partial class ChatViewModel : ObservableObject
     // Przerywa trwającą odpowiedź (żądanie HTTP i narzędzia); tekst, który już napłynął, zostaje
     [RelayCommand(CanExecute = nameof(IsSending))]
     private void Stop() => _cts?.Cancel();
+
+    // Wywołania przerwane przed wynikiem dostają jawny wynik „przerwano”, żeby historia była kompletna dla modelu
+    private void CloseOpenToolCalls(int start)
+    {
+        for (var i = start; i < Messages.Count; i++)
+        {
+            foreach (var call in Messages[i].ToolCalls ?? [])
+            {
+                if (Messages.Any(m => m.Role == "tool" && m.ToolCallId == call.Id)) continue;
+                var result = new ChatMessage("tool", Loc.T("chat.msg.toolStopped"), ToolCallId: call.Id, ToolName: call.Name);
+                ApplyCollapse(result);
+                Messages.Add(result);
+            }
+        }
+    }
 
     // Zamyka odpowiedź: w trybie strumieniowym uzupełnia już widoczną wiadomość pełnymi danymi, inaczej dodaje nową
     private void Complete(ChatMessage? live, ChatMessage fresh, ChatReply reply)
@@ -671,6 +708,10 @@ public sealed partial class ChatViewModel : ObservableObject
             Log.LogInformation("Czat: wyniki narzędzia {Tool} ({Chars} zn.): {Result}", call.Name, result.Length, AppLog.Preview(result));
             return result;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Log.LogError(ex, "Czat: narzędzie {Tool} zgłosiło błąd (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
@@ -805,6 +846,21 @@ public sealed partial class ChatViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(SessionLabel));
+        // Pusty id: rozmowa nie ma jeszcze zapisanej sesji
+        SessionChanged?.Invoke("");
+    }
+
+    // Wznawia zapisaną rozmowę (edytor promptu); false, gdy jej nie ma
+    public bool ResumeSession(string id)
+    {
+        var data = _sessionStore?.Load(id);
+        if (data is null) return false;
+
+        Restore(data);
+        // Ostatnia odpowiedź wraca, żeby można ją było znów zastosować
+        var last = data.Messages.LastOrDefault();
+        LastCompletedReply = last is { Role: "assistant", ToolCalls: not { Count: > 0 } } ? last.Content : null;
+        return true;
     }
 
     private void OpenSession(ChatSessionInfo info)
@@ -817,6 +873,11 @@ public sealed partial class ChatViewModel : ObservableObject
             return;
         }
 
+        Restore(data);
+    }
+
+    private void Restore(ChatSessionData data)
+    {
         _switching = true;
         try
         {
@@ -843,6 +904,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(SessionLabel));
+        SessionChanged?.Invoke(data.Id);
         MessageUpdated?.Invoke();
     }
 
@@ -862,6 +924,7 @@ public sealed partial class ChatViewModel : ObservableObject
             Messages = Messages.Select(ToData).ToList(),
         };
         _sessionStore.Save(data);
+        SessionChanged?.Invoke(data.Id);
 
         var info = new ChatSessionInfo(data.Id, data.Title, data.UpdatedUtc);
         _switching = true;

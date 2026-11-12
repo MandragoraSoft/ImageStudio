@@ -208,11 +208,13 @@ public sealed class OpenAiProvider : IAiProvider
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>
-        OpenAiCompat.ChatAsync(_http, "v1/chat/completions", model, messages, tools, ct, options);
+        OpenAiCompat.ChatAsync(_http, "v1/chat/completions", model, messages, tools, ct, options,
+                               _officialApi ? PromptCacheRouting.OpenAi : PromptCacheRouting.None);
     public Task<ChatReply> ChatStreamAsync(string model, IReadOnlyList<ChatMessage> messages,
                                            IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
                                            CancellationToken ct = default, ChatOptions? options = null) =>
-        OpenAiCompat.ChatStreamAsync(_http, "v1/chat/completions", model, messages, tools, onDelta, ct, options);
+        OpenAiCompat.ChatStreamAsync(_http, "v1/chat/completions", model, messages, tools, onDelta, ct, options,
+                                     _officialApi ? PromptCacheRouting.OpenAi : PromptCacheRouting.None);
 
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,

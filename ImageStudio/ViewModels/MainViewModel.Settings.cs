@@ -50,7 +50,7 @@ public sealed partial class MainViewModel
                                          _secrets.Load("mistral") ?? "", _secrets.Load("kilo") ?? "", _secrets.Load("opencodego") ?? "",
                                          _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "",
                                          _storage.Active.Id, null, Limits.MaxTools, Limits.ListLimit, Limits.MaxListLimit,
-                                         _state.GalleryArchiveFolder);
+                                         _state.GalleryArchiveFolder, _state.PromptChatHistory);
         Voice.RefreshDevices();
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
@@ -68,6 +68,7 @@ public sealed partial class MainViewModel
         _state.GalleryArchiveFolder = string.IsNullOrWhiteSpace(result.GalleryArchiveFolder)
             ? UserState.DefaultGalleryArchiveFolder
             : result.GalleryArchiveFolder.Trim();
+        _state.PromptChatHistory = result.PromptChatHistory;
         SyncVoiceFolder();
         SaveState();
 

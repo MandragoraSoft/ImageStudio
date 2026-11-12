@@ -49,6 +49,9 @@ public interface IChatSessionStore
     void Delete(string id);
 }
 
+// Rozmowy z edytora promptu (Generowanie, Edycja, Wideo): osobny magazyn, żeby nie trafiały na listę zwykłych czatów
+public interface IPromptChatSessionStore : IChatSessionStore;
+
 public interface IWindowStateStore
 {
     WindowRecord? GetWindow(string key);

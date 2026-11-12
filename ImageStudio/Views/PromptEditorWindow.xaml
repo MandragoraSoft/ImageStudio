@@ -155,6 +155,10 @@
                             Margin="0,8,8,0" Padding="12,4" Style="{StaticResource SecondaryButton}"
                             DataContext="{Binding DataContext, ElementName=ConversationHost}"
                             Command="{Binding AnalyzeImagesCommand}" ToolTip="{loc:T prompt.chatAnalyze.tip}"/>
+                    <Button x:Name="NewConversationButton" Content="{loc:T prompt.chatNew}" Margin="0,8,8,0" Padding="12,4"
+                            Style="{StaticResource SecondaryButton}"
+                            DataContext="{Binding DataContext, ElementName=ConversationHost}"
+                            Command="{Binding NewChatCommand}"/>
                     <Button x:Name="UseConversationButton" Content="{loc:T prompt.chatApply}"
                             Margin="0,8,0,0" Padding="12,4" HorizontalAlignment="Left"
                             Click="UseConversation_Click">

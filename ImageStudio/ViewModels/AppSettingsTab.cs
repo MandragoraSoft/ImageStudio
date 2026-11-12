@@ -7,6 +7,8 @@ namespace ImageStudio.ViewModels;
 
 public sealed record ThemeOption(string Code, string Label);
 
+public sealed record PromptChatModeOption(PromptChatHistoryMode Mode, string Label);
+
 // Zakładka "Aplikacja": ustawienia ogólne, niezależne od dostawcy
 public sealed partial class AppSettingsTab : ObservableObject, ISettingsTab
 {
@@ -44,12 +46,24 @@ public sealed partial class AppSettingsTab : ObservableObject, ISettingsTab
     [ObservableProperty]
     private string _galleryArchiveFolder;
 
+    // Gdzie zapamiętywana jest rozmowa z edytora promptu (Generowanie, Edycja, Wideo)
+    public IReadOnlyList<PromptChatModeOption> PromptChatModes { get; } =
+    [
+        new(PromptChatHistoryMode.Disk, Loc.T("settings.promptChat.disk")),
+        new(PromptChatHistoryMode.UntilClose, Loc.T("settings.promptChat.untilClose")),
+        new(PromptChatHistoryMode.Off, Loc.T("settings.promptChat.off")),
+    ];
+
+    [ObservableProperty]
+    private PromptChatHistoryMode _selectedPromptChatHistory;
+
     public AppSettingsTab(SettingsResult current)
     {
         _maxSide = current.MaxSide;
         _selectedTheme = current.Theme;
         _useStreaming = current.UseStreaming;
         _selectedLanguage = current.Language;
+        _selectedPromptChatHistory = current.PromptChatHistory;
         _galleryArchiveFolder = string.IsNullOrWhiteSpace(current.GalleryArchiveFolder)
             ? UserState.DefaultGalleryArchiveFolder
             : current.GalleryArchiveFolder;
@@ -62,5 +76,6 @@ public sealed partial class AppSettingsTab : ObservableObject, ISettingsTab
         UseStreaming = UseStreaming,
         Language = SelectedLanguage,
         GalleryArchiveFolder = GalleryArchiveFolder,
+        PromptChatHistory = SelectedPromptChatHistory,
     };
 }

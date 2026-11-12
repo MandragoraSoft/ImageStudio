@@ -132,20 +132,23 @@ public sealed partial class MainViewModel : ObservableObject
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
-                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
+                         IActivityTracker activity, IChatSessionStore chatSessions, IPromptChatSessionStore promptChats,
+                         IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
                          IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills)
         : this(provider, providers, dialogs, downloads, settings, settingsStore, stateStore, galleryStore, presetStore,
-               secrets, prefs, toolHost, mcp, themes, activity, chatSessions, audioPlayer, audioRecorder,
+               secrets, prefs, toolHost, mcp, themes, activity, chatSessions, promptChats, audioPlayer, audioRecorder,
                voiceGallery, memory, storage, skills, null) { }
 
     public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
                          IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
-                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
+                         IActivityTracker activity, IChatSessionStore chatSessions, IPromptChatSessionStore promptChats,
+                         IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
                          IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills,
                          OutgoingRequestRegistry? requests)
     {
+        _promptChatDisk = promptChats;
         _storage = storage;
         _requests = requests;
         _provider = provider;

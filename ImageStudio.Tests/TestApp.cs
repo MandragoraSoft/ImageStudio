@@ -59,7 +59,7 @@ internal sealed class MemoryGalleryStore : IGalleryStore
     }
 }
 
-internal sealed class MemoryChatSessionStore : IChatSessionStore
+internal class MemoryChatSessionStore : IChatSessionStore
 {
     public Dictionary<string, ChatSessionData> Sessions { get; } = [];
     public int SaveCalls { get; private set; }
@@ -77,6 +77,9 @@ internal sealed class MemoryChatSessionStore : IChatSessionStore
 
     public void Delete(string id) => Sessions.Remove(id);
 }
+
+// Osobny magazyn "Rozmowy AI" z edytora promptu: nie miesza się ze zwykłymi sesjami czatu
+internal sealed class MemoryPromptChatSessionStore : MemoryChatSessionStore, IPromptChatSessionStore;
 
 internal sealed class MemoryPresetStore : IPresetStore
 {
@@ -187,6 +190,8 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton<IUserStateStore, MemoryUserStateStore>();
         services.AddSingleton<IGalleryStore, MemoryGalleryStore>();
         services.AddSingleton<IChatSessionStore, MemoryChatSessionStore>();
+        services.AddSingleton<MemoryPromptChatSessionStore>();
+        services.AddSingleton<IPromptChatSessionStore>(sp => sp.GetRequiredService<MemoryPromptChatSessionStore>());
         services.AddSingleton<MemoryVoiceGalleryStore>();
         services.AddSingleton<IVoiceGalleryStore>(sp => sp.GetRequiredService<MemoryVoiceGalleryStore>());
         services.AddSingleton<IPresetStore, MemoryPresetStore>();
@@ -226,6 +231,7 @@ internal sealed class TestApp : IDisposable
     public FakeProvider Provider => Get<FakeProvider>();
     public FakeDialogs Dialogs => Get<FakeDialogs>();
     public MemoryChatSessionStore ChatSessions => (MemoryChatSessionStore)Get<IChatSessionStore>();
+    public MemoryPromptChatSessionStore PromptChatSessions => Get<MemoryPromptChatSessionStore>();
     public MemoryPresetStore Presets => (MemoryPresetStore)Get<IPresetStore>();
     public MemoryUserStateStore State => (MemoryUserStateStore)Get<IUserStateStore>();
     public MemorySecretStore Secrets => (MemorySecretStore)Get<ISecretStore>();

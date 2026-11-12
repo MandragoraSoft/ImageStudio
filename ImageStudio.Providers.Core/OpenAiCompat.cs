@@ -30,9 +30,9 @@ public static class OpenAiCompat
     public static async Task<ChatReply> ChatAsync(HttpClient http, string path, string model,
                                                     IReadOnlyList<ChatMessage> messages,
                                                     IReadOnlyList<ToolDefinition>? tools, CancellationToken ct,
-                                                    ChatOptions? options = null)
+                                                    ChatOptions? options = null, PromptCacheRouting cacheRouting = PromptCacheRouting.None)
     {
-        var body = BuildChatBody(model, messages, tools, options);
+        var body = BuildChatBody(model, messages, tools, options, cacheRouting);
 
         using var response = await http.PostAsJsonAsync(path, body, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
@@ -103,7 +103,8 @@ public static class OpenAiCompat
 
     // Ciało żądania czatu: model, historia, narzędzia i (gdy podano) sterowanie rozumowaniem
     private static Dictionary<string, object?> BuildChatBody(string model, IReadOnlyList<ChatMessage> messages,
-                                                              IReadOnlyList<ToolDefinition>? tools, ChatOptions? options)
+                                                              IReadOnlyList<ToolDefinition>? tools, ChatOptions? options,
+                                                              PromptCacheRouting cacheRouting)
     {
         var body = new Dictionary<string, object?> { ["model"] = model, ["messages"] = messages.Select(ToWire).ToList() };
         if (tools is { Count: > 0 })
@@ -119,6 +120,11 @@ public static class OpenAiCompat
             }).ToList();
 
         ApplyReasoning(body, options);
+        if (options?.CacheSessionId is { Length: > 0 } cacheId)
+        {
+            if (cacheRouting == PromptCacheRouting.OpenAi) body["prompt_cache_key"] = cacheId;
+            else if (cacheRouting == PromptCacheRouting.OpenRouter) body["session_id"] = cacheId;
+        }
         return body;
     }
 
@@ -127,9 +133,10 @@ public static class OpenAiCompat
     public static async Task<ChatReply> ChatStreamAsync(HttpClient http, string path, string model,
                                                         IReadOnlyList<ChatMessage> messages,
                                                         IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
-                                                        CancellationToken ct = default, ChatOptions? options = null)
+                                                        CancellationToken ct = default, ChatOptions? options = null,
+                                                        PromptCacheRouting cacheRouting = PromptCacheRouting.None)
     {
-        var body = BuildChatBody(model, messages, tools, options);
+        var body = BuildChatBody(model, messages, tools, options, cacheRouting);
         body["stream"] = true;
         body["stream_options"] = new { include_usage = true };
 
