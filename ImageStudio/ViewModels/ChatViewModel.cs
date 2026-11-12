@@ -35,6 +35,7 @@ public sealed partial class ChatViewModel : ObservableObject
     private readonly Func<bool>? _useStreaming;
     private readonly IChatSessionStore? _sessionStore;
     private readonly Func<string>? _additionalSystemContext;
+    private readonly Func<IReadOnlyList<string>>? _analysisImagePaths;
     private CancellationTokenSource? _cts;
 
     // Treść ostatniej wiadomości zmieniła się w trakcie strumienia (widok przewija rozmowę na dół)
@@ -49,9 +50,11 @@ public sealed partial class ChatViewModel : ObservableObject
                          bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
                          IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null,
                          Func<bool>? useStreaming = null, IChatSessionStore? sessionStore = null,
-                         Func<string>? additionalSystemContext = null)
+                         Func<string>? additionalSystemContext = null,
+                         Func<IReadOnlyList<string>>? analysisImagePaths = null)
     {
         _additionalSystemContext = additionalSystemContext;
+        _analysisImagePaths = analysisImagePaths;
         _useStreaming = useStreaming;
         _sessionStore = sessionStore;
         LoadSessionList();
@@ -154,7 +157,7 @@ public sealed partial class ChatViewModel : ObservableObject
     public ObservableCollection<ChatImage> Attachments { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(AnalyzeImagesCommand))]
     [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(ToolsWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
     private string? _selectedModel;
 
@@ -270,7 +273,7 @@ public sealed partial class ChatViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(NewChatCommand), nameof(NewIncognitoChatCommand), nameof(AttachImagesCommand),
-                                nameof(PasteImageCommand), nameof(StopCommand), nameof(DeleteSessionCommand))]
+                                nameof(PasteImageCommand), nameof(StopCommand), nameof(DeleteSessionCommand), nameof(AnalyzeImagesCommand))]
     [NotifyPropertyChangedFor(nameof(CanChangeSession))]
     private bool _isSending;
 
@@ -296,19 +299,69 @@ public sealed partial class ChatViewModel : ObservableObject
 
     private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null;
 
+    private bool CanAnalyzeImages => !IsSending && SelectedModel is not null && _images is not null && _analysisImagePaths is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAnalyzeImages))]
+    private async Task AnalyzeImagesAsync()
+    {
+        if (!CanAnalyzeImages) return;
+        if (_images!.AcceptsImage(SelectedModel!) == false)
+        {
+            _report(Loc.T("gen.err.noImages", SelectedModel!), true);
+            return;
+        }
+
+        var paths = _analysisImagePaths!();
+        var chatImages = Messages.Where(m => m.Role == "user").SelectMany(m => m.Images ?? []).Concat(Attachments).ToList();
+        if (paths.Count == 0 && chatImages.Count == 0)
+        {
+            var selected = _images.Dialogs.PickImageFiles();
+            if (selected is not { Length: > 0 }) return;
+            paths = selected;
+        }
+
+        var images = new List<ChatImage>();
+        var hashes = new HashSet<string>(StringComparer.Ordinal);
+        void Add(ChatImage image)
+        {
+            if (hashes.Add(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image.Bytes))))
+                images.Add(image);
+        }
+        foreach (var path in paths)
+        {
+            try
+            {
+                var (bytes, mime) = ImageFitter.Downscale(File.ReadAllBytes(path), _images.MaxSide());
+                Add(new ChatImage(bytes, mime));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or InvalidOperationException)
+            {
+                Log.LogWarning(ex, "Nie udało się wczytać obrazu do analizy: {Path}", path);
+                _report(Loc.T("msg.loadNamedImageFailed", Path.GetFileName(path), ex.Message), true);
+                return;
+            }
+        }
+        foreach (var image in chatImages) Add(image);
+
+        await SendMessageAsync(Loc.T("prompt.chatAnalyzeQuestion"), images, fromInput: false);
+    }
+
     // Wysyła całą historię (z instrukcją systemową na początku). Gdy model prosi o narzędzia, wykonuje je (po zgodzie)
     // i odsyła wyniki, aż model odpowie tekstem. Błąd bez żadnego wykonanego narzędzia przywraca wiadomość i obrazy do pól.
     [RelayCommand(CanExecute = nameof(CanSend))]
-    private async Task SendAsync()
+    private Task SendAsync() => SendMessageAsync(Input.Trim(), Attachments.ToList(), fromInput: true);
+
+    private async Task SendMessageAsync(string question, List<ChatImage> images, bool fromInput)
     {
         LastCompletedReply = null;
-        var question = Input.Trim();
-        var images = Attachments.ToList();
         var sent = new ChatMessage("user", question, Images: images.Count > 0 ? images : null);
         var start = Messages.Count;
         Messages.Add(sent);
-        Input = "";
-        Attachments.Clear();
+        if (fromInput)
+        {
+            Input = "";
+            Attachments.Clear();
+        }
         IsSending = true;
         _report(Loc.T("chat.msg.answering"), false);
         ChatMessage? live = null;
@@ -319,7 +372,7 @@ public sealed partial class ChatViewModel : ObservableObject
         var provider = _provider();
         try
         {
-            var definitions = Tools?.Tools ?? [];
+            var definitions = fromInput ? Tools?.Tools ?? [] : [];
             Log.LogInformation("Czat: wysyłam do {Provider}/{Model} (historia {History}, obrazów {Images}, narzędzi {Tools}, strumień {Stream})",
                 provider.Id, SelectedModel, Messages.Count, images.Count, definitions.Count, _useStreaming?.Invoke() == true);
             for (var round = 0; ; round++)
@@ -345,6 +398,8 @@ public sealed partial class ChatViewModel : ObservableObject
                     reply = await _provider().ChatAsync(SelectedModel!, history, tools, ct, BuildOptions());
                 }
                 ct.ThrowIfCancellationRequested();
+                if (!fromInput && reply.ToolCalls.Count > 0)
+                    throw new InvalidOperationException(Loc.T("prompt.chatAnalyzeToolError"));
 
                 Log.LogInformation("Czat: odpowiedź rundy {Round}: tekst {Chars} zn., rozumowanie {Reasoning} zn., wywołania narzędzi [{Calls}], tokeny {Usage}",
                     round, reply.Content.Length, reply.Reasoning?.Length ?? 0, string.Join(", ", reply.ToolCalls.Select(c => c.Name)), reply.Usage);
@@ -352,9 +407,10 @@ public sealed partial class ChatViewModel : ObservableObject
                 if (reply.ToolCalls.Count == 0)
                 {
                     // Pusta odpowiedź (model nie napisał nic po wynikach narzędzi): nie zostawiamy pustej bańki w rozmowie
-                    if (string.IsNullOrWhiteSpace(reply.Content) && string.IsNullOrWhiteSpace(reply.Reasoning))
+                    if (string.IsNullOrWhiteSpace(reply.Content) && (!fromInput || string.IsNullOrWhiteSpace(reply.Reasoning)))
                     {
                         if (live is not null) Messages.Remove(live);
+                        if (!fromInput) Messages.Remove(sent);
                         emptyReply = true;
                         break;
                     }
@@ -409,18 +465,23 @@ public sealed partial class ChatViewModel : ObservableObject
             if (stopped) Log.LogInformation("Czat: przerwano przez użytkownika ({Provider}/{Model})", provider.Id, SelectedModel);
             else Log.LogError(ex, "Czat: błąd przy {Provider}/{Model} (wiadomości w rozmowie {Count})", provider.Id, SelectedModel, Messages.Count);
 
-            // Pusta wiadomość ze strumienia, który nic nie dostarczył, nie zostaje w rozmowie
-            if (live is not null && live.Content.Length == 0 && !live.HasToolCalls) Messages.Remove(live);
-
-            // Po wykonanych narzędziach zostawiamy rozmowę, żeby ponowienie nie uruchomiło ich drugi raz
-            if (Messages.Count == start + 1)
+            if (!fromInput)
             {
-                Messages.Remove(sent);
-                Input = question;
-                foreach (var image in images) Attachments.Add(image);
+                while (Messages.Count > start) Messages.RemoveAt(Messages.Count - 1);
+            }
+            else
+            {
+                // Po wykonanych narzędziach zostawiamy rozmowę, żeby ponowienie nie uruchomiło ich drugi raz
+                if (live is not null && live.Content.Length == 0 && !live.HasToolCalls) Messages.Remove(live);
+                if (Messages.Count == start + 1)
+                {
+                    Messages.Remove(sent);
+                    Input = question;
+                    foreach (var image in images) Attachments.Add(image);
+                }
             }
 
-            // Stop zostawia tekst, który zdążył napłynąć; to nie jest błąd
+            // Stop nie jest błędem; niepełny opis analizy nie zostaje w kontekście
             if (stopped) _report(Loc.T("chat.msg.stopped"), false);
             else _report(Loc.T("chat.msg.error", ex.Message), true);
         }

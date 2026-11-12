@@ -70,7 +70,7 @@ public sealed partial class MainViewModel
             GeneratePrompt = edit.Prompt;
             if (edit.NegativePrompt is not null) NegativePrompt = edit.NegativePrompt;
             _generateHistory = edit.History;
-        }, () => DescribeImagesAsync([]));
+        }, () => DescribeImagesAsync([]), () => []);
 
     [RelayCommand]
     private void EditEditPrompt() =>
@@ -81,18 +81,18 @@ public sealed partial class MainViewModel
             EditPrompt = edit.Prompt;
             if (edit.NegativePrompt is not null) EditNegativePrompt = edit.NegativePrompt;
             _editHistory = edit.History;
-        }, () => DescribeImagesAsync(References));
+        }, () => DescribeImagesAsync(References), () => References.Select(item => item.Path).ToArray());
 
     // Edytor z zestawami. Gdy w oknie nadpisano zestaw, a zatwierdzone pola są z nim zgodne, stan
     // "zmieniono od ostatniego zapisu" wraca do wartości sprzed otwarcia (zapis jest propagowany do okna głównego)
     private void EditPromptWithPresets(string title, string kind, PromptEdit initial, Action<PromptEdit> apply,
-                                       Func<Task<string>> describe)
+                                       Func<Task<string>> describe, Func<IReadOnlyList<string>> imagePaths)
     {
         var wasDirty = PresetDirty;
         Preset? saved = null;
         var edit = _dialogs.ShowPromptEditor(title, initial, current => RebuildPromptAsync(current), this, PresetsOfKind(kind),
                                              preset => { _presetStore.Save(preset); saved = preset; }, describe,
-                                             (current, report) => CreatePromptConversation(current, report));
+                                             (current, report) => CreatePromptConversation(current, report, imagePaths: imagePaths));
         if (edit is null) return;
 
         apply(edit);
@@ -131,7 +131,8 @@ public sealed partial class MainViewModel
     {
         if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(VideoSystemPrompt, VideoPrompt, History: _videoHistory, NegativePrompt: VideoNegativePrompt),
                                       describeImages: () => DescribeImagesAsync(VideoAttachments),
-                                      createConversation: (current, report) => CreatePromptConversation(current, report)) is not { } edit) return;
+                                      createConversation: (current, report) => CreatePromptConversation(current, report,
+                                          imagePaths: () => VideoAttachments.Select(item => item.Path).ToArray())) is not { } edit) return;
 
         VideoSystemPrompt = edit.System ?? "";
         VideoPrompt = edit.Prompt;

@@ -26,6 +26,9 @@ public static class WindowMemory
         DependencyProperty.RegisterAttached("ColumnKey", typeof(string), typeof(WindowMemory),
             new PropertyMetadata(null, OnColumnKeyChanged));
 
+    private static readonly DependencyProperty ColumnTimerProperty =
+        DependencyProperty.RegisterAttached("ColumnTimer", typeof(DispatcherTimer), typeof(WindowMemory));
+
     public static bool GetRemember(DependencyObject d) => (bool)d.GetValue(RememberProperty);
     public static void SetRemember(DependencyObject d, bool value) => d.SetValue(RememberProperty, value);
     public static string? GetColumnKey(DependencyObject d) => (string?)d.GetValue(ColumnKeyProperty);
@@ -94,16 +97,20 @@ public static class WindowMemory
 
         // GridSplitter zmienia Width kolumny; zapis z opóźnieniem, żeby nie pisać pliku przy każdym pikselu przeciągania
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            if (column.ActualWidth > 0) Store.SetColumn(key, column.ActualWidth);
-        };
+        column.SetValue(ColumnTimerProperty, timer);
+        timer.Tick += (_, _) => SaveColumn(column);
         DependencyPropertyDescriptor.FromProperty(ColumnDefinition.WidthProperty, typeof(ColumnDefinition))
             .AddValueChanged(column, (_, _) =>
             {
                 timer.Stop();
                 timer.Start();
             });
+    }
+
+    public static void SaveColumn(ColumnDefinition column)
+    {
+        (column.GetValue(ColumnTimerProperty) as DispatcherTimer)?.Stop();
+        if (GetColumnKey(column) is { } key && column.ActualWidth > 0)
+            Store.SetColumn(key, column.ActualWidth);
     }
 }

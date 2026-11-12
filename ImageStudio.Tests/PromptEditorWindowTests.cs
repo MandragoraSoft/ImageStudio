@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.ViewModels;
@@ -41,6 +42,79 @@ public sealed class PromptEditorWindowTests
             Assert.Equal(Visibility.Collapsed, Named<UIElement>(window, "SystemSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Named<UIElement>(window, "RebuildSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Named<UIElement>(window, "DescribeButton").Visibility);
+        });
+    }
+
+    [Fact]
+    public void Splitter_moves_and_restores_sidebar_even_after_immediate_close()
+    {
+        WpfHost.Run(() =>
+        {
+            var previous = WindowMemory.Store;
+            var store = new MemoryWindowStateStore();
+            WindowMemory.Store = store;
+            try
+            {
+                var first = new PromptEditorWindow("Edytor", new PromptEdit("", "tekst", "i"), e => Task.FromResult(e));
+                first.Show();
+                first.Width = 1100;
+                first.UpdateLayout();
+                var grid = Named<Grid>(first, "BodyGrid");
+                var splitter = Named<GridSplitter>(first, "PanelSplitter");
+                var original = grid.ColumnDefinitions[2].ActualWidth;
+                splitter.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
+                splitter.RaiseEvent(new DragDeltaEventArgs(-80, 0) { RoutedEvent = Thumb.DragDeltaEvent });
+                splitter.RaiseEvent(new DragCompletedEventArgs(-80, 0, false) { RoutedEvent = Thumb.DragCompletedEvent });
+                first.UpdateLayout();
+                var resized = grid.ColumnDefinitions[2].ActualWidth;
+                Assert.True(resized > original);
+                first.Close();
+                Assert.Equal(resized, store.GetColumn("PromptEditor.Sidebar")!.Value, 1);
+
+                var minimal = new PromptEditorWindow("Edytor", new PromptEdit(null, "tekst"));
+                minimal.Show();
+                minimal.Close();
+                Assert.Equal(resized, store.GetColumn("PromptEditor.Sidebar")!.Value, 1);
+
+                var second = new PromptEditorWindow("Edytor", new PromptEdit("", "tekst", "i"), e => Task.FromResult(e));
+                second.Show();
+                second.UpdateLayout();
+                Assert.Equal(resized, Named<Grid>(second, "BodyGrid").ColumnDefinitions[2].ActualWidth, 1);
+                second.Close();
+            }
+
+            finally
+            {
+                WindowMemory.Store = previous;
+            }
+        });
+    }
+
+    [Fact]
+    public void Restored_wide_sidebar_fits_a_small_window()
+    {
+        WpfHost.Run(() =>
+        {
+            var previous = WindowMemory.Store;
+            var store = new MemoryWindowStateStore();
+            store.SetColumn("PromptEditor.Sidebar", 600);
+            WindowMemory.Store = store;
+            try
+            {
+                var window = new PromptEditorWindow("Edytor", new PromptEdit("", "tekst", "i"), e => Task.FromResult(e));
+                window.Show();
+                window.Width = window.MinWidth;
+                window.UpdateLayout();
+                var grid = Named<Grid>(window, "BodyGrid");
+                Assert.True(grid.ColumnDefinitions[0].ActualWidth >= 300);
+                Assert.True(grid.ColumnDefinitions[2].ActualWidth >= 260);
+                Assert.True(grid.ColumnDefinitions.Sum(column => column.ActualWidth) <= grid.ActualWidth + 1);
+                window.Close();
+            }
+            finally
+            {
+                WindowMemory.Store = previous;
+            }
         });
     }
 
@@ -142,13 +216,19 @@ public sealed class PromptEditorWindowTests
         WpfHost.Run(() =>
         {
             var provider = new FakeProvider();
+            ChatViewModel? chat = null;
             var window = new PromptEditorWindow("Edytor", new PromptEdit("", "tekst", "i", NegativePrompt: ""),
                 edit => Task.FromResult(edit),
-                createConversation: (_, report) => new ChatViewModel(() => provider, ["m"], report, "") { SelectedModel = "m" });
+                createConversation: (_, report) => chat = new ChatViewModel(() => provider, ["m"], report, "",
+                    images: new ChatImageSupport(new FakeDialogs(), _ => true, () => 1536), analysisImagePaths: () => [])
+                    { SelectedModel = "m" });
             window.Show();
             window.UpdateLayout();
             Assert.True(Named<FrameworkElement>(window, "ConversationHost").IsVisible);
             Assert.True(Named<FrameworkElement>(window, "ConversationHost").ActualHeight > 0);
+            var analyze = Named<Button>(window, "AnalyzeConversationImagesButton");
+            Assert.Same(chat!.AnalyzeImagesCommand, analyze.Command);
+            Assert.True(analyze.IsEnabled);
             window.Close();
         });
     }

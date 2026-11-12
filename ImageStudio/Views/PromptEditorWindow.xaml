@@ -33,9 +33,9 @@
 
         <Grid x:Name="BodyGrid" Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="360"/>
+                <ColumnDefinition Width="*" MinWidth="300"/>
                 <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="360"/>
+                <ColumnDefinition Width="360" MinWidth="260"/>
             </Grid.ColumnDefinitions>
 
             <!-- Lewa kolumna: system (gdy jest), REQUEST i opcjonalny negative prompt -->
@@ -83,6 +83,9 @@
             <!-- Prawa kolumna: opis obrazów i przebudowa; przy braku obu ta kolumna ma szerokość 0 (code-behind) -->
             <!-- Wysokość kolumny jest co najmniej wysokością okna przewijania: pole instrukcji (wiersz *) wypełnia wolne miejsce,
                  a gdy reszta się nie mieści (rozwinięty panel parametrów), kolumna się przewija -->
+            <GridSplitter x:Name="PanelSplitter" Grid.Column="1" Width="6" HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+                          Background="{DynamicResource BorderSoftBrush}"/>
             <TabControl x:Name="SidebarTabs" Grid.Column="2">
               <TabItem Header="{loc:T prompt.rebuildTab}">
                <ScrollViewer x:Name="SidebarHost" VerticalScrollBarVisibility="Auto">
@@ -148,6 +151,10 @@
                     </StackPanel>
                     <views:ChatConversation x:Name="ConversationHost" Grid.Row="1"/>
                     <WrapPanel Grid.Row="2">
+                    <Button x:Name="AnalyzeConversationImagesButton" Content="{loc:T prompt.chatAnalyze}"
+                            Margin="0,8,8,0" Padding="12,4" Style="{StaticResource SecondaryButton}"
+                            DataContext="{Binding DataContext, ElementName=ConversationHost}"
+                            Command="{Binding AnalyzeImagesCommand}" ToolTip="{loc:T prompt.chatAnalyze.tip}"/>
                     <Button x:Name="UseConversationButton" Content="{loc:T prompt.chatApply}"
                             Margin="0,8,0,0" Padding="12,4" HorizontalAlignment="Left"
                             Click="UseConversation_Click">

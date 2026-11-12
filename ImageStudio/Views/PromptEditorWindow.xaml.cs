@@ -46,8 +46,16 @@ public partial class PromptEditorWindow : Window
         if (describeImages is null && RebuildSection.Visibility != Visibility.Visible && createConversation is null)
         {
             SidebarTabs.Visibility = Visibility.Collapsed;
+            PanelSplitter.Visibility = Visibility.Collapsed;
+            BodyGrid.ColumnDefinitions[2].MinWidth = 0;
             BodyGrid.ColumnDefinitions[1].Width = new GridLength(0);
             BodyGrid.ColumnDefinitions[2].Width = new GridLength(0);
+        }
+        else
+        {
+            var column = BodyGrid.ColumnDefinitions[2];
+            WindowMemory.SetColumnKey(column, "PromptEditor.Sidebar");
+            Closing += (_, _) => WindowMemory.SaveColumn(column);
         }
         SystemBox.Text = initial.System ?? "";
         PromptBox.Text = initial.Prompt;

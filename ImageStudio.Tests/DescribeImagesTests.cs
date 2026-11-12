@@ -76,4 +76,155 @@ public sealed class DescribeImagesTests : IDisposable
             Assert.Throws<InvalidOperationException>(() => dialogs.LastDescribe!().GetAwaiter().GetResult());
         });
     }
+
+    [Fact]
+    public void Conversation_analyzes_tab_and_chat_images_without_changing_prompt_or_draft()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            var path = Png("tab.png");
+            vm.References.Add(new ReferenceItem(path, "a", "a"));
+            vm.EditPrompt = "oryginalny prompt";
+            vm.EditEditPromptCommand.Execute(null);
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+            chat.SelectedModel = "model-rozmowy";
+            var duplicate = new ChatImage(File.ReadAllBytes(path), "image/png");
+            chat.Attachments.Add(duplicate);
+            chat.Messages.Add(new ChatMessage("user", "wcześniej", Images: [new ChatImage(TestImages.Png(9, 9), "image/png")]));
+            chat.Input = "niewysłana wiadomość";
+
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+
+            Assert.Equal("model-rozmowy", provider.LastModel);
+            Assert.Equal(2, provider.LastMessages.Last().Images!.Count);
+            Assert.Equal("niewysłana wiadomość", chat.Input);
+            Assert.Same(duplicate, Assert.Single(chat.Attachments));
+            Assert.Equal("oryginalny prompt", vm.EditPrompt);
+            Assert.Contains(chat.Messages, m => m.Role == "assistant" && m.Content.Contains("Kot siedzi"));
+
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Contains(provider.LastMessages, m => m.Role == "assistant" && m.Content.Contains("Kot siedzi"));
+        });
+    }
+
+    [Fact]
+    public void Conversation_picks_files_when_no_images_and_preserves_input_on_failure()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            vm.EditGeneratePromptCommand.Execute(null);
+            var reports = new List<(string, bool)>();
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (text, error) => reports.Add((text, error)));
+            chat.Input = "szkic";
+            dialogs.PickResult = null;
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(0, provider.ChatCalls);
+
+            dialogs.PickResult = [Png("selected.png")];
+            provider.OnChat = (_, _) => throw new InvalidOperationException("błąd modelu");
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Empty(chat.Messages);
+            Assert.Equal("szkic", chat.Input);
+            Assert.Contains(reports, report => report.Item2 && report.Item1.Contains("błąd modelu"));
+        });
+    }
+
+    [Fact]
+    public void Video_editor_supplies_its_attachments_to_conversation_analysis()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            var path = Png("video.png");
+            vm.VideoAttachments.Add(new ReferenceItem(path, "v", "v"));
+            vm.EditVideoPromptCommand.Execute(null);
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Single(provider.LastMessages.Last().Images!);
+        });
+    }
+
+    [Fact]
+    public async Task Stopping_conversation_analysis_keeps_draft_and_attachments()
+    {
+        await WpfHost.RunAsync(async () =>
+        {
+            var (vm, dialogs, provider) = Create();
+            vm.EditGeneratePromptCommand.Execute(null);
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (_, _) => { });
+            var image = new ChatImage(TestImages.Png(8, 8), "image/png");
+            chat.Attachments.Add(image);
+            chat.Input = "szkic";
+            provider.Gate = ct => Task.Delay(Timeout.Infinite, ct);
+
+            var task = chat.AnalyzeImagesCommand.ExecuteAsync(null);
+            Assert.True(chat.IsSending);
+            chat.StopCommand.Execute(null);
+            await task;
+            Assert.False(chat.IsSending);
+            Assert.Empty(chat.Messages);
+            Assert.Equal("szkic", chat.Input);
+            Assert.Same(image, Assert.Single(chat.Attachments));
+        });
+    }
+
+    [Fact]
+    public void Unsupported_vision_model_is_rejected_before_selecting_or_sending_images()
+    {
+        Sta.Run(() =>
+        {
+            var provider = new FakeProvider();
+            var dialogs = new FakeDialogs();
+            var reports = new List<(string, bool)>();
+            var chat = new ChatViewModel(() => provider, ["m"], (text, error) => reports.Add((text, error)), "",
+                images: new ChatImageSupport(dialogs, _ => false, () => 1536), analysisImagePaths: () => [])
+                { SelectedModel = "m" };
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(0, provider.ChatCalls);
+            Assert.Contains(reports, report => report.Item2);
+        });
+    }
+
+    [Fact]
+    public void Missing_tab_image_reports_error_without_sending_or_losing_draft()
+    {
+        Sta.Run(() =>
+        {
+            var (vm, dialogs, provider) = Create();
+            vm.References.Add(new ReferenceItem(Path.Combine(_dir, "missing.png"), "a", "a"));
+            vm.EditEditPromptCommand.Execute(null);
+            var reports = new List<(string, bool)>();
+            var chat = dialogs.LastConversationFactory!(() => dialogs.LastInitial!, (text, error) => reports.Add((text, error)));
+            var image = new ChatImage(TestImages.Png(8, 8), "image/png");
+            chat.Attachments.Add(image);
+            chat.Input = "szkic";
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Equal(0, provider.ChatCalls);
+            Assert.Contains(reports, report => report.Item2);
+            Assert.Equal("szkic", chat.Input);
+            Assert.Same(image, Assert.Single(chat.Attachments));
+        });
+    }
+
+    [Fact]
+    public void Partial_analysis_is_not_left_in_context_on_stream_failure()
+    {
+        Sta.Run(() =>
+        {
+            var provider = new StreamingFakeProvider { FailAfterDeltas = new IOException("błąd strumienia") };
+            provider.Deltas.Add(new ChatDelta("niepełny opis", null));
+            var reports = new List<(string, bool)>();
+            var chat = new ChatViewModel(() => provider, ["m"], (text, error) => reports.Add((text, error)), "",
+                images: new ChatImageSupport(new FakeDialogs(), _ => true, () => 1536),
+                useStreaming: () => true, analysisImagePaths: () => []) { SelectedModel = "m", Input = "szkic" };
+            chat.Attachments.Add(new ChatImage(TestImages.Png(8, 8), "image/png"));
+            chat.AnalyzeImagesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Empty(chat.Messages);
+            Assert.Equal("szkic", chat.Input);
+            Assert.Single(chat.Attachments);
+            Assert.Contains(reports, report => report.Item2 && report.Item1.Contains("błąd strumienia"));
+        });
+    }
 }
