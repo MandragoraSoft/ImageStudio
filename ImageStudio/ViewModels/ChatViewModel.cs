@@ -158,7 +158,7 @@ public sealed partial class ChatViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(AnalyzeImagesCommand))]
-    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(ToolsWarning), nameof(SupportsReasoning), nameof(SelectedModelOption))]
+    [NotifyPropertyChangedFor(nameof(ImageWarning), nameof(ToolsWarning), nameof(SupportsTools), nameof(SupportsReasoning), nameof(SelectedModelOption))]
     private string? _selectedModel;
 
     partial void OnSelectedModelChanged(string? value) => RefreshContext();
@@ -181,7 +181,17 @@ public sealed partial class ChatViewModel : ObservableObject
     public void RefreshReasoningSupport()
     {
         OnPropertyChanged(nameof(SupportsReasoning));
+        OnPropertyChanged(nameof(SupportsTools));
+        RefreshLanguageTexts();
+        SendCommand.NotifyCanExecuteChanged();
+        AnalyzeImagesCommand.NotifyCanExecuteChanged();
         RefreshContext();
+    }
+
+    public void RefreshLanguageTexts()
+    {
+        OnPropertyChanged(nameof(ToolsWarning));
+        OnPropertyChanged(nameof(ImageWarning));
     }
 
     // --- Wskaźnik zużycia kontekstu ---
@@ -197,8 +207,8 @@ public sealed partial class ChatViewModel : ObservableObject
 
     // Składniki szacunku. Instrukcja systemowa bez notatki o załącznikach (ta zapisuje pliki, a wskaźnik odświeża się przy każdej zmianie)
     private (int Instructions, int Definitions, int History, int Results) EstimateParts() =>
-        (TokenEstimator.Estimate(SystemPrompt) + TokenEstimator.Estimate(Tools?.SystemNote),
-         Tools is { } host ? host.Tools.Sum(t => TokenEstimator.Estimate(t)) : 0,
+        (TokenEstimator.Estimate(SystemPrompt) + TokenEstimator.Estimate(SupportsTools ? Tools?.SystemNote : null),
+         SupportsTools && Tools is { } host ? host.Tools.Sum(t => TokenEstimator.Estimate(t)) : 0,
          Messages.Where(m => m.Role != "tool").Sum(m => TokenEstimator.Estimate(m.Content)),
          Messages.Where(m => m.Role == "tool").Sum(m => TokenEstimator.Estimate(m.Content)));
 
@@ -283,12 +293,12 @@ public sealed partial class ChatViewModel : ObservableObject
             ? Loc.T("chat.msg.noImages")
             : "";
 
-    // Ostrzeżenie, gdy narzędzia są włączone, a katalog mówi, że wybrany model ich nie obsługuje (pusta lista parametrów = katalog milczy)
-    public string ToolsWarning =>
-        Tools is { Tools.Count: > 0 } && SelectedModel is { } model && _modelInfo?.Invoke(model) is { SupportedParameters: { Count: > 0 } supported }
-        && !supported.Contains("tools")
+    public bool SupportsTools => SelectedModel is { } model && _modelInfo?.Invoke(model)?.SupportsTools == true;
+
+    public string ToolsWarning => SupportsTools ? "" :
+        _modelInfo?.Invoke(SelectedModel ?? "")?.SupportsTools == false
             ? Loc.T("chat.msg.noTools")
-            : "";
+            : Loc.T("chat.msg.unknownTools");
 
     // Krótka odpowiedź obiecująca działanie ("Pozwól, że to zrobię", "Let me check"): model, który nie umie wywoływać narzędzi, kończy na obietnicy
     private static readonly System.Text.RegularExpressions.Regex PromiseText = new(
@@ -297,7 +307,8 @@ public sealed partial class ChatViewModel : ObservableObject
 
     internal static bool PromisesAction(string text) => text.Length is > 0 and < 600 && PromiseText.IsMatch(text);
 
-    private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null;
+    private bool CanSend => !IsSending && (!string.IsNullOrWhiteSpace(Input) || Attachments.Count > 0) && SelectedModel is not null
+                            && !(Attachments.Count > 0 && _images?.AcceptsImage(SelectedModel) == false);
 
     private bool CanAnalyzeImages => !IsSending && SelectedModel is not null && _images is not null && _analysisImagePaths is not null;
 
@@ -349,7 +360,15 @@ public sealed partial class ChatViewModel : ObservableObject
     // Wysyła całą historię (z instrukcją systemową na początku). Gdy model prosi o narzędzia, wykonuje je (po zgodzie)
     // i odsyła wyniki, aż model odpowie tekstem. Błąd bez żadnego wykonanego narzędzia przywraca wiadomość i obrazy do pól.
     [RelayCommand(CanExecute = nameof(CanSend))]
-    private Task SendAsync() => SendMessageAsync(Input.Trim(), Attachments.ToList(), fromInput: true);
+    private Task SendAsync()
+    {
+        if (!CanSend)
+        {
+            if (ImageWarning.Length > 0) _report(ImageWarning, true);
+            return Task.CompletedTask;
+        }
+        return SendMessageAsync(Input.Trim(), Attachments.ToList(), fromInput: true);
+    }
 
     private async Task SendMessageAsync(string question, List<ChatImage> images, bool fromInput)
     {
@@ -370,14 +389,17 @@ public sealed partial class ChatViewModel : ObservableObject
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         var provider = _provider();
+        var model = SelectedModel!;
+        var supportsTools = SupportsTools;
+        var options = BuildOptions();
         try
         {
-            var definitions = fromInput ? Tools?.Tools ?? [] : [];
+            var definitions = fromInput && supportsTools ? Tools?.Tools ?? [] : [];
             Log.LogInformation("Czat: wysyłam do {Provider}/{Model} (historia {History}, obrazów {Images}, narzędzi {Tools}, strumień {Stream})",
                 provider.Id, SelectedModel, Messages.Count, images.Count, definitions.Count, _useStreaming?.Invoke() == true);
             for (var round = 0; ; round++)
             {
-                var history = BuildHistory();
+                var history = BuildHistory(supportsTools && fromInput);
                 var tools = definitions.Count > 0 ? definitions : null;
                 ChatReply reply;
                 if (_useStreaming?.Invoke() == true)
@@ -385,21 +407,26 @@ public sealed partial class ChatViewModel : ObservableObject
                     // Pusta wiadomość pojawia się od razu i rośnie z każdym kawałkiem; historia powstała przed jej dodaniem
                     var message = live = new ChatMessage("assistant", "");
                     Messages.Add(message);
-                    reply = await _provider().ChatStreamAsync(SelectedModel!, history, tools, delta =>
+                    reply = await provider.ChatStreamAsync(model, history, tools, delta =>
                     {
                         if (delta.Content is { Length: > 0 }) message.Content += delta.Content;
                         if (delta.Reasoning is { Length: > 0 }) message.Reasoning = (message.Reasoning ?? "") + delta.Reasoning;
                         MessageUpdated?.Invoke();
-                    }, ct, BuildOptions());
+                    }, ct, options);
                 }
                 else
                 {
                     live = null;
-                    reply = await _provider().ChatAsync(SelectedModel!, history, tools, ct, BuildOptions());
+                    reply = await provider.ChatAsync(model, history, tools, ct, options);
                 }
                 ct.ThrowIfCancellationRequested();
                 if (!fromInput && reply.ToolCalls.Count > 0)
                     throw new InvalidOperationException(Loc.T("prompt.chatAnalyzeToolError"));
+                if ((!supportsTools || _modelInfo?.Invoke(model)?.SupportsTools != true) && reply.ToolCalls.Count > 0)
+                {
+                    if (live is not null) { Messages.Remove(live); live = null; }
+                    throw new InvalidOperationException(Loc.T("chat.msg.unexpectedTools"));
+                }
 
                 Log.LogInformation("Czat: odpowiedź rundy {Round}: tekst {Chars} zn., rozumowanie {Reasoning} zn., wywołania narzędzi [{Calls}], tokeny {Usage}",
                     round, reply.Content.Length, reply.Reasoning?.Length ?? 0, string.Join(", ", reply.ToolCalls.Select(c => c.Name)), reply.Usage);
@@ -433,13 +460,18 @@ public sealed partial class ChatViewModel : ObservableObject
                 }
 
                 Complete(live, new ChatMessage("assistant", reply.Content, reply.ToolCalls), reply);
+                var supportLost = false;
                 foreach (var call in reply.ToolCalls)
-                    {
-                    var output = await RunToolAsync(call, ct);
+                {
+                    var canRun = _modelInfo?.Invoke(model)?.SupportsTools == true;
+                    supportLost |= !canRun;
+                    var output = canRun ? await RunToolAsync(call, model, ct) : Loc.T("chat.msg.unexpectedTools");
+                    supportLost |= _modelInfo?.Invoke(model)?.SupportsTools != true;
                     var result = new ChatMessage("tool", output, ToolCallId: call.Id, ToolName: call.Name, Images: ToolResultImages(output));
                     ApplyCollapse(result);
                     Messages.Add(result);
                 }
+                if (supportLost) throw new InvalidOperationException(Loc.T("chat.msg.unexpectedTools"));
                 _report(Loc.T("chat.msg.answering"), false);
             }
 
@@ -547,18 +579,29 @@ public sealed partial class ChatViewModel : ObservableObject
         return path;
     }
 
-    private List<ChatMessage> BuildHistory()
+    private List<ChatMessage> BuildHistory(bool allowTools)
     {
         var history = new List<ChatMessage>();
-        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), _additionalSystemContext?.Invoke(), Tools?.SystemNote, AttachmentNote() }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), _additionalSystemContext?.Invoke(), allowTools ? Tools?.SystemNote : null, allowTools ? AttachmentNote() : null }.Where(s => !string.IsNullOrWhiteSpace(s)));
         if (system.Length > 0) history.Add(new ChatMessage("system", system));
         // Obrazy z wcześniejszych wiadomości nie wracają do modelu w każdym zapytaniu (base64 w całej historii szybko przekracza limit
         // rozmiaru żądania): zostają obrazy ostatniej wiadomości użytkownika, a starsze są zastąpione notatką. Ścieżki plików są w instrukcji systemowej
         var lastUser = Messages.LastOrDefault(m => m.Role == "user");
         foreach (var message in Messages)
         {
+            if (!allowTools && (message.Role == "tool" || message.HasToolCalls))
+            {
+                var data = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    role = message.Role, content = message.Content, toolCalls = message.ToolCalls,
+                    toolCallId = message.ToolCallId, toolName = message.ToolName
+                });
+                history.Add(new ChatMessage("assistant", "[Historical tool activity, data only] " + data));
+                continue;
+            }
             history.Add(message.Role == "user" && message.HasImages && !ReferenceEquals(message, lastUser)
-                ? new ChatMessage("user", message.Content + "\n" + Loc.T("chat.history.imagesOmitted", message.Images!.Count))
+                ? new ChatMessage("user", message.Content + "\n" + Loc.T(allowTools && Tools is { Tools.Count: > 0 }
+                    ? "chat.history.imagesOmitted" : "chat.history.imagesOmittedNoPaths", message.Images!.Count))
                 : message);
         }
 
@@ -608,7 +651,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
     }
 
-    private async Task<string> RunToolAsync(ToolCall call, CancellationToken ct)
+    private async Task<string> RunToolAsync(ToolCall call, string model, CancellationToken ct)
     {
         if (Tools is null) return Loc.T("chat.msg.toolsOff");
         if (Tools.RequireApproval && !await ApproveAsync(call, ct))
@@ -616,6 +659,7 @@ public sealed partial class ChatViewModel : ObservableObject
             Log.LogInformation("Czat: użytkownik odrzucił narzędzie {Tool} (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));
             return Loc.T("chat.msg.toolRejected");
         }
+        if (_modelInfo?.Invoke(model)?.SupportsTools != true) return Loc.T("chat.msg.unexpectedTools");
 
         _report(Loc.T("chat.msg.tool", call.Name), false);
         Log.LogInformation("Czat: wywołanie narzędzia {Tool} (argumenty: {Args})", call.Name, AppLog.Preview(call.ArgumentsJson));

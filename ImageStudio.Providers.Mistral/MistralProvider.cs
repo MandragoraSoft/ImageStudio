@@ -36,12 +36,16 @@ public sealed class MistralProvider : OpenAiChatProvider
             .Select(m =>
             {
                 var caps = m.TryGetProperty("capabilities", out var c) ? c : default;
-                var vision = caps.ValueKind == JsonValueKind.Object && Flag(caps, "vision");
+                var vision = OpenAiCompat.ReadBoolean(caps, "vision");
+                var tools = OpenAiCompat.ReadBoolean(caps, "function_calling");
                 var supported = new List<string> { "temperature", "top_p", "max_tokens" };
-                if (caps.ValueKind == JsonValueKind.Object && Flag(caps, "function_calling")) supported.Add("tools");
+                if (tools == true) supported.Add("tools");
                 var description = m.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
                 return new ChatModelInfo(m.GetProperty("id").GetString()!, supported, vision, Owner,
-                                         vision ? ["text", "image"] : ["text"], description, OpenAiCompat.ReadContextLength(m));
+                                         vision == true ? ["text", "image"] : ["text"], description, OpenAiCompat.ReadContextLength(m))
+                {
+                    SupportsTools = tools,
+                };
             })
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();

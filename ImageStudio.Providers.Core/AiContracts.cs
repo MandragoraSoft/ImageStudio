@@ -13,7 +13,11 @@ public sealed record ImageModels(IReadOnlyList<ImageModelInfo> Generation, IRead
 // ContextLength: rozmiar okna kontekstowego z katalogu (w tokenach); null = katalog nie podaje
 public sealed record ChatModelInfo(string Id, IReadOnlyList<string> SupportedParameters, bool? AcceptsImage = null,
                                    string? OwnedBy = null, IReadOnlyList<string>? InputModalities = null, string? Description = null,
-                                   int? ContextLength = null);
+                                   int? ContextLength = null)
+{
+    // null = katalog nie potwierdza ani nie wyklucza obsługi narzędzi
+    public bool? SupportsTools { get; init; }
+}
 
 // Narzędzie dla modelu: nazwa, opis i schemat parametrów (JSON Schema jako tekst)
 public sealed record ToolDefinition(string Name, string Description, string ParametersJson);

@@ -160,17 +160,20 @@ public sealed class ImageGenerationService : IDisposable
             .Select(m => new ChatModelInfo(
                 m.GetProperty("id").GetString()!,
                 m.TryGetProperty("supported_parameters", out var sp) && sp.ValueKind == JsonValueKind.Array
-                    ? sp.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
+                    ? sp.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).OfType<string>().ToList()
                     : [],
                 m.TryGetProperty("input_modalities", out var modalities) && modalities.ValueKind == JsonValueKind.Array
-                    ? modalities.EnumerateArray().Any(x => x.GetString() == "image")
-                    : null,
+                    ? modalities.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String && x.GetString() == "image")
+                    : OpenAiCompat.ReadBoolean(m, "supports_vision"),
                 m.TryGetProperty("owned_by", out var owner) && owner.ValueKind == JsonValueKind.String ? owner.GetString() : null,
                 m.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array
-                    ? inputs.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
+                    ? inputs.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).OfType<string>().ToList()
                     : null,
                 Describe(m),
-                OpenAiCompat.ReadContextLength(m)))
+                OpenAiCompat.ReadContextLength(m))
+                {
+                    SupportsTools = OpenAiCompat.ReadBoolean(m, "supports_tools") ?? OpenAiCompat.ReadToolsParameter(m),
+                })
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

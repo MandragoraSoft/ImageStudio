@@ -18,7 +18,7 @@ public sealed class McpEndToEndTests
                 [new ImageModelInfo("gen/a", "own", false, ["text"])],
                 [new ImageModelInfo("edit/a", "own", false, ["text", "image"]), new ImageModelInfo("edit/b", "own", false, ["text", "image"])]),
             VideoCatalog = [new ImageModelInfo("vid/a", "own", false, ["text"])],
-            ChatCatalog = [new ChatModelInfo("chat/a", ["tools"])],
+            ChatCatalog = [new ChatModelInfo("chat/a", ["tools"]) { SupportsTools = true }],
             PricingCatalog = new Dictionary<string, ModelPricing>
             {
                 ["edit/a"] = new(0.05m, null, null, "image", null, null),

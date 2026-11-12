@@ -59,7 +59,7 @@ public sealed class UsageTests
                 ? new ChatReply("gotowe", [], Usage: new TokenUsage(200, 20, 150))
                 : new ChatReply("", [new ToolCall("c1", "fs__read", "{}")], Usage: new TokenUsage(100, 10, 0));
             var host = new FakeToolHost();
-            var withTools = new ChatViewModel(() => app.Provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1", Input = "czytaj" };
+            var withTools = new ChatViewModel(() => app.Provider, ["m1"], (_, _) => { }, "", host, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1", Input = "czytaj" };
 
             withTools.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
 

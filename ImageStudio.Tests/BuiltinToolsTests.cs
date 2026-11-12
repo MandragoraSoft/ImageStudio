@@ -221,7 +221,7 @@ public sealed class BuiltinToolsTests : IDisposable
         using var app = TestApp.Create();
         app.Vm.Tools.UseTools = true;
         app.Get<MemoryMemoryStore>().Items.Add(new MemoryItem("11112222", "Pisze po polsku", DateTimeOffset.UtcNow));
-        app.Provider.ChatCatalog = [new ChatModelInfo("m", [])];
+        app.Provider.ChatCatalog = [new ChatModelInfo("m", []) { SupportsTools = true }];
         await app.Vm.InitializeAsync();
         app.Provider.OnChat = (_, _) => "ok";
         app.Vm.Chat.Input = "cześć";

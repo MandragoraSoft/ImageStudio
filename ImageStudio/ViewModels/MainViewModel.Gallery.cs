@@ -30,6 +30,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(VideoEstimateLabel));
         OnPropertyChanged(nameof(VideoHint));
         Voice.RefreshLanguageTexts();
+        RefreshChatLanguage();
     }
 
     public string GalleryTotalLabel

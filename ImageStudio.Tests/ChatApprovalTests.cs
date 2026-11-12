@@ -21,7 +21,7 @@ public sealed class ChatApprovalTests
             OnReply = history => history[^1].Role == "tool" ? new ChatReply("gotowe", []) : new ChatReply("", calls),
         };
         var host = new FakeToolHost { RequireApproval = true };
-        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1", InlineApproval = true };
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1", InlineApproval = true };
         return (vm, provider, host);
     }
 
@@ -125,7 +125,7 @@ public sealed class ChatApprovalTests
         var provider = new FakeProvider { OnReply = h => h.Any(m => m.Role == "tool") ? new ChatReply("ok", []) : new ChatReply("", [Call()]) };
         var host = new FakeToolHost { RequireApproval = true };
         var asked = 0;
-        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, _ => { asked++; return true; }) { SelectedModel = "m1" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, _ => { asked++; return true; }, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
         vm.Permissions.Allow("fs__read", ApprovalChoice.Session);
         vm.Input = "x";
 

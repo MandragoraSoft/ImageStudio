@@ -448,7 +448,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _chatModels.Clear();
         foreach (var model in chat) _chatModels[model.Id] = model;
-        Chat.RefreshReasoningSupport();
+        RefreshChatCapabilities();
         ReplaceStrings(EnhancerModels, chat.Select(m => m.Id));
         ReplaceChatOptions(chat, pricing);
 

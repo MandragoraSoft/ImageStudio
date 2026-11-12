@@ -65,8 +65,9 @@ public sealed class KiloProvider : OpenAiChatProvider
     }
 
     private static List<string> Modalities(JsonElement model, string field) =>
-        model.TryGetProperty("architecture", out var arch) && arch.TryGetProperty(field, out var list) && list.ValueKind == JsonValueKind.Array
-            ? list.EnumerateArray().Select(m => m.GetString()).OfType<string>().ToList()
+        model.TryGetProperty("architecture", out var arch) && arch.ValueKind == JsonValueKind.Object
+        && arch.TryGetProperty(field, out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Where(m => m.ValueKind == JsonValueKind.String).Select(m => m.GetString()).OfType<string>().ToList()
             : [];
 
     private static ChatModelInfo ToInfo(JsonElement model)
@@ -78,9 +79,14 @@ public sealed class KiloProvider : OpenAiChatProvider
         if (input.Count == 0) input.Add("text");
 
         var supported = model.TryGetProperty("supported_parameters", out var list) && list.ValueKind == JsonValueKind.Array
-            ? list.EnumerateArray().Select(p => p.GetString()).OfType<string>().ToList()
+            ? list.EnumerateArray().Where(p => p.ValueKind == JsonValueKind.String).Select(p => p.GetString()).OfType<string>().ToList()
             : [];
         var description = model.TryGetProperty("description", out var d) ? d.GetString() : null;
-        return new ChatModelInfo(id, supported, input.Contains("image"), id.Split('/')[0], input, description, OpenAiCompat.ReadContextLength(model));
+        var hasInput = model.TryGetProperty("architecture", out var arch) && arch.ValueKind == JsonValueKind.Object
+                       && arch.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array;
+        return new ChatModelInfo(id, supported, hasInput ? input.Contains("image") : null, id.Split('/')[0], input, description, OpenAiCompat.ReadContextLength(model))
+        {
+            SupportsTools = OpenAiCompat.ReadToolsParameter(model),
+        };
     }
 }

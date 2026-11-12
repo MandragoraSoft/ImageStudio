@@ -6,6 +6,30 @@ namespace ImageStudio.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private readonly List<WeakReference<ChatViewModel>> _promptConversations = [];
+
+    private void RefreshChatCapabilities()
+    {
+        Chat.RefreshReasoningSupport();
+        _promptConversations.RemoveAll(reference =>
+        {
+            if (!reference.TryGetTarget(out var conversation)) return true;
+            conversation.RefreshReasoningSupport();
+            return false;
+        });
+    }
+
+    private void RefreshChatLanguage()
+    {
+        Chat.RefreshLanguageTexts();
+        _promptConversations.RemoveAll(reference =>
+        {
+            if (!reference.TryGetTarget(out var conversation)) return true;
+            conversation.RefreshLanguageTexts();
+            return false;
+        });
+    }
+
     private ChatViewModel CreatePromptConversation(Func<PromptEdit> current, Action<string, bool> report, string? requestedModel = null,
                                                    Func<IReadOnlyList<string>>? imagePaths = null)
     {
@@ -43,6 +67,8 @@ public sealed partial class MainViewModel
         };
         chat.ConversationModelFilter = BindFilter(true, chat.ModelOptionsView);
         chat.ConversationModelFilter.PreferredOnly = _prefs.For(_provider.Id).PreferredOnly;
+        _promptConversations.RemoveAll(reference => !reference.TryGetTarget(out _));
+        _promptConversations.Add(new WeakReference<ChatViewModel>(chat));
         return chat;
     }
 }

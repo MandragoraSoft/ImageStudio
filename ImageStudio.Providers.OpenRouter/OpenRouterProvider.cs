@@ -31,7 +31,8 @@ public sealed class OpenRouterProvider : IAiProvider
 
     private sealed record RawModel(string Id, IReadOnlyList<string> Input, IReadOnlyList<string> Output,
                                    IReadOnlyList<string> Supported, string? Description = null, decimal? ImageTokenUsd = null,
-                                   decimal? PromptUsd = null, decimal? CompletionUsd = null, int? ContextLength = null);
+                                   decimal? PromptUsd = null, decimal? CompletionUsd = null, int? ContextLength = null,
+                                   bool? SupportsTools = null, bool? AcceptsImage = null);
 
     // baseUrl podmieniają tylko testy (lokalny serwer zamiast openrouter.ai)
     public OpenRouterProvider(string apiKey, string baseUrl = "https://openrouter.ai") : this(apiKey, baseUrl, null) { }
@@ -77,7 +78,10 @@ public sealed class OpenRouterProvider : IAiProvider
     {
         var models = await GetModelsAsync(ct);
         return models.Where(m => m.Output.Contains("text"))
-                     .Select(m => new ChatModelInfo(m.Id, m.Supported, m.Input.Contains("image"), m.Id.Split('/')[0], m.Input, m.Description, m.ContextLength))
+                     .Select(m => new ChatModelInfo(m.Id, m.Supported, m.AcceptsImage, m.Id.Split('/')[0], m.Input, m.Description, m.ContextLength)
+                     {
+                         SupportsTools = m.SupportsTools,
+                     })
                      .ToList();
     }
 
@@ -445,7 +449,11 @@ public sealed class OpenRouterProvider : IAiProvider
                 Strings(m, "architecture", "output_modalities"),
                 Strings(m, "supported_parameters"),
                 m.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null,
-                ImageTokenUsd(m), PricingUsd(m, "prompt"), PricingUsd(m, "completion"), OpenAiCompat.ReadContextLength(m)))
+                ImageTokenUsd(m), PricingUsd(m, "prompt"), PricingUsd(m, "completion"), OpenAiCompat.ReadContextLength(m),
+                OpenAiCompat.ReadToolsParameter(m),
+                m.TryGetProperty("architecture", out var architecture) && architecture.ValueKind == JsonValueKind.Object
+                    && architecture.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array
+                    ? Strings(m, "architecture", "input_modalities").Contains("image") : null))
             .ToList();
     }
 
@@ -458,12 +466,12 @@ public sealed class OpenRouterProvider : IAiProvider
         var current = element;
         foreach (var name in path)
         {
-            if (!current.TryGetProperty(name, out var next)) return [];
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(name, out var next)) return [];
             current = next;
         }
 
         return current.ValueKind == JsonValueKind.Array
-            ? current.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
+            ? current.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).OfType<string>().ToList()
             : [];
     }
 

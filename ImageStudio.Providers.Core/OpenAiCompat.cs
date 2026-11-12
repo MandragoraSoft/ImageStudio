@@ -10,6 +10,22 @@ namespace ImageStudio.Services;
 // Wspólne dla dostawców zgodnych z formatem OpenAI (/chat/completions) i podziału promptu na system + koncept
 public static class OpenAiCompat
 {
+    public static bool? ReadBoolean(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value)
+            ? value.ValueKind switch { JsonValueKind.True => true, JsonValueKind.False => false, _ => null }
+            : null;
+
+    // Pusta lista oznacza brak obsługi, brak listy lub nieprawidłowa lista — brak informacji.
+    public static bool? ReadToolsParameter(JsonElement model)
+    {
+        if (model.ValueKind != JsonValueKind.Object || !model.TryGetProperty("supported_parameters", out var parameters)
+            || parameters.ValueKind != JsonValueKind.Array) return null;
+
+        var values = parameters.EnumerateArray().ToList();
+        if (values.Any(v => v.ValueKind != JsonValueKind.String)) return null;
+        return values.Any(v => v.GetString() == "tools");
+    }
+
     // Wspólne dla providerów: /chat/completions (format OpenAI) z pełną historią i opcjonalnymi narzędziami
     public static async Task<ChatReply> ChatAsync(HttpClient http, string path, string model,
                                                     IReadOnlyList<ChatMessage> messages,

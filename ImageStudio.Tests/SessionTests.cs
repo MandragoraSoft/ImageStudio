@@ -324,7 +324,7 @@ public sealed class SessionTests
             using var app = TestApp.Create();
             var provider = app.Provider;
             var host = new BlockingToolHost();
-            var chat = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1" };
+            var chat = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
             host.OnStart = () => chat.StopCommand.Execute(null);
             provider.OnReply = _ => new ChatReply("", [new ToolCall("c1", "fs__read", "{}")]);
 

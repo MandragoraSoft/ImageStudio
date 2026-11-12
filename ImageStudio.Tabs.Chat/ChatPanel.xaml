@@ -54,7 +54,9 @@
             <Button Content="{loc:T chat.deleteSession}" Margin="0,6,0,0" Command="{Binding DeleteSessionCommand}"
                     Style="{StaticResource SecondaryButton}" ToolTip="{loc:T chat.deleteSession.tip}"/>
 
-            <local:ToolsPanel DataContext="{Binding Tools}"/>
+            <TextBlock Text="{Binding ToolsWarning}" TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" Margin="0,12,0,0"/>
+            <local:ToolsPanel DataContext="{Binding Tools}"
+                              IsEnabled="{Binding DataContext.SupportsTools, RelativeSource={RelativeSource AncestorType={x:Type local:ChatPanel}}}"/>
 
             <TextBlock Text="{loc:T chat.sessions.note}"
                        TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}" Margin="0,12,0,0"/>

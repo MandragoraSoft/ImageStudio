@@ -261,10 +261,14 @@ public sealed class PromptEnhanceTests
     {
         Sta.Run(() =>
         {
-            var provider = new FakeProvider { OnChat = (_, _) => "odpowiedź" };
+            var provider = new FakeProvider
+            {
+                OnChat = (_, _) => "odpowiedź",
+                ChatCatalog = [new ChatModelInfo("m", []) { SupportsTools = true }],
+            };
             var dialogs = new FakeDialogs();
             var vm = TestApp.CreateVm(provider: provider, dialogs: dialogs);
-            vm.EnhancerModels.Add("m");
+            vm.InitializeAsync().GetAwaiter().GetResult();
             vm.SelectedEnhancerModel = "m";
             vm.Models.Add(new ModelOption("image", "fake", false, ["text"], null));
             vm.Tools.AppControlEnabled = true;

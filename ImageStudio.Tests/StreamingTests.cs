@@ -251,7 +251,7 @@ public sealed class StreamingTests
             var chat = StreamingChat(app);
             var host = new FakeToolHost();
             var withTools = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host,
-                                              useStreaming: () => true) { SelectedModel = "m1", Input = "czytaj" };
+                                              modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }, useStreaming: () => true) { SelectedModel = "m1", Input = "czytaj" };
             provider.OnReply = history => history.Any(m => m.Role == "tool")
                 ? new ChatReply("gotowe", [], Usage: new TokenUsage(20, 2, 0))
                 : new ChatReply("", [new ToolCall("c1", "fs__read", "{}")]);

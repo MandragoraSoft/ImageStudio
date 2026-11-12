@@ -67,14 +67,18 @@ public sealed class OpenCodeGoProvider : OpenAiChatProvider
         var id = model.GetProperty("id").GetString()!;
 
         // Modalności jako typy MIME ("image/png", "application/pdf") -> nazwy używane przez aplikację
-        var input = model.TryGetProperty("modalities", out var modalities) && modalities.TryGetProperty("input", out var list)
-            ? list.EnumerateArray().Select(m => KindOf(m.GetString() ?? "")).OfType<string>().Distinct().ToList()
+        var input = model.TryGetProperty("modalities", out var modalities) && modalities.ValueKind == JsonValueKind.Object
+                    && modalities.TryGetProperty("input", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Where(m => m.ValueKind == JsonValueKind.String).Select(m => KindOf(m.GetString() ?? "")).OfType<string>().Distinct().ToList()
             : ["text"];
 
         var supported = new List<string> { "temperature", "top_p", "max_tokens" };
-        if (model.TryGetProperty("capabilities", out var caps))
+        bool? supportsTools = null;
+        if (model.TryGetProperty("capabilities", out var caps) && caps.ValueKind == JsonValueKind.Object)
         {
-            if (caps.TryGetProperty("tools", out var tools) && tools.TryGetProperty("supported", out var t) && t.ValueKind == JsonValueKind.True)
+            if (caps.TryGetProperty("tools", out var tools))
+                supportsTools = OpenAiCompat.ReadBoolean(tools, "supported");
+            if (supportsTools == true)
                 supported.Add("tools");
 
             // Interfejs ustawia poziomy low/medium/high: sterowanie tylko, gdy model zna "medium" (inaczej API odrzuciłoby wartość)
@@ -86,7 +90,12 @@ public sealed class OpenCodeGoProvider : OpenAiChatProvider
         var canonical = model.TryGetProperty("canonical_id", out var cid) ? cid.GetString() : null;
         var owner = canonical is { Length: > 0 } && canonical.Contains('/') ? canonical.Split('/')[0] : "opencode";
         var description = model.TryGetProperty("description", out var d) ? d.GetString() : null;
-        return new ChatModelInfo(id, supported, input.Contains("image"), owner, input, description, OpenAiCompat.ReadContextLength(model));
+        var hasInput = model.TryGetProperty("modalities", out var mode) && mode.ValueKind == JsonValueKind.Object
+                       && mode.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array;
+        return new ChatModelInfo(id, supported, hasInput ? input.Contains("image") : null, owner, input, description, OpenAiCompat.ReadContextLength(model))
+        {
+            SupportsTools = supportsTools,
+        };
     }
 
     private static string? KindOf(string mime) => mime switch

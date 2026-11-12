@@ -188,7 +188,8 @@ public sealed class ActivityTests
             ? new ChatReply("gotowe", [])
             : new ChatReply("", [new ToolCall("c1", "fs__read", "{}")]);
         var chat = new ImageStudio.ViewModels.ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host,
-                                                           activity: tracker) { SelectedModel = "m1", Input = "czytaj" };
+            activity: tracker, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true })
+            { SelectedModel = "m1", Input = "czytaj" };
 
         await chat.SendCommand.ExecuteAsync(null);
 

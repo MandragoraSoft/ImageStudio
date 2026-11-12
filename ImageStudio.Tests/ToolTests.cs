@@ -19,7 +19,8 @@ public class ChatToolLoopTests
         var host = new FakeToolHost { RequireApproval = requireApproval };
         var confirms = new List<ToolCall>();
         var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host,
-                                   call => { confirms.Add(call); return approve; })
+                                   call => { confirms.Add(call); return approve; },
+                                   modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true })
         {
             SelectedModel = "m1",
         };
@@ -37,7 +38,7 @@ public class ChatToolLoopTests
     {
         var reports = new List<(string Text, bool Error)>();
         var provider = new FakeProvider { OnReply = _ => new ChatReply("Wywołam `fs__read`, zaraz to zrobię.", []) };
-        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost(), modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
         vm.Input = "przeczytaj plik";
 
         await vm.SendCommand.ExecuteAsync(null);
@@ -56,7 +57,7 @@ public class ChatToolLoopTests
     {
         var reports = new List<(string Text, bool Error)>();
         var provider = new FakeProvider { OnReply = _ => new ChatReply(answer, []) };
-        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost(), modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
         vm.Input = "zrób to";
 
         await vm.SendCommand.ExecuteAsync(null);
@@ -85,7 +86,7 @@ public class ChatToolLoopTests
     {
         var provider = new FakeProvider { OnReply = reply ?? (_ => new ChatReply("ok", [])) };
         var host = new FakeToolHost();
-        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
         return (vm, provider, host);
     }
 
@@ -137,7 +138,7 @@ public class ChatToolLoopTests
     {
         var reports = new List<(string Text, bool Error)>();
         var provider = new FakeProvider { OnReply = history => history.Any(m => m.Role == "tool") ? new ChatReply("", []) : new ChatReply("", [Call()]) };
-        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost()) { SelectedModel = "m1" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (text, error) => reports.Add((text, error)), "", new FakeToolHost(), modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1" };
         vm.Input = "zrób to";
 
         await vm.SendCommand.ExecuteAsync(null);
@@ -179,9 +180,9 @@ public class ChatToolLoopTests
     public void Warning_appears_only_when_tools_are_on_and_the_catalog_says_the_model_has_no_tools()
     {
         var host = new FakeToolHost();
-        var supported = new Dictionary<string, string[]> { ["m1"] = ["temperature"], ["m2"] = ["tools"], ["m3"] = [] };
+        var supported = new Dictionary<string, bool?> { ["m1"] = false, ["m2"] = true, ["m3"] = null };
         var vm = new ChatViewModel(() => new FakeProvider(), ["m1", "m2", "m3"], (_, _) => { }, "", host,
-                                   modelInfo: id => new ChatModelInfo(id, supported[id]));
+                                   modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = supported.GetValueOrDefault(id) });
 
         vm.SelectedModel = "m1";
         Assert.Contains("narzędzi", vm.ToolsWarning);
@@ -190,11 +191,11 @@ public class ChatToolLoopTests
         Assert.Equal("", vm.ToolsWarning);
 
         vm.SelectedModel = "m3";
-        Assert.Equal("", vm.ToolsWarning);
+        Assert.NotEmpty(vm.ToolsWarning);
 
         vm.SelectedModel = "m1";
         host.Tools = [];
-        Assert.Equal("", vm.ToolsWarning);
+        Assert.NotEmpty(vm.ToolsWarning);
     }
 
     [Fact]
@@ -317,7 +318,7 @@ public class ChatToolLoopTests
     {
         var provider = new FakeProvider { OnReply = ThenAnswer(Call()) };
         var host = new FakeToolHost { RequireApproval = true };
-        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host) { SelectedModel = "m1", Input = "x" };
+        var vm = new ChatViewModel(() => provider, ["m1"], (_, _) => { }, "", host, modelInfo: id => new ChatModelInfo(id, []) { SupportsTools = true }) { SelectedModel = "m1", Input = "x" };
 
         await vm.SendCommand.ExecuteAsync(null);
 
