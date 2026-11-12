@@ -57,6 +57,7 @@ public sealed partial class MainViewModel
     // Kroki przebudowy AI osobno dla zakładek; trafiają do modelu jako kontekst i znikają po wczytaniu zestawu
     private IReadOnlyList<PromptRevision>? _generateHistory;
     private IReadOnlyList<PromptRevision>? _editHistory;
+    private IReadOnlyList<PromptRevision>? _videoHistory;
 
     private List<Preset> PresetsOfKind(string kind) => _presetStore.LoadAll().Where(p => p.Kind == kind).ToList();
 
@@ -90,7 +91,8 @@ public sealed partial class MainViewModel
         var wasDirty = PresetDirty;
         Preset? saved = null;
         var edit = _dialogs.ShowPromptEditor(title, initial, current => RebuildPromptAsync(current), this, PresetsOfKind(kind),
-                                             preset => { _presetStore.Save(preset); saved = preset; }, describe);
+                                             preset => { _presetStore.Save(preset); saved = preset; }, describe,
+                                             (current, report) => CreatePromptConversation(current, report));
         if (edit is null) return;
 
         apply(edit);
@@ -108,7 +110,8 @@ public sealed partial class MainViewModel
     private PromptEdit? EditPresetPrompt(PresetPromptEditRequest request) =>
         _dialogs.ShowPromptEditor(request.Title, request.Initial,
                                   current => RebuildPromptAsync(current, request.Model, ApiParameters(request.Parameters)),
-                                  describeImages: () => DescribeImagesAsync([], request.Model));
+                                  describeImages: () => DescribeImagesAsync([], request.Model),
+                                  createConversation: (current, report) => CreatePromptConversation(current, report, request.Model));
 
     // Wartości włączonych parametrów w kształcie żądania API (całkowite jako int), jak w ModelParameter.ToApiValue
     private static Dictionary<string, object> ApiParameters(IReadOnlyDictionary<string, ParamState> parameters)
@@ -126,12 +129,14 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void EditVideoPrompt()
     {
-        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(VideoSystemPrompt, VideoPrompt, NegativePrompt: VideoNegativePrompt),
-                                      describeImages: () => DescribeImagesAsync(VideoAttachments)) is not { } edit) return;
+        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(VideoSystemPrompt, VideoPrompt, History: _videoHistory, NegativePrompt: VideoNegativePrompt),
+                                      describeImages: () => DescribeImagesAsync(VideoAttachments),
+                                      createConversation: (current, report) => CreatePromptConversation(current, report)) is not { } edit) return;
 
         VideoSystemPrompt = edit.System ?? "";
         VideoPrompt = edit.Prompt;
         if (edit.NegativePrompt is not null) VideoNegativePrompt = edit.NegativePrompt;
+        _videoHistory = edit.History;
     }
 
     // Opis obrazów wybranym modelem tekstowym (musi przyjmować obrazy). Obrazy z zakładki (referencje, załączniki wideo),

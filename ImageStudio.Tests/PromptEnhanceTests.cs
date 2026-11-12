@@ -257,6 +257,58 @@ public sealed class PromptEnhanceTests
             : "none";
 
     [Fact]
+    public void Editor_conversation_uses_current_fields_and_blocks_only_set_prompt()
+    {
+        Sta.Run(() =>
+        {
+            var provider = new FakeProvider { OnChat = (_, _) => "odpowiedź" };
+            var dialogs = new FakeDialogs();
+            var vm = TestApp.CreateVm(provider: provider, dialogs: dialogs);
+            vm.EnhancerModels.Add("m");
+            vm.SelectedEnhancerModel = "m";
+            vm.Models.Add(new ModelOption("image", "fake", false, ["text"], null));
+            vm.Tools.AppControlEnabled = true;
+            vm.Tools.UseTools = true;
+            vm.GeneratePrompt = "oryginał";
+            vm.EditGeneratePromptCommand.Execute(null);
+
+            var current = new PromptEdit("styl", "kot", NegativePrompt: "napisy");
+            var chat = dialogs.LastConversationFactory!(() => current, (_, _) => { });
+            Assert.Contains(vm.Tools.Tools, t => t.Name == "imagestudio__set_prompt");
+            Assert.DoesNotContain(chat.Tools!.Tools, t => t.Name == "imagestudio__set_prompt");
+            Assert.Contains(chat.Tools.Tools, t => t.Name == "imagestudio__get_state");
+            var denied = chat.Tools.CallAsync(new ToolCall("1", "imagestudio__set_prompt", """{"prompt":"zmiana"}""")).GetAwaiter().GetResult();
+            Assert.Contains("niedostępne", denied);
+            Assert.Equal("oryginał", vm.GeneratePrompt);
+            vm.Tools.UseTools = false;
+            var disabled = chat.Tools.CallAsync(new ToolCall("2", "imagestudio__get_state", "{}")).GetAwaiter().GetResult();
+            Assert.Contains("wyłączone", disabled);
+            vm.Tools.UseTools = true;
+            chat.Input = "ulepsz";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Contains("kot", provider.LastMessages[0].Content);
+            Assert.Contains("napisy", provider.LastMessages[0].Content);
+            Assert.Empty(vm.Chat.Messages);
+            provider.OnReply = messages => messages[^1].Role == "tool"
+                ? new ChatReply("wynik po narzędziu", [])
+                : new ChatReply("", [new ToolCall("3", "imagestudio__get_state", "{}")]);
+            chat.Permissions.Allow("imagestudio__get_state", ApprovalChoice.Session);
+            chat.Input = "sprawdź stan";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Contains(chat.Messages, message => message.Role == "tool" && message.ToolName == "imagestudio__get_state");
+            Assert.Equal("wynik po narzędziu", chat.LastCompletedReply);
+            chat.Permissions.Allow("builtin__get_datetime", ApprovalChoice.Session);
+            Assert.False(vm.Chat.Permissions.IsAllowed("builtin__get_datetime"));
+            chat.Permissions.Allow("builtin__get_datetime", ApprovalChoice.Always);
+            Assert.Contains("builtin__get_datetime", vm.Tools.Permissions.Always);
+            vm.EditEditPromptCommand.Execute(null);
+            Assert.NotNull(dialogs.LastConversationFactory);
+            vm.EditVideoPromptCommand.Execute(null);
+            Assert.NotNull(dialogs.LastConversationFactory);
+        });
+    }
+
+    [Fact]
     public void Rebuild_passes_history_to_the_model_and_returns_it_extended()
     {
         Sta.Run(() =>

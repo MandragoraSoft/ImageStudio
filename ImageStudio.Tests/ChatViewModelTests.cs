@@ -47,6 +47,43 @@ public class ChatViewModelTests
     }
 
     [Fact]
+    public async Task Additional_context_is_refreshed_for_each_conversation_turn()
+    {
+        var provider = new FakeProvider { OnChat = (_, _) => "ok" };
+        var context = "pierwszy";
+        var vm = new ChatViewModel(() => provider, ["m"], (_, _) => { }, "instrukcja",
+            additionalSystemContext: () => context) { SelectedModel = "m" };
+        vm.Input = "pytanie";
+        await vm.SendCommand.ExecuteAsync(null);
+        context = "drugi";
+        vm.Input = "dalej";
+        await vm.SendCommand.ExecuteAsync(null);
+
+        Assert.Contains("drugi", provider.LastMessages[0].Content);
+        Assert.DoesNotContain("pierwszy", provider.LastMessages[0].Content);
+        Assert.Equal(["system", "user", "assistant", "user"], provider.LastMessages.Select(m => m.Role));
+    }
+
+    [Fact]
+    public async Task Stopped_reply_is_not_marked_complete_even_if_provider_ignores_cancellation()
+    {
+        var (vm, provider, _) = Create();
+        provider.OnChat = (_, _) => "pierwsza";
+        vm.Input = "pytanie";
+        await vm.SendCommand.ExecuteAsync(null);
+        Assert.Equal("pierwsza", vm.LastCompletedReply);
+
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        provider.Gate = _ => gate.Task;
+        vm.Input = "dalej";
+        var send = vm.SendCommand.ExecuteAsync(null);
+        vm.StopCommand.Execute(null);
+        gate.SetResult();
+        await send;
+        Assert.Null(vm.LastCompletedReply);
+    }
+
+    [Fact]
     public async Task Send_without_system_prompt_sends_no_system_message()
     {
         var (vm, provider, _) = Create(system: "   ");

@@ -17,13 +17,15 @@ public partial class PromptEditorWindow : Window
     private bool _busy;
     private readonly Action<Preset>? _savePreset;
     private readonly Func<Task<string>>? _describeImages;
+    private readonly ChatViewModel? _conversation;
 
     // initial.System == null: rodzaj bez promptu systemowego (np. wideo), sekcja jest ukryta;
     // brak instrukcji albo przebudowy ukrywa sekcję promptu technicznego
     public PromptEditorWindow(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
                               object? enhancerContext = null,
                               IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null,
-                              Func<Task<string>>? describeImages = null)
+                              Func<Task<string>>? describeImages = null,
+                              Func<Func<PromptEdit>, Action<string, bool>, ChatViewModel>? createConversation = null)
     {
         InitializeComponent();
         _rebuild = rebuild;
@@ -40,9 +42,10 @@ public partial class PromptEditorWindow : Window
         NegativeSection.Visibility = initial.NegativePrompt is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
         // Bez opisu obrazów i bez przebudowy prawa kolumna jest pusta: zwijamy ją, prompt zajmuje całe okno
-        if (describeImages is null && RebuildSection.Visibility != Visibility.Visible)
+        ConversationTab.Visibility = createConversation is null ? Visibility.Collapsed : Visibility.Visible;
+        if (describeImages is null && RebuildSection.Visibility != Visibility.Visible && createConversation is null)
         {
-            SidebarHost.Visibility = Visibility.Collapsed;
+            SidebarTabs.Visibility = Visibility.Collapsed;
             BodyGrid.ColumnDefinitions[1].Width = new GridLength(0);
             BodyGrid.ColumnDefinitions[2].Width = new GridLength(0);
         }
@@ -51,12 +54,17 @@ public partial class PromptEditorWindow : Window
         NegativeBox.Text = initial.NegativePrompt ?? "";
         _history = initial.History;
         InstructionBox.Text = initial.Instruction ?? "";
+        _conversation = createConversation?.Invoke(Read, SetStatus);
+        ConversationHost.DataContext = _conversation;
+        if (_conversation is not null) SidebarTabs.SelectedItem = ConversationTab;
+        Closed += (_, _) => _conversation?.StopCommand.Execute(null);
         UpdateCounters();
         UpdateHistoryLabel();
         Loaded += (_, _) => { PromptBox.Focus(); PromptBox.CaretIndex = PromptBox.Text.Length; };
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && !_busy) { Apply_Click(this, e); e.Handled = true; }
+            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && !_busy && !ConversationHost.IsKeyboardFocusWithin)
+            { Apply_Click(this, e); e.Handled = true; }
         };
     }
 
@@ -160,7 +168,41 @@ public partial class PromptEditorWindow : Window
         Show(_beforeRebuild);
         _beforeRebuild = null;
         UndoButton.IsEnabled = false;
+        ChatUndoButton.IsEnabled = false;
         SetStatus("");
+    }
+
+    private void UseConversation_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _conversation is null || _conversation.IsSending) return;
+        try
+        {
+            var content = _conversation.LastCompletedReply ?? throw new InvalidOperationException(Loc.T("prompt.chatNoResult"));
+            var marker = content.LastIndexOf("```json", StringComparison.OrdinalIgnoreCase);
+            if (marker >= 0)
+            {
+                var start = marker + "```json".Length;
+                var end = content.IndexOf("```", start, StringComparison.Ordinal);
+                if (end < 0) throw new InvalidOperationException(Loc.T("prompt.chatNoResult"));
+                content = content[start..end].Trim();
+            }
+            var parts = OpenAiCompat.ParseSplit(content);
+            var before = Read();
+            var instruction = _conversation.Messages.LastOrDefault(m => m.Role == "user")?.Content ?? "";
+            var revision = new PromptRevision(before.System ?? "", before.Prompt, parts.System, parts.Concept,
+                                              instruction, parts.Changes, before.NegativePrompt, parts.Negative);
+            var history = (before.History ?? []).Append(revision).TakeLast(OpenAiCompat.MaxHistory).ToList();
+            Show(before with { System = before.System is null ? null : parts.System, Prompt = parts.Concept,
+                               NegativePrompt = before.NegativePrompt is null ? null : parts.Negative, History = history });
+            _beforeRebuild = before;
+            UndoButton.IsEnabled = true;
+            ChatUndoButton.IsEnabled = true;
+            SetStatus(parts.Changes is { Length: > 0 } changes ? Loc.T("prompt.changes", changes) : "");
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetStatus(Loc.T("prompt.msg.rewriteError", ex.Message), warning: true);
+        }
     }
 
     private void DefaultInstruction_Click(object sender, RoutedEventArgs e) => InstructionBox.Text = MainViewModel.DefaultInstruction;
@@ -171,7 +213,7 @@ public partial class PromptEditorWindow : Window
         _busy = busy;
         // W trakcie przebudowy wynik nadpisze pola, więc blokujemy wszystko, co je zmienia
         RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = DescribeButton.IsEnabled = !busy;
-        UndoButton.IsEnabled = !busy && _beforeRebuild is not null;
+        UndoButton.IsEnabled = ChatUndoButton.IsEnabled = !busy && _beforeRebuild is not null;
         PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = NegativeBox.IsReadOnly = busy;
     }
 

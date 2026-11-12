@@ -95,6 +95,90 @@ public sealed class PromptEditorWindowTests
     }
 
     [Fact]
+    public void Conversation_proposal_is_applied_only_on_click_and_can_be_undone()
+    {
+        WpfHost.Run(() =>
+        {
+            var history = new[] { new PromptRevision("a", "b", "c", "d", "i") };
+            var initial = new PromptEdit("system", "koncept", "instrukcja", history, "negatywny");
+            var provider = new FakeProvider { OnChat = (_, _) => "Propozycja:\n```json\n{\"system\":\"S\",\"concept\":\"C\",\"negative\":\"N\",\"changes\":\"zmiana\"}\n```" };
+            ChatViewModel? chat = null;
+            var window = new PromptEditorWindow("Edytor", initial, edit => Task.FromResult(edit),
+                createConversation: (_, report) => chat = new ChatViewModel(() => provider, ["m"], report, "") { SelectedModel = "m" });
+            chat!.Input = "popraw";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+
+            Assert.Equal(initial, window.Result);
+            Named<Button>(window, "UseConversationButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(("S", "C", "N"), (window.Result.System, window.Result.Prompt, window.Result.NegativePrompt));
+            Assert.Equal(2, window.Result.History!.Count);
+            Named<Button>(window, "ChatUndoButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(initial, window.Result);
+        });
+    }
+
+    [Fact]
+    public void Conversation_keeps_hidden_fields_hidden_and_undo_works_without_rebuild_panel()
+    {
+        WpfHost.Run(() =>
+        {
+            var initial = new PromptEdit(null, "przed");
+            var provider = new FakeProvider { OnChat = (_, _) => """{"system":"ukryte","concept":"po","negative":"ukryte"}""" };
+            ChatViewModel? chat = null;
+            var window = new PromptEditorWindow("Edytor", initial,
+                createConversation: (_, report) => chat = new ChatViewModel(() => provider, ["m"], report, "") { SelectedModel = "m" });
+            chat!.Input = "popraw";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Named<Button>(window, "UseConversationButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal((null, "po", null), (window.Result.System, window.Result.Prompt, window.Result.NegativePrompt));
+            Named<Button>(window, "ChatUndoButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(initial, window.Result);
+        });
+    }
+
+    [Fact]
+    public void Conversation_is_visible_when_editor_opens()
+    {
+        WpfHost.Run(() =>
+        {
+            var provider = new FakeProvider();
+            var window = new PromptEditorWindow("Edytor", new PromptEdit("", "tekst", "i", NegativePrompt: ""),
+                edit => Task.FromResult(edit),
+                createConversation: (_, report) => new ChatViewModel(() => provider, ["m"], report, "") { SelectedModel = "m" });
+            window.Show();
+            window.UpdateLayout();
+            Assert.True(Named<FrameworkElement>(window, "ConversationHost").IsVisible);
+            Assert.True(Named<FrameworkElement>(window, "ConversationHost").ActualHeight > 0);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void Invalid_or_failed_conversation_does_not_change_editor()
+    {
+        WpfHost.Run(() =>
+        {
+            var initial = new PromptEdit(null, "koncept");
+            var provider = new FakeProvider { OnChat = (_, _) => """{"system":"","concept":"","negative":""}""" };
+            ChatViewModel? chat = null;
+            var window = new PromptEditorWindow("Edytor", initial,
+                createConversation: (_, report) => chat = new ChatViewModel(() => provider, ["m"], report, "") { SelectedModel = "m" });
+            chat!.Input = "popraw";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Named<Button>(window, "UseConversationButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(initial, window.Result);
+            Assert.NotEmpty(Named<TextBlock>(window, "StatusText").Text);
+
+            provider.OnChat = (_, _) => throw new InvalidOperationException("błąd");
+            chat.Input = "ponów";
+            chat.SendCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            Assert.Null(chat.LastCompletedReply);
+            Named<Button>(window, "UseConversationButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(initial, window.Result);
+        });
+    }
+
+    [Fact]
     public void Loading_generate_preset_updates_visible_negative_prompt()
     {
         WpfHost.Run(() =>

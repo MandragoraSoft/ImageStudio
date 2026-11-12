@@ -34,6 +34,7 @@ public sealed partial class ChatViewModel : ObservableObject
     private readonly IActivityTracker? _activity;
     private readonly Func<bool>? _useStreaming;
     private readonly IChatSessionStore? _sessionStore;
+    private readonly Func<string>? _additionalSystemContext;
     private CancellationTokenSource? _cts;
 
     // Treść ostatniej wiadomości zmieniła się w trakcie strumienia (widok przewija rozmowę na dół)
@@ -47,8 +48,10 @@ public sealed partial class ChatViewModel : ObservableObject
                          ChatImageSupport? images = null, Func<string, ChatModelInfo?>? modelInfo = null,
                          bool reasoningEnabled = true, string reasoningEffort = ReasoningSupport.DefaultEffort,
                          IActivityTracker? activity = null, ObservableCollection<ModelOption>? modelOptions = null,
-                         Func<bool>? useStreaming = null, IChatSessionStore? sessionStore = null)
+                         Func<bool>? useStreaming = null, IChatSessionStore? sessionStore = null,
+                         Func<string>? additionalSystemContext = null)
     {
+        _additionalSystemContext = additionalSystemContext;
         _useStreaming = useStreaming;
         _sessionStore = sessionStore;
         LoadSessionList();
@@ -86,6 +89,7 @@ public sealed partial class ChatViewModel : ObservableObject
     // Te same modele z opisem (ikony możliwości); widok ma filtry ustawiane przez MainViewModel
     public ObservableCollection<ModelOption> ModelOptions { get; }
     public ICollectionView ModelOptionsView { get; }
+    public ModelFilter? ConversationModelFilter { get; set; }
 
     // Wybór w selektorze z opisem; null z selektora (filtr ukrył wybraną pozycję) nie zmienia wyboru
     public ModelOption? SelectedModelOption
@@ -143,6 +147,8 @@ public sealed partial class ChatViewModel : ObservableObject
     public IToolHost? Tools { get; }
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
+
+    public string? LastCompletedReply { get; private set; }
 
     // Obrazy czekające na wysłanie z następną wiadomością
     public ObservableCollection<ChatImage> Attachments { get; } = [];
@@ -295,6 +301,7 @@ public sealed partial class ChatViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
     {
+        LastCompletedReply = null;
         var question = Input.Trim();
         var images = Attachments.ToList();
         var sent = new ChatMessage("user", question, Images: images.Count > 0 ? images : null);
@@ -337,6 +344,7 @@ public sealed partial class ChatViewModel : ObservableObject
                     live = null;
                     reply = await _provider().ChatAsync(SelectedModel!, history, tools, ct, BuildOptions());
                 }
+                ct.ThrowIfCancellationRequested();
 
                 Log.LogInformation("Czat: odpowiedź rundy {Round}: tekst {Chars} zn., rozumowanie {Reasoning} zn., wywołania narzędzi [{Calls}], tokeny {Usage}",
                     round, reply.Content.Length, reply.Reasoning?.Length ?? 0, string.Join(", ", reply.ToolCalls.Select(c => c.Name)), reply.Usage);
@@ -352,6 +360,7 @@ public sealed partial class ChatViewModel : ObservableObject
                     }
 
                     Complete(live, new ChatMessage("assistant", reply.Content), reply);
+                    LastCompletedReply = reply.Content;
                     announced = tools is null ? null
                         : tools.FirstOrDefault(t => reply.Content.Contains(t.Name, StringComparison.Ordinal))?.Name
                           ?? (PromisesAction(reply.Content) ? "" : null);
@@ -480,7 +489,7 @@ public sealed partial class ChatViewModel : ObservableObject
     private List<ChatMessage> BuildHistory()
     {
         var history = new List<ChatMessage>();
-        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), Tools?.SystemNote, AttachmentNote() }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var system = string.Join("\n\n", new[] { SystemPrompt?.Trim(), _additionalSystemContext?.Invoke(), Tools?.SystemNote, AttachmentNote() }.Where(s => !string.IsNullOrWhiteSpace(s)));
         if (system.Length > 0) history.Add(new ChatMessage("system", system));
         // Obrazy z wcześniejszych wiadomości nie wracają do modelu w każdym zapytaniu (base64 w całej historii szybko przekracza limit
         // rozmiaru żądania): zostają obrazy ostatniej wiadomości użytkownika, a starsze są zastąpione notatką. Ścieżki plików są w instrukcji systemowej
@@ -676,6 +685,7 @@ public sealed partial class ChatViewModel : ObservableObject
         try
         {
             Messages.Clear();
+            LastCompletedReply = null;
             Attachments.Clear();
             Permissions.ClearSession();
             _sessionId = Guid.NewGuid().ToString("N");
@@ -706,6 +716,7 @@ public sealed partial class ChatViewModel : ObservableObject
         try
         {
             Messages.Clear();
+            LastCompletedReply = null;
             Attachments.Clear();
             Permissions.ClearSession();
             foreach (var message in data.Messages)

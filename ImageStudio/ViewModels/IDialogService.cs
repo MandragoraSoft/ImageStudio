@@ -62,7 +62,8 @@ public interface IDialogService
     PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null,
                                  object? enhancerContext = null,
                                  IReadOnlyList<Preset>? presets = null, Action<Preset>? savePreset = null,
-                                 Func<Task<string>>? describeImages = null);
+                                 Func<Task<string>>? describeImages = null,
+                                 Func<Func<PromptEdit>, Action<string, bool>, ChatViewModel>? createConversation = null);
 
     void CopyText(string text);
 

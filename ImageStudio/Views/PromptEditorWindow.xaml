@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
         xmlns:views="clr-namespace:ImageStudio.Views"
+        xmlns:shared="clr-namespace:ImageStudio.Views;assembly=ImageStudio.Shared"
         Style="{StaticResource WindowBase}"
         Width="1100" Height="720" MinWidth="760" MinHeight="480"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
@@ -82,7 +83,9 @@
             <!-- Prawa kolumna: opis obrazów i przebudowa; przy braku obu ta kolumna ma szerokość 0 (code-behind) -->
             <!-- Wysokość kolumny jest co najmniej wysokością okna przewijania: pole instrukcji (wiersz *) wypełnia wolne miejsce,
                  a gdy reszta się nie mieści (rozwinięty panel parametrów), kolumna się przewija -->
-            <ScrollViewer x:Name="SidebarHost" Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <TabControl x:Name="SidebarTabs" Grid.Column="2">
+              <TabItem Header="{loc:T prompt.rebuildTab}">
+               <ScrollViewer x:Name="SidebarHost" VerticalScrollBarVisibility="Auto">
                 <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -127,7 +130,43 @@
                         </StackPanel>
                     </Grid>
                 </Grid>
-            </ScrollViewer>
+               </ScrollViewer>
+              </TabItem>
+              <TabItem x:Name="ConversationTab" Header="{loc:T prompt.chatTab}">
+                <Grid Margin="0,6,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{loc:T prompt.chatHelp}" TextWrapping="Wrap" Style="{StaticResource MutedTextBlock}"/>
+                        <shared:ModelPicker Header="{loc:T common.model}" HasFilters="True"
+                                            DataContext="{Binding DataContext, ElementName=ConversationHost}"
+                                            FiltersContext="{Binding ConversationModelFilter}" ItemsSource="{Binding ModelOptionsView}"
+                                            SelectedItem="{Binding SelectedModelOption}" IsEnabled="{Binding CanChangeSession}"/>
+                    </StackPanel>
+                    <views:ChatConversation x:Name="ConversationHost" Grid.Row="1"/>
+                    <WrapPanel Grid.Row="2">
+                    <Button x:Name="UseConversationButton" Content="{loc:T prompt.chatApply}"
+                            Margin="0,8,0,0" Padding="12,4" HorizontalAlignment="Left"
+                            Click="UseConversation_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsSending, ElementName=ConversationHost}" Value="True">
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button x:Name="ChatUndoButton" Content="{loc:T prompt.undo}" Margin="8,8,0,0" Padding="12,4"
+                            Style="{StaticResource SecondaryButton}" IsEnabled="False" Click="UndoRebuild_Click"/>
+                    </WrapPanel>
+                </Grid>
+              </TabItem>
+            </TabControl>
         </Grid>
 
         <DockPanel Grid.Row="2" Margin="0,12,0,0">

@@ -229,11 +229,13 @@ internal sealed class FakeDialogs : IDialogService
     public ImageStudio.Configuration.Preset? OverwritePreset { get; set; }
     public PromptEdit? LastInitial { get; private set; }
     public Func<PromptEdit, Task<PromptEdit>>? LastRebuild { get; private set; }
-    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null, object? enhancerContext = null, IReadOnlyList<ImageStudio.Configuration.Preset>? presets = null, Action<ImageStudio.Configuration.Preset>? savePreset = null, Func<Task<string>>? describeImages = null)
+    public Func<Func<PromptEdit>, Action<string, bool>, ChatViewModel>? LastConversationFactory { get; private set; }
+    public PromptEdit? ShowPromptEditor(string title, PromptEdit initial, Func<PromptEdit, Task<PromptEdit>>? rebuild = null, object? enhancerContext = null, IReadOnlyList<ImageStudio.Configuration.Preset>? presets = null, Action<ImageStudio.Configuration.Preset>? savePreset = null, Func<Task<string>>? describeImages = null, Func<Func<PromptEdit>, Action<string, bool>, ChatViewModel>? createConversation = null)
     {
         LastInitial = initial;
         LastDescribe = describeImages;
         LastRebuild = rebuild;
+        LastConversationFactory = createConversation;
         // Symuluje "Nadpisz wybrany" w oknie: prompt z wyniku trafia do zestawu przez delegat zapisu
         if (OverwritePreset is { } preset && PromptEditResult is { } result && savePreset is not null)
         {
