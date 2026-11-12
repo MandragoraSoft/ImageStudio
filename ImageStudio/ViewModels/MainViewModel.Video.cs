@@ -41,11 +41,21 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _videoAspect = "16:9";
 
+    // Osobny prompt SYSTEM wideo: dołączany przed promptem jako część tekstu, a nie rola API
+    [ObservableProperty]
+    private string _videoSystemPrompt = "";
+
+    // Osobny negatywny prompt wideo; idzie tylko natywnym parametrem modelu, który go potwierdza
+    [ObservableProperty]
+    private string _videoNegativePrompt = "";
+
     // Załączniki do promptu wideo (obrazy wejściowe); wiele = pole input_images
     public ObservableCollection<ReferenceItem> VideoAttachments { get; } = [];
 
     // Wybór modelu wideo trafia do state.json (jak modele obrazów), żeby narzędzia bez okna znały ten sam domyślny model
     partial void OnSelectedVideoModelChanged(ModelOption? value) => SaveState();
+    partial void OnVideoNegativePromptChanged(string value) => SaveState();
+    partial void OnVideoSystemPromptChanged(string value) => SaveState();
 
     public string VideoHint
     {
@@ -125,15 +135,17 @@ public sealed partial class MainViewModel
         try
         {
             var attachments = VideoAttachments.Select(a => a.Path).ToList();
-            var entry = (await Studio.GenerateVideoAsync(new VideoGenerationRequest(VideoPrompt, SelectedVideoModel!.Id, VideoDuration, VideoAspect, attachments,
-                                                                          s => Status = Loc.T("video.msg.progress", s), Publish: false))).Entry;
+            var result = await Studio.GenerateVideoAsync(new VideoGenerationRequest(VideoPrompt, SelectedVideoModel!.Id, VideoDuration, VideoAspect, attachments,
+                                                                          s => Status = Loc.T("video.msg.progress", s), Publish: false,
+                                                                          NegativePrompt: VideoNegativePrompt, SystemPrompt: VideoSystemPrompt));
+            var entry = result.Entry;
 
             ShowVideo = true;
             VideoSource = new Uri(entry.FilePath);
             entry.Size = $"{VideoAspect} · {VideoDuration} s" + (attachments.Count > 0 ? Loc.T("video.sizeAttachments", attachments.Count) : "");
             entry.Thumbnail = GalleryStore.Thumbnail(entry.FilePath);
             AddToGallery(entry);
-            Status = Loc.T("video.msg.saved", entry.FilePath);
+            Status = WithWarnings(Loc.T("video.msg.saved", entry.FilePath), result.Warnings);
         }
         catch (Exception ex)
         {

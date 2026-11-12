@@ -574,14 +574,16 @@ public sealed class PromptEditorPresetStateTests
             using var app = TestApp.Create();
             var vm = app.Vm;
             vm.InitializeAsync().GetAwaiter().GetResult();
+            vm.NegativePrompt = "stare";
             vm.PresetDirty = false;
-            var preset = app.Presets.Create(new Preset { Name = "p", Kind = "generate" });
-            app.Dialogs.PromptEditResult = new PromptEdit("sys", "koncept");
+            var preset = app.Presets.Create(new Preset { Name = "p", Kind = "generate", NegativePrompt = "zapisane" });
+            app.Dialogs.PromptEditResult = new PromptEdit("sys", "koncept", NegativePrompt: "nowe");
             app.Dialogs.OverwritePreset = preset;
 
             vm.EditGeneratePromptCommand.Execute(null);
 
             Assert.Equal("koncept", preset.Prompt);
+            Assert.Equal("nowe", preset.NegativePrompt);
             Assert.False(vm.PresetDirty);
         });
     }
@@ -1039,13 +1041,59 @@ public sealed class PresetAssistTests
     {
         Sta.Run(() =>
         {
-            var (app, vm) = Open(Generate("a"), Context(edit: _ => null));
+            var preset = Generate("a");
+            preset.NegativePrompt = "zachowaj";
+            var (app, vm) = Open(preset, Context(edit: _ => null));
             using var _ = app;
 
             vm.EditInEditorCommand.Execute(null);
 
             Assert.Equal("p", vm.EditPrompt);
+            Assert.Equal("zachowaj", vm.EditNegativePrompt);
             Assert.False(vm.IsDirty);
+        });
+    }
+
+    [Fact]
+    public void Generate_preset_editor_loads_and_updates_negative_prompt()
+    {
+        Sta.Run(() =>
+        {
+            PresetPromptEditRequest? request = null;
+            var preset = Generate("a");
+            preset.NegativePrompt = "stare";
+            var (app, vm) = Open(preset, Context(edit: r =>
+            {
+                request = r;
+                return r.Initial with { NegativePrompt = "nowe" };
+            }));
+            using var _ = app;
+
+            vm.EditInEditorCommand.Execute(null);
+
+            Assert.Equal("stare", request!.Initial.NegativePrompt);
+            Assert.Equal("nowe", vm.EditNegativePrompt);
+        });
+    }
+
+    [Fact]
+    public void Edit_preset_editor_loads_and_updates_negative_prompt()
+    {
+        Sta.Run(() =>
+        {
+            PresetPromptEditRequest? request = null;
+            var preset = new Preset { Name = "a", Kind = "edit", Prompt = "p", NegativePrompt = "zachowaj", Width = 1024, Height = 1024 };
+            var (app, vm) = Open(preset, Context(edit: r =>
+            {
+                request = r;
+                return r.Initial with { Prompt = "zmieniony", NegativePrompt = "nowe" };
+            }));
+            using var _ = app;
+
+            vm.EditInEditorCommand.Execute(null);
+
+            Assert.Equal("zachowaj", request!.Initial.NegativePrompt);
+            Assert.Equal("nowe", vm.EditNegativePrompt);
         });
     }
 

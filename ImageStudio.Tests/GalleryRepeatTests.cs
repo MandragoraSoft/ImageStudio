@@ -54,7 +54,7 @@ public sealed class GalleryRepeatTests : IDisposable
 
         Assert.NotEqual(first.Id, again.Id);
         Assert.Equal(("gen/b", "styl\n\nkot", "512x256"), (_provider.LastImage!.Value.Model, _provider.LastImage.Value.Prompt, _provider.LastImage.Value.Size));
-        Assert.Equal(new ImageOptions(7, "bez", "high"), _provider.LastImage.Value.Options);
+        Assert.Equal(new ImageOptions(7, "bez", "high"), _provider.LastImage.Value.Options! with { NegativeNotice = null });
         Assert.Equal(2, _library.MediaItems.Count);
         Assert.Same(again, _library.MediaItems[0]);
     }
@@ -204,6 +204,23 @@ public sealed class GalleryRepeatTests : IDisposable
         Assert.Contains("Zapisano", app.Vm.Status);
     }
 
+    [Fact]
+    public async Task The_window_sends_video_system_and_negative_prompts_through_the_studio()
+    {
+        var provider = WindowProvider();
+        provider.NegativeOutcome = NegativePromptOutcome.Unsupported;
+        using var app = TestApp.Create(provider: provider);
+        await app.Vm.InitializeAsync();
+        app.Vm.VideoPrompt = "fala";
+        app.Vm.VideoSystemPrompt = "kamera: dron";
+        app.Vm.VideoNegativePrompt = "bez ludzi";
+
+        await app.Vm.GenerateVideoCommand.ExecuteAsync(null);
+
+        Assert.Equal("kamera: dron\n\nfala", provider.LastVideo!.Value.Prompt);
+        Assert.Equal("bez ludzi", provider.LastVideoOptions!.NegativePrompt);
+        Assert.Contains("negative_prompt", app.Vm.Status);  // ostrzeżenie trafia do statusu
+    }
     [Fact]
     public async Task The_window_repeats_a_video_and_reports_a_failure_in_the_status()
     {

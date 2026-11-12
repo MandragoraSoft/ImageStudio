@@ -1,5 +1,6 @@
 using System.IO;
 using ImageStudio.Configuration;
+using ImageStudio.Localization;
 using ImageStudio.Storage;
 using ImageStudio.ViewModels;
 
@@ -162,11 +163,15 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var composed = Compose(request.SystemPrompt, request.Prompt);
         var size = $"{request.Width}x{request.Height}";
         using var _ = activity?.Begin("Generowanie obrazu");
-        var result = await provider().GenerateImageAsync(id, composed, size, request.Options, ct);
-        var options = request.Options;
-        var parameters = Params(("width", request.Width), ("height", request.Height), ("seed", options?.Seed), ("negative", options?.NegativePrompt),
-                                ("quality", options?.Quality));
-        return await SaveImageAsync("generate", id, composed, size, result, request.Publish, null, parameters, ct);
+        // Negative prompt idzie tylko natywnym parametrem potwierdzonym przez model; inaczej ostrzeżenie i nic nie jest wysyłane
+        var options = request.Options is { } given ? given with { NegativePrompt = TrimmedOrNull(given.NegativePrompt) } : null;
+        var warnings = new List<string>();
+        if (options is not null) options = options with { NegativeNotice = outcome => AddNegativeWarning(warnings, outcome, id) };
+        var result = await provider().GenerateImageAsync(id, composed, size, options, ct);
+        var parameters = Params(("width", request.Width), ("height", request.Height), ("seed", options?.Seed),
+                                ("negative", warnings.Count == 0 ? options?.NegativePrompt : null), ("quality", options?.Quality));
+        var saved = await SaveImageAsync("generate", id, composed, size, result, request.Publish, null, parameters, ct);
+        return warnings.Count > 0 ? saved with { Warnings = warnings } : saved;
     }
 
     public async Task<StudioResult> EditImageAsync(EditRequest request, CancellationToken ct = default)
@@ -181,14 +186,20 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         // Kształt wyniku: podane wymiary albo proporcje pierwszej referencji (jak w oknie), z dłuższym bokiem najwyżej MaxEditSide.
         // Najpierw prosimy o nie model (aspect_ratio / size, jeśli je przyjmuje), żeby kadr powstał od razu w tych proporcjach
         var (width, height, aspect) = request.Width is { } w && request.Height is { } h ? (w, h, w / (double)h) : SourceShape(paths[0]);
-        var edited = await provider().EditImageAsync(id, composed, paths, new ImageEditOptions(aspect), ct);
+        var negative = TrimmedOrNull(request.NegativePrompt);
+        var warnings = new List<string>();
+        var edited = await provider().EditImageAsync(id, composed, paths,
+            new ImageEditOptions(aspect, negative, outcome => AddNegativeWarning(warnings, outcome, id)), ct);
 
         // Dostawca bez tej możliwości (albo model, który jej nie honoruje) zwraca własne proporcje: dopasowanie lokalne
         // (przycięcie środka i skalowanie) jest zabezpieczeniem, więc wynik zawsze ma żądany kształt
         edited = edited with { Bytes = ImageFitter.FitTo(edited.Bytes, width, height) };
         var size = $"{width}x{height}";
 
-        return await SaveImageAsync("edit", id, composed, size, edited, request.Publish, request.References.ToList(), null, ct);
+        // Wartość negative zapisujemy we wpisie tylko wtedy, gdy rzeczywiście poszła do modelu (powtórzenie z galerii ją odtworzy)
+        var parameters = Params(("negative", warnings.Count == 0 ? negative : null));
+        var saved = await SaveImageAsync("edit", id, composed, size, edited, request.Publish, request.References.ToList(), parameters, ct);
+        return warnings.Count > 0 ? saved with { Warnings = warnings } : saved;
     }
 
     public async Task<StudioResult> GenerateVideoAsync(VideoGenerationRequest request, CancellationToken ct = default)
@@ -203,20 +214,47 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var files = paths.Select(p => (Bytes: File.ReadAllBytes(p), Mime: MimeOf(p))).ToList();
         var estimate = Catalog?.Pricing.GetValueOrDefault(id)?.PriceNow is { } now ? now * request.Duration : (decimal?)null;
 
+        // System to tylko część tekstu promptu (API wideo nie ma roli system); bez niego prompt idzie bez zmian
+        var prompt = string.IsNullOrWhiteSpace(request.SystemPrompt) ? request.Prompt : Compose(request.SystemPrompt, request.Prompt);
         using var _ = activity?.Begin("Generowanie wideo");
-        var result = await provider().GenerateVideoAsync(id, request.Prompt, request.Duration, request.AspectRatio, files, request.Progress, ct);
+        var negative = TrimmedOrNull(request.NegativePrompt);
+        var warnings = new List<string>();
+        var videoOptions = new VideoOptions(negative, outcome =>
+        {
+            if (AddNegativeWarning(warnings, outcome, id)) request.Progress?.Invoke(warnings[^1]);
+        });
+        var result = await provider().GenerateVideoAsync(id, prompt, request.Duration, request.AspectRatio, files, videoOptions,
+                                                         request.Progress, ct);
         var (path, storageId) = await WriteResultAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes, ct);
         var entry = new GalleryEntry
         {
-            Kind = "video", Prompt = request.Prompt, Model = id, Provider = provider().DisplayName, FilePath = path,
+            Kind = "video", Prompt = prompt, Model = id, Provider = provider().DisplayName, FilePath = path,
             StorageId = storageId,
             Size = $"{request.AspectRatio} · {request.Duration} s" + (files.Count > 0 ? $" · {files.Count} zał." : ""),
             Inputs = request.Attachments is { Count: > 0 } attachments ? attachments.ToList() : null,
-            Params = Params(("duration", request.Duration), ("aspect", request.AspectRatio)),
+            Params = Params(("duration", request.Duration), ("aspect", request.AspectRatio), ("negative", warnings.Count == 0 ? negative : null)),
             CostUsd = result.CostUsd ?? estimate, CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (request.Publish) library.AddMedia(entry);
-        return new StudioResult(entry);
+        return new StudioResult(entry, Warnings: warnings.Count > 0 ? warnings : null);
+    }
+
+    private static string? TrimmedOrNull(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    // Powód, dla którego negative prompt nie poszedł do modelu; wysyłamy go wyłącznie natywnym parametrem, bez tekstowego zamiennika.
+    // false = takie ostrzeżenie już było
+    private static bool AddNegativeWarning(List<string> warnings, NegativePromptOutcome outcome, string model)
+    {
+        var text = Loc.T(outcome switch
+        {
+            NegativePromptOutcome.Unsupported => "neg.warn.unsupported",
+            NegativePromptOutcome.Rejected => "neg.warn.rejected",
+            _ => "neg.warn.unconfirmed",
+        }, model);
+        if (warnings.Contains(text)) return false;
+
+        warnings.Add(text);
+        return true;
     }
 
     private async Task<StudioResult> SaveImageAsync(string kind, string model, string prompt, string size, ImageResult result,
@@ -257,13 +295,13 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
                 if (entry.Inputs is not { Count: > 0 } references)
                     throw new ArgumentException("Wpis edycji nie ma zapisanych referencji (starszy wpis): użyj edit_image z references.");
                 var size = SizeOf(entry);
-                return EditImageAsync(new EditRequest(entry.Prompt, null, references, model, size?.Width, size?.Height, request.Publish), ct);
+                return EditImageAsync(new EditRequest(entry.Prompt, null, references, model, size?.Width, size?.Height, request.Publish, P("negative")), ct);
             }
 
             case "video":
             {
                 var (duration, aspect) = VideoOf(entry);
-                return GenerateVideoAsync(new VideoGenerationRequest(entry.Prompt, model, duration, aspect, entry.Inputs ?? [], request.Progress, request.Publish), ct);
+                return GenerateVideoAsync(new VideoGenerationRequest(entry.Prompt, model, duration, aspect, entry.Inputs ?? [], request.Progress, request.Publish, P("negative")), ct);
             }
 
             case "speech":

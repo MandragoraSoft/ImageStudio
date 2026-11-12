@@ -72,6 +72,7 @@ internal class FakeProvider : IAiProvider
                                                 CancellationToken ct = default)
     {
         LastImage = (model, prompt, size, options);
+        if (NegativeOutcome is { } outcome && !string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(outcome);
         return OnGenerateImage is { } run ? Task.FromResult(run(model, prompt, size, options)) : throw new NotSupportedException();
     }
 
@@ -84,11 +85,16 @@ internal class FakeProvider : IAiProvider
 
     // Edycja z opcjami (kształt wyniku): zapamiętuje opcje i działa jak zwykła edycja
     public ImageEditOptions? LastEditOptions { get; private set; }
+    public VideoOptions? LastVideoOptions { get; private set; }
+
+    // Ustawione: atrapa zgłasza ten wynik, gdy dostaje niepusty negatywny prompt (null = model go przyjmuje)
+    public NegativePromptOutcome? NegativeOutcome { get; set; }
 
     Task<ImageResult> IAiProvider.EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
                                                  CancellationToken ct)
     {
         LastEditOptions = options;
+        if (NegativeOutcome is { } outcome && !string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(outcome);
         return EditImageAsync(model, prompt, imagePaths, ct);
     }
 
@@ -98,6 +104,15 @@ internal class FakeProvider : IAiProvider
     {
         LastVideo = (model, prompt, duration, aspectRatio, attachments.Count);
         return OnGenerateVideo is { } run ? Task.FromResult(run(model, prompt, duration, aspectRatio, attachments.Count)) : throw new NotSupportedException();
+    }
+
+    Task<ImageResult> IAiProvider.GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
+                                                     IReadOnlyList<(byte[] Bytes, string Mime)> attachments, VideoOptions? options,
+                                                     Action<string>? progress, CancellationToken ct)
+    {
+        LastVideoOptions = options;
+        if (NegativeOutcome is { } outcome && !string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(outcome);
+        return GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, progress, ct);
     }
 
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
@@ -220,6 +235,7 @@ internal sealed class FakeDialogs : IDialogService
         {
             preset.Prompt = result.Prompt;
             preset.SystemPrompt = result.System ?? "";
+            if (result.NegativePrompt is not null) preset.NegativePrompt = result.NegativePrompt;
             savePreset(preset);
         }
         return PromptEditResult;

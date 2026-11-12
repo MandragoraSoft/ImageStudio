@@ -161,6 +161,9 @@ public sealed partial class MainViewModel : ObservableObject
         EnhancerInstruction = string.IsNullOrWhiteSpace(_state.EnhancerInstruction) ? DefaultInstruction : _state.EnhancerInstruction;
         SeedText = _state.SeedText ?? "";
         NegativePrompt = _state.NegativePrompt ?? "";
+        EditNegativePrompt = _state.EditNegativePrompt ?? "";
+        VideoNegativePrompt = _state.VideoNegativePrompt ?? "";
+        VideoSystemPrompt = _state.VideoSystemPrompt ?? "";
         SelectedQuality = _state.Quality ?? "auto";
         Studio = new StudioApi(() => _provider, _storage, this, _presetStore, _downloads, Activity, new WindowDefaults(this),
                                () => _prefs.For(_provider.Id).Preferred);
@@ -296,6 +299,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnEnhancerInstructionChanged(string value) => OnPresetInputChanged();
     partial void OnSeedTextChanged(string value) => OnPresetInputChanged();
     partial void OnNegativePromptChanged(string value) => OnPresetInputChanged();
+    partial void OnEditNegativePromptChanged(string value) => OnPresetInputChanged();
     partial void OnSelectedQualityChanged(string value) => OnPresetInputChanged();
     partial void OnGeneratePromptChanged(string value) => OnPresetInputChanged();
     partial void OnEditPromptChanged(string value) => OnPresetInputChanged();
@@ -496,6 +500,9 @@ public sealed partial class MainViewModel : ObservableObject
         _state.EnhancerInstruction = EnhancerInstruction;
         _state.SeedText = SeedText;
         _state.NegativePrompt = NegativePrompt;
+        _state.EditNegativePrompt = EditNegativePrompt;
+        _state.VideoNegativePrompt = VideoNegativePrompt;
+        _state.VideoSystemPrompt = VideoSystemPrompt;
         _state.Quality = SelectedQuality;
         foreach (var p in EnhancerParameters)
             _state.EnhancerParams[p.Key] = new ParamState { Enabled = p.Enabled, Value = p.Value };

@@ -37,6 +37,7 @@ public partial class PromptEditorWindow : Window
         PresetBox.ItemsSource = presets;
         PromptHeader.Text = Loc.T("prompt.header");
         SystemSection.Visibility = initial.System is null ? Visibility.Collapsed : Visibility.Visible;
+        NegativeSection.Visibility = initial.NegativePrompt is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
         // Bez opisu obrazów i bez przebudowy prawa kolumna jest pusta: zwijamy ją, prompt zajmuje całe okno
         if (describeImages is null && RebuildSection.Visibility != Visibility.Visible)
@@ -47,6 +48,7 @@ public partial class PromptEditorWindow : Window
         }
         SystemBox.Text = initial.System ?? "";
         PromptBox.Text = initial.Prompt;
+        NegativeBox.Text = initial.NegativePrompt ?? "";
         _history = initial.History;
         InstructionBox.Text = initial.Instruction ?? "";
         UpdateCounters();
@@ -64,12 +66,14 @@ public partial class PromptEditorWindow : Window
         SystemSection.Visibility == Visibility.Visible ? SystemBox.Text : null,
         PromptBox.Text,
         RebuildSection.Visibility == Visibility.Visible ? InstructionBox.Text : null,
-        _history);
+        _history,
+        NegativeSection.Visibility == Visibility.Visible ? NegativeBox.Text : null);
 
     private void Show(PromptEdit edit)
     {
         if (SystemSection.Visibility == Visibility.Visible) SystemBox.Text = edit.System ?? "";
         PromptBox.Text = edit.Prompt;
+        if (NegativeSection.Visibility == Visibility.Visible) NegativeBox.Text = edit.NegativePrompt ?? "";
         _history = edit.History;
         UpdateHistoryLabel();
     }
@@ -168,7 +172,7 @@ public partial class PromptEditorWindow : Window
         // W trakcie przebudowy wynik nadpisze pola, więc blokujemy wszystko, co je zmienia
         RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = DescribeButton.IsEnabled = !busy;
         UndoButton.IsEnabled = !busy && _beforeRebuild is not null;
-        PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = busy;
+        PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = NegativeBox.IsReadOnly = busy;
     }
 
     private void PresetBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
@@ -178,12 +182,15 @@ public partial class PromptEditorWindow : Window
     {
         if (PresetBox.SelectedItem is not Preset preset) return;
 
-        var hasText = !string.IsNullOrWhiteSpace(PromptBox.Text) || !string.IsNullOrWhiteSpace(SystemBox.Text);
-        var same = PromptBox.Text == preset.Prompt && SystemBox.Text == preset.SystemPrompt;
+        var hasText = !string.IsNullOrWhiteSpace(PromptBox.Text) || !string.IsNullOrWhiteSpace(SystemBox.Text)
+            || (NegativeSection.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(NegativeBox.Text));
+        var same = PromptBox.Text == preset.Prompt && SystemBox.Text == preset.SystemPrompt
+            && (NegativeSection.Visibility != Visibility.Visible || NegativeBox.Text == (preset.NegativePrompt ?? ""));
         if (hasText && !same && !Confirm(Loc.T("prompt.confirmReplace", preset.Name))) return;
 
         if (SystemSection.Visibility == Visibility.Visible) SystemBox.Text = preset.SystemPrompt;
         PromptBox.Text = preset.Prompt;
+        if (NegativeSection.Visibility == Visibility.Visible) NegativeBox.Text = preset.NegativePrompt ?? "";
         if (RebuildSection.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(preset.EnhancerInstruction))
             InstructionBox.Text = preset.EnhancerInstruction;
     }
@@ -195,6 +202,8 @@ public partial class PromptEditorWindow : Window
 
         preset.Prompt = PromptBox.Text;
         if (SystemSection.Visibility == Visibility.Visible) preset.SystemPrompt = SystemBox.Text;
+        if (NegativeSection.Visibility == Visibility.Visible)
+            preset.NegativePrompt = string.IsNullOrWhiteSpace(NegativeBox.Text) ? null : NegativeBox.Text;
         if (RebuildSection.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(InstructionBox.Text))
             preset.EnhancerInstruction = InstructionBox.Text;
         try
@@ -217,6 +226,7 @@ public partial class PromptEditorWindow : Window
     {
         SystemBox.Clear();
         PromptBox.Clear();
+        if (NegativeSection.Visibility == Visibility.Visible) NegativeBox.Clear();
         _history = null;
         UpdateHistoryLabel();
         PromptBox.Focus();
@@ -232,6 +242,7 @@ public partial class PromptEditorWindow : Window
         if (InstructionCounter is null) return; // TextChanged przy InitializeComponent
         SystemCounter.Text = Describe(SystemBox.Text);
         PromptCounter.Text = Describe(PromptBox.Text);
+        NegativeCounter.Text = Describe(NegativeBox.Text);
         InstructionCounter.Text = Describe(InstructionBox.Text);
     }
 

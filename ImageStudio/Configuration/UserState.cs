@@ -68,6 +68,10 @@ public sealed class UserState
     public string GalleryArchiveFolder { get; set; } = DefaultGalleryArchiveFolder;
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
+    // Negatywne prompty edycji i wideo są osobne od generowania; starszy state.json ich nie ma (null = puste)
+    public string? EditNegativePrompt { get; set; }
+    public string? VideoNegativePrompt { get; set; }
+    public string? VideoSystemPrompt { get; set; }
     public string? Quality { get; set; }
     // Okno zestawów: zapisywanie zmian bez pytania przy zmianie zestawu i zamykaniu okna
     public bool PresetsAutoSave { get; set; }

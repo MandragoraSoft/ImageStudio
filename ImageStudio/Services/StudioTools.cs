@@ -12,7 +12,8 @@ public sealed class StudioTools : IMcpToolSet
                                string[]? Needs = null);
 
     // Wynik operacji na pliku, czytelny dla modelu
-    private sealed record Created(string Id, string Kind, string Model, string Path, string Cost, string? Text = null);
+    private sealed record Created(string Id, string Kind, string Model, string Path, string Cost, string? Text = null,
+                                 IReadOnlyList<string>? Warnings = null);
 
     private readonly IStudioApi _studio;
     private readonly Func<ToolCall, bool> _confirm;
@@ -55,7 +56,7 @@ public sealed class StudioTools : IMcpToolSet
 
     private static ToolDefinition ToDefinition(Tool t) => new(t.Name, t.Description, t.Schema);
 
-    private static Created Describe(StudioResult r) => Describe(r.Entry);
+    private static Created Describe(StudioResult r) => Describe(r.Entry) with { Warnings = r.Warnings };
 
     private static Created Describe(GalleryEntry e) =>
         new(e.Id, e.Kind, e.Model, e.FilePath, e.CostLabel, e.Kind == "generate" || e.Kind == "edit" || e.Kind == "video" ? null : e.Prompt);
@@ -162,7 +163,7 @@ public sealed class StudioTools : IMcpToolSet
                    ("width", """{"type":"integer","minimum":64,"maximum":4096}""", false),
                    ("height", """{"type":"integer","minimum":64,"maximum":4096}""", false),
                    ("seed", """{"type":"integer"}""", false),
-                   ("negative_prompt", """{"type":"string"}""", false),
+                   ("negative_prompt", """{"type":"string","description":"Tylko natywny parametr modelu, który go potwierdza w schemacie; inaczej ostrzeżenie w wyniku i nic nie jest wysyłane"}""", false),
                    ("quality", """{"type":"string","enum":["auto","low","medium","high"]}""", false),
                    .. common]),
             true, async args =>
@@ -181,6 +182,7 @@ public sealed class StudioTools : IMcpToolSet
                    ("references", """{"type":"array","items":{"type":"string"},"description":"Pełne ścieżki plików albo adresy http(s); pierwszy jest podstawowy"}""", true),
                    ("width", """{"type":"integer","minimum":64,"maximum":4096,"description":"Z height: dopasowuje wynik do tych proporcji"}""", false),
                    ("height", """{"type":"integer","minimum":64,"maximum":4096}""", false),
+                   ("negative_prompt", """{"type":"string","description":"Tylko natywny parametr modelu, który go potwierdza w schemacie; inaczej ostrzeżenie w wyniku i nic nie jest wysyłane"}""", false),
                    .. common]),
             true, async args =>
             {
@@ -191,7 +193,8 @@ public sealed class StudioTools : IMcpToolSet
                     : ((int, int)?)null;
                 return Serialize(Describe(await _studio.EditImageAsync(new EditRequest(
                     prompt, OptString(args, "system_prompt") ?? preset?.SystemPrompt, OptStrings(args, "references"),
-                    OptString(args, "model") ?? preset?.Model, fit?.Item1, fit?.Item2))));
+                    OptString(args, "model") ?? preset?.Model, fit?.Item1, fit?.Item2,
+                    NegativePrompt: OptString(args, "negative_prompt") ?? preset?.NegativePrompt))));
             }, Needs: ["edit"]);
 
         yield return new Tool("generate_video",
@@ -200,10 +203,13 @@ public sealed class StudioTools : IMcpToolSet
                    ("model", """{"type":"string","description":"Id modelu wideo (list_models); pominięty = domyślny"}""", false),
                    ("duration", """{"type":"integer","minimum":1,"maximum":60,"description":"Sekundy, domyślnie 5"}""", false),
                    ("aspect_ratio", """{"type":"string","enum":["16:9","9:16","1:1","4:3"]}""", false),
-                   ("attachments", """{"type":"array","items":{"type":"string"},"description":"Obrazy wejściowe: ścieżki plików albo adresy http(s)"}""", false)),
+                   ("attachments", """{"type":"array","items":{"type":"string"},"description":"Obrazy wejściowe: ścieżki plików albo adresy http(s)"}""", false),
+                   ("system_prompt", """{"type":"string","description":"Dołączany przed promptem jako część tekstu (API wideo nie ma roli system)"}""", false),
+                   ("negative_prompt", """{"type":"string","description":"Tylko natywny parametr modelu, który go potwierdza w schemacie; inaczej ostrzeżenie w wyniku i nic nie jest wysyłane"}""", false)),
             true, async args => Serialize(Describe(await _studio.GenerateVideoAsync(new VideoGenerationRequest(
                 RequiredString(args, "prompt"), OptString(args, "model"), OptInt(args, "duration") ?? 5,
-                OptString(args, "aspect_ratio") ?? "16:9", OptStrings(args, "attachments"))))),
+                OptString(args, "aspect_ratio") ?? "16:9", OptStrings(args, "attachments"),
+                NegativePrompt: OptString(args, "negative_prompt"), SystemPrompt: OptString(args, "system_prompt"))))),
             Needs: ["video"]);
 
         yield return new Tool("rebuild_prompt",
@@ -244,7 +250,7 @@ public sealed class StudioTools : IMcpToolSet
                    ("width", """{"type":"integer","minimum":64,"maximum":4096}""", false),
                    ("height", """{"type":"integer","minimum":64,"maximum":4096}""", false),
                    ("seed", """{"type":"integer"}""", false),
-                   ("negative_prompt", """{"type":"string"}""", false),
+                   ("negative_prompt", """{"type":"string","description":"Tylko natywny parametr modelu, który go potwierdza w schemacie; inaczej ostrzeżenie w wyniku i nic nie jest wysyłane"}""", false),
                    ("quality", """{"type":"string","enum":["auto","low","medium","high"]}""", false)),
             false, args =>
             {

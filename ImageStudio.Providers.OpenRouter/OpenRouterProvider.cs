@@ -107,9 +107,9 @@ public sealed class OpenRouterProvider : IAiProvider
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                 CancellationToken ct = default)
     {
+        // Brak potwierdzonego natywnego parametru: ostrzegamy i nie dopisujemy tekstu do promptu
+        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(NegativePromptOutcome.Unsupported);
         var text = $"{prompt}\n\nOutput size: {size}.";
-        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt))
-            text += $" Avoid: {options.NegativePrompt}.";
 
         var body = new Dictionary<string, object>
         {
@@ -119,8 +119,7 @@ public sealed class OpenRouterProvider : IAiProvider
         };
         if (options?.Seed is int seed) body["seed"] = seed;
 
-        var negative = string.IsNullOrWhiteSpace(options?.NegativePrompt) ? "" : $" Avoid: {options.NegativePrompt}.";
-        return SendImageRequestAsync(body, () => ImagesBody(model, prompt + negative, size, options?.Seed, []), ct);
+        return SendImageRequestAsync(body, () => ImagesBody(model, prompt, size, options?.Seed, []), ct);
     }
 
     public Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths,

@@ -70,14 +70,27 @@ public interface IAiProvider : IDisposable
                                          CancellationToken ct = default);
     Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths,
                                      CancellationToken ct = default);
-    // Edycja z prośbą o kształt wyniku (proporcje). Dostawca bez takiej możliwości nie nadpisuje: edycja idzie bez opcji
+    // Edycja z opcjami (kształt wyniku, negative prompt). Dostawca bez takiej możliwości nie nadpisuje: edycja idzie bez opcji,
+    // a negative prompt nie jest wysyłany ani dopisywany do tekstu (NegativeNotice dostaje Unsupported)
     Task<ImageResult> EditImageAsync(string model, string prompt, IReadOnlyList<string> imagePaths, ImageEditOptions? options,
-                                     CancellationToken ct = default) =>
-        EditImageAsync(model, prompt, imagePaths, ct);
+                                     CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(NegativePromptOutcome.Unsupported);
+        return EditImageAsync(model, prompt, imagePaths, ct);
+    }
 
     Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                          IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
                                          Action<string>? progress = null, CancellationToken ct = default);
+    // Wideo z opcjami (negative prompt). Domyślnie, jak przy edycji: negative prompt nie jest wysyłany ani dopisywany do promptu
+    Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
+                                         IReadOnlyList<(byte[] Bytes, string Mime)> attachments, VideoOptions? options,
+                                         Action<string>? progress = null, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(NegativePromptOutcome.Unsupported);
+        return GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, progress, ct);
+    }
+
     // Zwykła rozmowa: cała historia (system, user, assistant, tool) na wejściu, odpowiedź modelu na wyjściu.
     // Z tools model może zamiast tekstu poprosić o wywołanie narzędzi (ChatReply.ToolCalls).
     // options (opcjonalne) włącza/wyłącza i ustawia poziom rozumowania modelu, który to deklaruje

@@ -47,6 +47,11 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
                                                 Action<string>? progress = null, CancellationToken ct = default) =>
         Track(Loc.T("activity.generateVideo"), () => inner.GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, progress, ct));
 
+    public Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
+                                                IReadOnlyList<(byte[] Bytes, string Mime)> attachments, VideoOptions? options,
+                                                Action<string>? progress = null, CancellationToken ct = default) =>
+        Track(Loc.T("activity.generateVideo"), () => inner.GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, options, progress, ct));
+
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>

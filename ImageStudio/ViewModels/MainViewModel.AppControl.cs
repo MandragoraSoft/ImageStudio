@@ -72,6 +72,7 @@ public sealed partial class MainViewModel : IAppControl, IStudioLibrary
                 break;
             default:
                 VideoPrompt = prompt;
+                if (systemPrompt is not null) VideoSystemPrompt = systemPrompt;
                 break;
         }
     }

@@ -239,7 +239,7 @@ public sealed partial class MainViewModel
         Width = Width,
         Height = Height,
         SeedText = SeedText,
-        NegativePrompt = NegativePrompt,
+        NegativePrompt = ActiveTab == 1 ? EditNegativePrompt : NegativePrompt,
         Quality = SelectedQuality,
         EnhancerModel = SelectedEnhancerModel,
         EnhancerInstruction = EnhancerInstruction,
@@ -256,6 +256,7 @@ public sealed partial class MainViewModel
             EditPrompt = preset.Prompt;
             EditSystemPrompt = preset.SystemPrompt;
             SelectedEditModel = EditModels.FirstOrDefault(m => m.Id == preset.Model) ?? SelectedEditModel;
+            EditNegativePrompt = preset.NegativePrompt ?? "";
         }
         else
         {

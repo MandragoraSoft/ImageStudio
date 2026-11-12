@@ -10,7 +10,8 @@ public static class VideoRequest
 {
     // schema = obiekt parameters z opisu modelu albo null; notes dostaje zmiany względem tego, o co poprosił użytkownik
     public static Dictionary<string, object> Build(JsonElement? schema, string model, string prompt, int duration, string aspectRatio,
-                                                   IReadOnlyList<(byte[] Bytes, string Mime)> attachments, List<string> notes)
+                                                   IReadOnlyList<(byte[] Bytes, string Mime)> attachments, List<string> notes,
+                                                   string? negativePrompt = null, Action<NegativePromptOutcome>? negativeNotice = null)
     {
         JsonElement? properties = schema is { ValueKind: JsonValueKind.Object } s && s.TryGetProperty("properties", out var p) ? p : null;
         bool Has(string name) => properties is null || properties.Value.TryGetProperty(name, out _);
@@ -39,10 +40,23 @@ public static class VideoRequest
             notes.Add("model nie ma wyboru proporcji: wynikają z obrazu");
         }
 
+        // negative_prompt tylko natywnie i tylko gdy schemat modelu go potwierdza; bez potwierdzenia nie idzie nigdzie (też do promptu)
+        if (!string.IsNullOrWhiteSpace(negativePrompt))
+        {
+            if (NegativePromptBlocker(schema) is { } blocker) negativeNotice?.Invoke(blocker);
+            else body["negative_prompt"] = negativePrompt.Trim();
+        }
+
         var uris = attachments.Select(a => $"data:{a.Mime};base64,{Convert.ToBase64String(a.Bytes)}").ToList();
         if (uris.Count > 0) AddPictures(body, uris, Has, Property, notes);
         return body;
     }
+
+    // null = schemat potwierdza parametr negative_prompt; inaczej powód, dla którego go nie wysyłamy
+    public static NegativePromptOutcome? NegativePromptBlocker(JsonElement? schema) =>
+        schema is { ValueKind: JsonValueKind.Object } s && s.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object
+            ? properties.TryGetProperty("negative_prompt", out _) ? null : NegativePromptOutcome.Unsupported
+            : NegativePromptOutcome.Unconfirmed;
 
     private static void AddPictures(Dictionary<string, object> body, List<string> uris, Func<string, bool> has,
                                     Func<string, JsonElement?> property, List<string> notes)

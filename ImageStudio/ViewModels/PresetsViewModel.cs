@@ -217,12 +217,15 @@ public sealed partial class PresetsViewModel : ObservableObject
 
         var parameters = EditParameters.ToDictionary(p => p.Key, p => new ParamState { Enabled = p.Enabled, Value = p.Value });
         var result = edit(new PresetPromptEditRequest(Loc.T("presets.editor.title", EditName),
-                                                     new PromptEdit(EditSystemPrompt, EditPrompt, EditEnhancerInstruction, []),
+                                                     new PromptEdit(EditSystemPrompt, EditPrompt, EditEnhancerInstruction, [],
+                                                         EditNegativePrompt),
                                                      EditEnhancerModel, parameters));
         if (result is null) return;
 
         EditSystemPrompt = result.System ?? "";
         EditPrompt = result.Prompt;
+        if (result.NegativePrompt is not null)
+            EditNegativePrompt = result.NegativePrompt;
         EditEnhancerInstruction = result.Instruction ?? EditEnhancerInstruction;
     }
 

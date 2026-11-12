@@ -181,4 +181,99 @@ public sealed class EditAspectTests : IDisposable
         // dostawca zwrócił poziomy kadr 160x90, wynik wraca do pionowych proporcji źródła
         Assert.Equal((32, 40), TestImages.Size(result.Bytes!));
     }
+
+    private const string NegativeProps = """{"prompt":{"type":"string"},"negative_prompt":{"type":"string"}}""";
+    private const string NegativeRejected = "{\"error\":{\"message\":\"Unrecognized request argument supplied: negative_prompt\"}}";
+
+    [Fact]
+    public async Task Edit_multipart_carries_negative_prompt_when_the_schema_declares_it()
+    {
+        using var server = new Server((200, ModelWith(NegativeProps)), (200, Image));
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await service.EditAsync("m/x", "ciemne włosy", [Picture()], new ImageEditOptions(null, "  bez rozmycia ", outcomes.Add));
+        await server.Finished;
+
+        var post = server.Requests[1];
+        Assert.Contains("name=negative_prompt", post.Body);
+        Assert.Contains("bez rozmycia", post.Body);
+        Assert.DoesNotContain("Avoid", post.Body);
+        Assert.Empty(outcomes);
+    }
+
+    [Theory]
+    [InlineData(true, NegativePromptOutcome.Unsupported)]
+    [InlineData(false, NegativePromptOutcome.Unconfirmed)]
+    public async Task Edit_multipart_omits_negative_prompt_when_the_schema_lacks_it_or_is_missing(bool hasSchema, NegativePromptOutcome expected)
+    {
+        using var server = hasSchema
+            ? new Server((200, ModelWith(Ratios)), (200, Image))
+            : new Server((404, "{\"error\":\"not found\"}"), (200, Image));
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await service.EditAsync("m/x", "ciemne włosy", [Picture()], new ImageEditOptions(null, "bez rozmycia", outcomes.Add));
+        await server.Finished;
+
+        var post = server.Requests.Single(r => r.Method == "POST");
+        Assert.DoesNotContain("negative_prompt", post.Body);
+        Assert.DoesNotContain("bez rozmycia", post.Body);  // brak tekstowego zamiennika
+        Assert.Equal([expected], outcomes);
+    }
+
+    [Fact]
+    public async Task Edit_multipart_drops_a_rejected_negative_prompt_and_remembers_it()
+    {
+        using var server = new Server((200, ModelWith(NegativeProps)), (400, NegativeRejected), (200, Image), (200, Image));
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+        var options = new ImageEditOptions(null, "bez", outcomes.Add);
+
+        await service.EditAsync("m/x", "p", [Picture()], options);
+        await service.EditAsync("m/x", "p", [Picture()], options);
+        await server.Finished;
+
+        var posts = server.Requests.Where(r => r.Method == "POST").ToList();
+        Assert.Contains("name=negative_prompt", posts[0].Body);
+        Assert.DoesNotContain("negative_prompt", posts[1].Body);
+        Assert.DoesNotContain("negative_prompt", posts[2].Body);
+        Assert.Equal([NegativePromptOutcome.Rejected, NegativePromptOutcome.Rejected], outcomes);
+    }
+
+    [Fact]
+    public async Task Generation_sends_negative_prompt_only_when_the_schema_declares_it()
+    {
+        using var server = new Server((200, ModelWith(NegativeProps)), (200, Image), (200, ModelWith(Ratios)), (200, Image));
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await service.GenerateAsync("m/x", "kot", "1024x1024", new ImageOptions(null, " bez ", null, outcomes.Add));
+        Assert.Empty(outcomes);
+        await service.GenerateAsync("m/y", "kot", "1024x1024", new ImageOptions(null, "bez", null, outcomes.Add));
+        await server.Finished;
+
+        var posts = server.Requests.Where(r => r.Method == "POST").ToList();
+        Assert.Equal("bez", JsonDocument.Parse(posts[0].Body).RootElement.GetProperty("negative_prompt").GetString());
+        Assert.DoesNotContain("negative_prompt", posts[1].Body);
+        Assert.DoesNotContain("bez", posts[1].Body);
+        Assert.Equal([NegativePromptOutcome.Unsupported], outcomes);
+    }
+
+    [Fact]
+    public async Task Generation_without_a_negative_prompt_needs_no_schema_and_a_rejected_one_is_dropped()
+    {
+        using var server = new Server((200, Image), (200, ModelWith(NegativeProps)), (400, NegativeRejected), (200, Image));
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await service.GenerateAsync("m/x", "kot", "1024x1024", new ImageOptions(null, "  ", null, outcomes.Add));
+        await service.GenerateAsync("m/x", "kot", "1024x1024", new ImageOptions(null, "bez", null, outcomes.Add));
+        await server.Finished;
+
+        Assert.Equal(["POST", "GET", "POST", "POST"], server.Requests.Select(r => r.Method));
+        Assert.DoesNotContain("negative_prompt", server.Requests[0].Body);
+        Assert.DoesNotContain("negative_prompt", server.Requests[3].Body);
+        Assert.Equal([NegativePromptOutcome.Rejected], outcomes);
+    }
 }

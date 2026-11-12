@@ -142,7 +142,7 @@ public sealed class StudioApiTests : IDisposable
         var entry = result.Entry;
 
         Assert.Equal(("img-a", "realizm\n\nkot", "512x256"), (_provider.LastImage!.Value.Model, _provider.LastImage.Value.Prompt, _provider.LastImage.Value.Size));
-        Assert.Equal(new ImageOptions(7, "rozmycie", "high"), _provider.LastImage.Value.Options);
+        Assert.Equal(new ImageOptions(7, "rozmycie", "high"), _provider.LastImage.Value.Options! with { NegativeNotice = null });
         Assert.True(File.Exists(entry.FilePath));
         Assert.Equal(0.04m, entry.CostUsd);
         Assert.Equal("Fake", entry.Provider);  // dostawca trafia do wpisu (dymek galerii)
@@ -319,6 +319,85 @@ public sealed class StudioApiTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => _studio.GenerateVideoAsync(new VideoGenerationRequest("x", AspectRatio: "21:9")));
     }
 
+    [Fact]
+    public async Task Edit_negative_prompt_reaches_the_provider_and_is_recorded_when_sent()
+    {
+        var reference = TempFile("ref.png", TestImages.Png(4, 4));
+
+        var result = await _studio.EditImageAsync(new EditRequest("jaśniej", null, [reference], NegativePrompt: "  rozmycie "));
+
+        Assert.Equal("rozmycie", _provider.LastEditOptions!.NegativePrompt);
+        Assert.Equal("jaśniej", _provider.LastEdit!.Value.Prompt);  // bez tekstowego fallbacku
+        Assert.Null(result.Warnings);
+        Assert.Equal("rozmycie", result.Entry.Params!["negative"]);
+    }
+
+    [Theory]
+    [InlineData(NegativePromptOutcome.Unsupported)]
+    [InlineData(NegativePromptOutcome.Unconfirmed)]
+    [InlineData(NegativePromptOutcome.Rejected)]
+    public async Task Edit_and_video_warn_and_do_not_record_a_negative_prompt_that_was_not_sent(NegativePromptOutcome outcome)
+    {
+        _provider.NegativeOutcome = outcome;
+        var reference = TempFile("ref.png", TestImages.Png(4, 4));
+
+        var edit = await _studio.EditImageAsync(new EditRequest("x", null, [reference], NegativePrompt: "bez"));
+        var progress = new List<string>();
+        var video = await _studio.GenerateVideoAsync(new VideoGenerationRequest("x", Progress: progress.Add, NegativePrompt: "bez"));
+
+        Assert.Single(edit.Warnings!);
+        Assert.Contains("edit-a", edit.Warnings![0]);
+        Assert.Single(video.Warnings!);
+        Assert.Contains("vid-a", video.Warnings![0]);
+        Assert.Contains(video.Warnings[0], progress);
+        Assert.False(edit.Entry.Params?.ContainsKey("negative") ?? false);
+        Assert.False(video.Entry.Params?.ContainsKey("negative") ?? false);
+        Assert.Equal("x", _provider.LastVideo!.Value.Prompt);
+    }
+
+    [Fact]
+    public async Task Generate_image_warns_and_does_not_record_a_negative_prompt_that_was_not_sent()
+    {
+        var sent = await _studio.GenerateImageAsync(new ImageRequest("kot", null, null, 512, 256, new ImageOptions(null, " bez ", null)));
+        _provider.NegativeOutcome = NegativePromptOutcome.Unsupported;
+        var blank = await _studio.GenerateImageAsync(new ImageRequest("kot", null, null, 512, 256, new ImageOptions(null, "  ", null)));
+        var skipped = await _studio.GenerateImageAsync(new ImageRequest("kot", null, null, 512, 256, new ImageOptions(null, "bez", null)));
+
+        Assert.Equal("bez", sent.Entry.Params!["negative"]);
+        Assert.Null(sent.Warnings);
+        Assert.Null(blank.Warnings);
+        Assert.False(blank.Entry.Params!.ContainsKey("negative"));
+        Assert.Single(skipped.Warnings!);
+        Assert.Contains("img-a", skipped.Warnings![0]);
+        Assert.False(skipped.Entry.Params!.ContainsKey("negative"));
+    }
+
+    [Fact]
+    public async Task Video_system_prompt_is_composed_into_the_text_prompt_and_blank_changes_nothing()
+    {
+        var plain = await _studio.GenerateVideoAsync(new VideoGenerationRequest(" fala ", SystemPrompt: "  "));
+        Assert.Equal(" fala ", _provider.LastVideo!.Value.Prompt);  // zgodność wstecz: bez systemu prompt idzie bez zmian
+
+        var composed = await _studio.GenerateVideoAsync(new VideoGenerationRequest("fala", SystemPrompt: " kamera: dron "));
+
+        Assert.Equal("kamera: dron\n\nfala", _provider.LastVideo!.Value.Prompt);
+        Assert.Equal("kamera: dron\n\nfala", composed.Entry.Prompt);
+        Assert.Equal(" fala ", plain.Entry.Prompt);
+    }
+
+    [Fact]
+    public async Task Blank_negative_prompt_is_not_passed_to_edit_or_video()
+    {
+        _provider.NegativeOutcome = NegativePromptOutcome.Unsupported;
+        var reference = TempFile("ref.png", TestImages.Png(4, 4));
+
+        var edit = await _studio.EditImageAsync(new EditRequest("x", null, [reference], NegativePrompt: "  "));
+        var video = await _studio.GenerateVideoAsync(new VideoGenerationRequest("x", NegativePrompt: ""));
+
+        Assert.Null(edit.Warnings);
+        Assert.Null(video.Warnings);
+        Assert.Null(_provider.LastVideoOptions?.NegativePrompt);
+    }
     [Fact]
     public async Task Speak_writes_audio_and_translates_when_asked()
     {

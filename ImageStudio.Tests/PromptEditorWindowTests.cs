@@ -45,6 +45,36 @@ public sealed class PromptEditorWindowTests
     }
 
     [Fact]
+    public void Negative_prompt_is_visible_only_when_supplied_and_is_returned()
+    {
+        WpfHost.Run(() =>
+        {
+            var generated = new PromptEditorWindow("Edytor", new PromptEdit("system", "request", NegativePrompt: "unikaj tekstu"));
+            Assert.Equal(Visibility.Visible, Named<UIElement>(generated, "NegativeSection").Visibility);
+            Assert.Equal("unikaj tekstu", generated.Result.NegativePrompt);
+
+            var edited = new PromptEditorWindow("Edytor", new PromptEdit("system", "request"));
+            Assert.Equal(Visibility.Collapsed, Named<UIElement>(edited, "NegativeSection").Visibility);
+            Assert.Null(edited.Result.NegativePrompt);
+        });
+    }
+
+    [Fact]
+    public void Loading_generate_preset_updates_visible_negative_prompt()
+    {
+        WpfHost.Run(() =>
+        {
+            var preset = new Preset { Name = "zestaw", Prompt = "", SystemPrompt = "", NegativePrompt = "unikaj tekstu" };
+            var window = new PromptEditorWindow("Edytor", new PromptEdit("", "", NegativePrompt: ""), presets: [preset]);
+            Named<ComboBox>(window, "PresetBox").SelectedIndex = 0;
+
+            Named<Button>(window, "LoadPresetButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            Assert.Equal("unikaj tekstu", window.Result.NegativePrompt);
+        });
+    }
+
+    [Fact]
     public void Overwrite_is_disabled_without_selection()
     {
         WpfHost.Run(() =>

@@ -13,6 +13,7 @@ public sealed class ImageGenerationService : IDisposable
     private const string GenerationPath = "/v1/images/generations";
     private const string EditPath = "/v1/images/edits";
     private const string VideoPath = "/v1/video/generations";
+    private const string NegativeField = "negative_prompt";
 
     private HttpClient _http;
 
@@ -194,11 +195,39 @@ public sealed class ImageGenerationService : IDisposable
     public async Task<ImageResult> GenerateAsync(string model, string prompt, string size, ImageOptions? options = null,
                                             CancellationToken ct = default)
     {
-        var request = new ImageRequest(model, prompt, 1, size, "b64_json",
-                                       options?.Seed, options?.NegativePrompt, options?.Quality);
-        using var response = await _http.PostAsJsonAsync(GenerationPath, request, ct);
-        return await ReadImageAsync(response, ct);
+        // negative_prompt tylko natywnie i tylko gdy schemat modelu go potwierdza (bez tekstowego zamiennika)
+        var negative = string.IsNullOrWhiteSpace(options?.NegativePrompt) ? null : options.NegativePrompt.Trim();
+        if (negative is not null)
+        {
+            if (_rejectedNegativeGeneration.ContainsKey(model))
+            {
+                options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
+                negative = null;
+            }
+            else if (VideoRequest.NegativePromptBlocker(await GetModelSchemaAsync(model, ct)) is { } blocker)
+            {
+                options!.NegativeNotice?.Invoke(blocker);
+                negative = null;
+            }
+        }
+
+        while (true)
+        {
+            var request = new ImageRequest(model, prompt, 1, size, "b64_json", options?.Seed, negative, options?.Quality);
+            using var response = await _http.PostAsJsonAsync(GenerationPath, request, ct);
+            if (negative is null || response.IsSuccessStatusCode) return await ReadImageAsync(response, ct);
+
+            var text = await response.Content.ReadAsStringAsync(ct);
+            if (ApiErrors.RejectedParameter(text) != NegativeField) throw ApiErrors.Failure(response.StatusCode, text);
+
+            _rejectedNegativeGeneration[model] = true;
+            options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
+            negative = null;
+        }
     }
+
+    // Modele generowania, które odrzuciły negative_prompt w tej sesji
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _rejectedNegativeGeneration = new();
 
     public Task<ImageResult> EditAsync(string model, string prompt, IReadOnlyList<string> imagePaths, CancellationToken ct = default) =>
         EditAsync(model, prompt, imagePaths, null, ct);
@@ -213,9 +242,20 @@ public sealed class ImageGenerationService : IDisposable
                                              CancellationToken ct = default)
     {
         var shape = new Dictionary<string, string>();
-        if (options?.Aspect is { } aspect && PickShape(await GetModelSchemaAsync(model, ct), aspect) is { } picked)
+        var negative = string.IsNullOrWhiteSpace(options?.NegativePrompt) ? null : options.NegativePrompt.Trim();
+        var schema = options?.Aspect is not null || negative is not null ? await GetModelSchemaAsync(model, ct) : null;
+        if (options?.Aspect is { } aspect && PickShape(schema, aspect) is { } picked)
             shape[picked.Field] = picked.Value;
-        foreach (var skipped in _rejectedEditParameters.GetValueOrDefault(model) ?? []) shape.Remove(skipped);
+
+        // negative_prompt tylko natywnie i tylko gdy schemat modelu go potwierdza (bez tekstowego zamiennika)
+        if (negative is not null)
+        {
+            if (VideoRequest.NegativePromptBlocker(schema) is { } blocker) options!.NegativeNotice?.Invoke(blocker);
+            else shape[NegativeField] = negative;
+        }
+
+        foreach (var skipped in _rejectedEditParameters.GetValueOrDefault(model) ?? [])
+            if (shape.Remove(skipped) && skipped == NegativeField) options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
 
         while (true)
         {
@@ -239,6 +279,7 @@ public sealed class ImageGenerationService : IDisposable
             var text = await response.Content.ReadAsStringAsync(ct);
             if (ApiErrors.RejectedParameter(text) is { } rejected && shape.Remove(rejected))
             {
+                if (rejected == NegativeField) options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
                 _rejectedEditParameters.AddOrUpdate(model, _ => [rejected], (_, known) => [.. known, rejected]);
                 continue;
             }
@@ -335,15 +376,18 @@ public sealed class ImageGenerationService : IDisposable
 
     public async Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
                                                       IReadOnlyList<(byte[] Bytes, string Mime)> attachments,
-                                                      Action<string>? progress = null, CancellationToken ct = default)
+                                                      Action<string>? progress = null, CancellationToken ct = default,
+                                                      VideoOptions? options = null)
     {
         // Schemat żądania tego modelu (dozwolone pola, czasy i proporcje) z GET /v1/models/<id>; bez niego idą nazwy z dokumentacji
         var notes = new List<string>();
-        var body = VideoRequest.Build(await GetModelSchemaAsync(model, ct), model, prompt, duration, aspectRatio, attachments, notes);
+        var body = VideoRequest.Build(await GetModelSchemaAsync(model, ct), model, prompt, duration, aspectRatio, attachments, notes,
+                                      options?.NegativePrompt, options?.NegativeNotice);
         foreach (var note in notes) progress?.Invoke(note);
 
         // Parametry odrzucone wcześniej przez ten model (np. aspect_ratio dla modeli image-to-video) pomijamy od razu
-        foreach (var skipped in _rejectedVideoParameters.GetValueOrDefault(model) ?? []) body.Remove(skipped);
+        foreach (var skipped in _rejectedVideoParameters.GetValueOrDefault(model) ?? [])
+            if (body.Remove(skipped) && skipped == NegativeField) options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
 
         string createText;
         while (true)
@@ -359,7 +403,8 @@ public sealed class ImageGenerationService : IDisposable
             if (ApiErrors.RejectedParameter(createText) is { } rejected && rejected is not ("model" or "prompt") && body.Remove(rejected))
             {
                 _rejectedVideoParameters.AddOrUpdate(model, _ => [rejected], (_, known) => [.. known, rejected]);
-                progress?.Invoke($"model nie przyjmuje parametru {rejected}: pomijam");
+                if (rejected == NegativeField) options!.NegativeNotice?.Invoke(NegativePromptOutcome.Rejected);
+                else progress?.Invoke($"model nie przyjmuje parametru {rejected}: pomijam");
                 continue;
             }
 

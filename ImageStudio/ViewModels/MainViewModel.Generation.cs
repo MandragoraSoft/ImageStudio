@@ -47,6 +47,10 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _negativePrompt = "";
 
+    // Osobny negatywny prompt edycji (nie miesza się z generowaniem); idzie tylko natywnym parametrem modelu, który go potwierdza
+    [ObservableProperty]
+    private string _editNegativePrompt = "";
+
     [ObservableProperty]
     private string _selectedQuality = "auto";
 
@@ -58,19 +62,23 @@ public sealed partial class MainViewModel
 
     [RelayCommand]
     private void EditGeneratePrompt() =>
-        EditPromptWithPresets("Prompt generowania", "generate", new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction, _generateHistory), edit =>
+        EditPromptWithPresets("Prompt generowania", "generate",
+            new PromptEdit(GenerateSystemPrompt, GeneratePrompt, EnhancerInstruction, _generateHistory, NegativePrompt), edit =>
         {
             GenerateSystemPrompt = edit.System ?? "";
             GeneratePrompt = edit.Prompt;
+            if (edit.NegativePrompt is not null) NegativePrompt = edit.NegativePrompt;
             _generateHistory = edit.History;
         }, () => DescribeImagesAsync([]));
 
     [RelayCommand]
     private void EditEditPrompt() =>
-        EditPromptWithPresets("Prompt edycji", "edit", new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction, _editHistory), edit =>
+        EditPromptWithPresets("Prompt edycji", "edit",
+            new PromptEdit(EditSystemPrompt, EditPrompt, EnhancerInstruction, _editHistory, EditNegativePrompt), edit =>
         {
             EditSystemPrompt = edit.System ?? "";
             EditPrompt = edit.Prompt;
+            if (edit.NegativePrompt is not null) EditNegativePrompt = edit.NegativePrompt;
             _editHistory = edit.History;
         }, () => DescribeImagesAsync(References));
 
@@ -90,7 +98,8 @@ public sealed partial class MainViewModel
         if (saved is null) return;
 
         Status = Loc.T("gen.msg.promptSaved", saved.Name);
-        if (edit.Prompt == saved.Prompt && (edit.System ?? "") == saved.SystemPrompt)
+        if (edit.Prompt == saved.Prompt && (edit.System ?? "") == saved.SystemPrompt
+            && (edit.NegativePrompt is null || edit.NegativePrompt == (saved.NegativePrompt ?? "")))
             PresetDirty = wasDirty;
     }
 
@@ -117,8 +126,12 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void EditVideoPrompt()
     {
-        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(null, VideoPrompt),
-                                      describeImages: () => DescribeImagesAsync(VideoAttachments)) is { } edit) VideoPrompt = edit.Prompt;
+        if (_dialogs.ShowPromptEditor("Prompt wideo", new PromptEdit(VideoSystemPrompt, VideoPrompt, NegativePrompt: VideoNegativePrompt),
+                                      describeImages: () => DescribeImagesAsync(VideoAttachments)) is not { } edit) return;
+
+        VideoSystemPrompt = edit.System ?? "";
+        VideoPrompt = edit.Prompt;
+        if (edit.NegativePrompt is not null) VideoNegativePrompt = edit.NegativePrompt;
     }
 
     // Opis obrazów wybranym modelem tekstowym (musi przyjmować obrazy). Obrazy z zakładki (referencje, załączniki wideo),
@@ -215,7 +228,8 @@ public sealed partial class MainViewModel
     {
         SaveState();
         return RunAsync(() => Studio.EditImageAsync(new EditRequest(EditPrompt, EditSystemPrompt, References.Select(r => r.Path).ToList(),
-                                                                    SelectedEditModel!.Id, Width, Height, Publish: false)));
+                                                                    SelectedEditModel!.Id, Width, Height, Publish: false,
+                                                                    NegativePrompt: EditNegativePrompt)));
     }
 
     // Ctrl+Enter w głównym oknie: akcja aktywnej zakładki. Wideo celowo pomijamy (każde wywołanie to płatne zadanie)
@@ -298,6 +312,10 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void FitImage() => FitToWindow = true;
 
+    // Ostrzeżenia (np. negative prompt niewysłany) zostają w statusie obok informacji o zapisie
+    private static string WithWarnings(string status, IReadOnlyList<string>? warnings) =>
+        warnings is { Count: > 0 } ? $"{status} {string.Join(" ", warnings)}" : status;
+
     // Każdy wynik trafia do galerii razem z promptem i kosztem (StudioApi liczy estymatę z cennika, gdy API nie zwróci kosztu)
     private async Task RunAsync(Func<Task<StudioResult>> produce)
     {
@@ -314,7 +332,7 @@ public sealed partial class MainViewModel
 
             entry.Thumbnail = GalleryStore.Thumbnail(entry.FilePath);
             AddToGallery(entry);
-            Status = Loc.T("gen.msg.saved", entry.FilePath);
+            Status = WithWarnings(Loc.T("gen.msg.saved", entry.FilePath), result.Warnings);
         }
         catch (Exception ex)
         {

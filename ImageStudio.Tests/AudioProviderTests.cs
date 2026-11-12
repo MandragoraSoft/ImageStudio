@@ -272,6 +272,19 @@ public sealed class AudioProviderTests
     }
 
     [Fact]
+    public async Task OpenAi_never_appends_the_negative_prompt_to_the_prompt_and_reports_it_unsupported()
+    {
+        using var api = new Api((_, _) => Reply.Json("""{"created":1,"data":[{"b64_json":"AQID"}]}"""));
+        using var provider = new OpenAiProvider(api.Url, "sk-test");
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await provider.GenerateImageAsync("gpt-image-1", "kot", "1024x1024", new ImageOptions(null, "bez ludzi", null, outcomes.Add));
+
+        Assert.DoesNotContain("bez ludzi", api.Requests.Single().Text);
+        Assert.Equal([NegativePromptOutcome.Unsupported], outcomes);
+    }
+
+    [Fact]
     public async Task OpenAi_synthesizes_through_the_same_endpoint_without_a_cost()
     {
         using var api = new Api((_, _) => new Reply(200, [5, 6], "audio/mpeg"));
@@ -304,6 +317,21 @@ public sealed class AudioProviderTests
         Assert.Contains("prompt\":\"kot", api.Requests[1].Text);
         Assert.Contains("size\":\"1024x1024", api.Requests[1].Text);
         Assert.Contains("seed\":7", api.Requests[1].Text);
+    }
+
+    [Fact]
+    public async Task OpenRouter_never_appends_the_negative_prompt_to_the_prompt_and_reports_it_unsupported()
+    {
+        using var api = new Api((_, path) => path == "/api/v1/chat/completions"
+            ? Reply.Json("""{"error":{"message":"meta/muse-image is an image generation model and cannot be used with the chat/completions endpoint. Use the /api/v1/images endpoint instead.","code":404}}""", 404)
+            : Reply.Json("""{"created":1,"data":[{"b64_json":"AQID"}]}"""));
+        using var provider = new OpenRouterProvider("k", api.Url);
+        var outcomes = new List<NegativePromptOutcome>();
+
+        await provider.GenerateImageAsync("meta/muse-image", "kot", "1024x1024", new ImageOptions(null, "bez ludzi", null, outcomes.Add));
+
+        Assert.All(api.Requests, r => Assert.DoesNotContain("bez ludzi", r.Text));
+        Assert.Equal([NegativePromptOutcome.Unsupported], outcomes);
     }
 
     [Fact]

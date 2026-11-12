@@ -194,4 +194,23 @@ public sealed class ActivityTests
         Assert.True(duringCall);
         Assert.Equal(0, tracker.Open);
     }
+
+    [Fact]
+    public async Task Decorator_forwards_edit_and_video_options_to_the_inner_provider()
+    {
+        var fake = new FakeProvider
+        {
+            OnEditImage = (_, _, _) => new ImageResult([1], null),
+            OnGenerateVideo = (_, _, _, _, _) => new ImageResult([1], null),
+        };
+        IAiProvider provider = new ActivityAiProvider(fake, new RecordingTracker());
+        var edit = new ImageEditOptions(1.5, "bez", _ => { });
+        var video = new VideoOptions("bez", _ => { });
+
+        await provider.EditImageAsync("m", "p", [], edit);
+        await provider.GenerateVideoAsync("m", "p", 4, "16:9", [], video);
+
+        Assert.Same(edit, fake.LastEditOptions);
+        Assert.Same(video, fake.LastVideoOptions);
+    }
 }

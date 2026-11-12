@@ -185,11 +185,21 @@ public sealed class ChatMessage : System.ComponentModel.INotifyPropertyChanged
 public sealed record ImageResult(byte[] Bytes, decimal? CostUsd);
 
 // Prośba o kształt wyniku edycji: proporcje szerokość/wysokość (np. 0.75 dla 3:4). Dostawca przekazuje je modelowi, jeśli ten
-// przyjmuje proporcje (wybiera najbliższą dozwoloną wartość), a inaczej ignoruje; null = bez prośby
-public sealed record ImageEditOptions(double? Aspect);
+// przyjmuje proporcje (wybiera najbliższą dozwoloną wartość), a inaczej ignoruje; null = bez prośby.
+// NegativePrompt trafia do modelu wyłącznie jako natywny parametr negative_prompt, gdy schemat modelu go potwierdza;
+// w pozostałych przypadkach nie jest wysyłany wcale (bez tekstowego zamiennika), a NegativeNotice dostaje powód
+public sealed record ImageEditOptions(double? Aspect, string? NegativePrompt = null, Action<NegativePromptOutcome>? NegativeNotice = null);
+
+// Opcje wideo: jak przy edycji, negative prompt tylko jako natywny parametr negative_prompt potwierdzony przez schemat modelu
+public sealed record VideoOptions(string? NegativePrompt = null, Action<NegativePromptOutcome>? NegativeNotice = null);
+
+// Dlaczego negative prompt nie został wysłany: model nie ma tego parametru w schemacie (Unsupported), nie udało się pobrać
+// schematu, więc wsparcie jest niepotwierdzone (Unconfirmed), albo API odrzuciło parametr mimo schematu (Rejected)
+public enum NegativePromptOutcome { Unsupported, Unconfirmed, Rejected }
 
 // Opcjonalne parametry generowania; null = nie wysyłamy (API odrzuca nieznane klucze)
-public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality);
+public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality,
+                                  Action<NegativePromptOutcome>? NegativeNotice = null);
 
 // Prompt rozdzielony: System = konfiguracja (styl, technika), Concept = treść wskazana przez użytkownika
 // Changes: jednozdaniowe podsumowanie, co model zmienił (opcjonalne)

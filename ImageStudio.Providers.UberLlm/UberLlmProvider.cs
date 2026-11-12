@@ -50,6 +50,11 @@ public sealed class UberLlmProvider : IAiProvider
                                                       Action<string>? progress = null, CancellationToken ct = default) =>
         await _api.GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, progress, ct);
 
+    public async Task<ImageResult> GenerateVideoAsync(string model, string prompt, int duration, string aspectRatio,
+                                                      IReadOnlyList<(byte[] Bytes, string Mime)> attachments, VideoOptions? options,
+                                                      Action<string>? progress = null, CancellationToken ct = default) =>
+        await _api.GenerateVideoAsync(model, prompt, duration, aspectRatio, attachments, progress, ct, options);
+
     public Task<ChatReply> ChatAsync(string model, IReadOnlyList<ChatMessage> messages,
                                      IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default,
                                      ChatOptions? options = null) =>

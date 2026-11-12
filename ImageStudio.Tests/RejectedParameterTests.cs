@@ -163,4 +163,63 @@ public sealed class RejectedParameterTests
         await server.Finished;
         Assert.Single(server.PostBodies);  // brak ponawiania dla parametrów podstawowych
     }
+
+    private const string NegativeSchema = """
+    {"id":"x/y","parameters":{"properties":{"model":{"type":"string"},"prompt":{"type":"string"},"negative_prompt":{"type":"string"}},
+     "required":["model","prompt"],"type":"object"}}
+    """;
+    private const string NegativeRejected = "{\"error\":{\"message\":\"Unrecognized request argument supplied: negative_prompt\"}}";
+
+    private static async Task<(JsonElement Post, List<NegativePromptOutcome> Outcomes)> VideoWithNegative(params (int, string)[] script)
+    {
+        using var server = new ScriptedServer(script);
+        using var service = new ImageGenerationService(server.Url, "key");
+        var outcomes = new List<NegativePromptOutcome>();
+        var options = new VideoOptions("  bez ludzi  ", outcomes.Add);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateVideoAsync("x/y", "ruch", 5, "16:9", [], null, default, options));
+        await server.Finished;
+        return (server.PostBodies.Last(), outcomes);
+    }
+
+    [Fact]
+    public async Task Video_negative_prompt_is_sent_natively_only_when_the_schema_declares_it()
+    {
+        var (post, outcomes) = await VideoWithNegative((200, NegativeSchema), (503, Overloaded));
+
+        Assert.Equal("bez ludzi", post.GetProperty("negative_prompt").GetString());
+        Assert.Equal("ruch", post.GetProperty("prompt").GetString());  // bez tekstowego fallbacku
+        Assert.Empty(outcomes);
+    }
+
+    [Fact]
+    public async Task Video_negative_prompt_is_not_sent_when_the_schema_lacks_it()
+    {
+        var (post, outcomes) = await VideoWithNegative((200, WanFlashModel), (503, Overloaded));
+
+        Assert.False(post.TryGetProperty("negative_prompt", out _));
+        Assert.Equal("ruch", post.GetProperty("prompt").GetString());
+        Assert.Equal([NegativePromptOutcome.Unsupported], outcomes);
+    }
+
+    [Fact]
+    public async Task Video_negative_prompt_is_not_sent_without_a_schema()
+    {
+        var (post, outcomes) = await VideoWithNegative((404, NoSchema), (503, Overloaded));
+
+        Assert.False(post.TryGetProperty("negative_prompt", out _));
+        Assert.Equal("ruch", post.GetProperty("prompt").GetString());
+        Assert.Equal([NegativePromptOutcome.Unconfirmed], outcomes);
+    }
+
+    [Fact]
+    public async Task Video_negative_prompt_rejected_by_the_api_is_dropped_with_a_notice()
+    {
+        var (post, outcomes) = await VideoWithNegative((200, NegativeSchema), (400, NegativeRejected), (503, Overloaded));
+
+        Assert.False(post.TryGetProperty("negative_prompt", out _));
+        Assert.Equal("ruch", post.GetProperty("prompt").GetString());
+        Assert.Equal([NegativePromptOutcome.Rejected], outcomes);
+    }
 }

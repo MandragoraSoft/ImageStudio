@@ -44,12 +44,15 @@ public static class StudioDefaults
 public sealed record ImageRequest(string Prompt, string? SystemPrompt = null, string? Model = null, int Width = 1024, int Height = 1024,
                                   ImageOptions? Options = null, bool Publish = true);
 
-// References: ścieżki plików albo adresy http(s); pierwszy jest podstawowy. Width i Height razem dopasowują wynik do proporcji
+// References: ścieżki plików albo adresy http(s); pierwszy jest podstawowy. Width i Height razem dopasowują wynik do proporcji.
+// NegativePrompt (opcjonalny) idzie tylko jako natywny parametr negative_prompt modelu, który go potwierdza w schemacie; inaczej
+// wynik niesie ostrzeżenie (StudioResult.Warnings) i nic nie jest wysyłane
 public sealed record EditRequest(string Prompt, string? SystemPrompt, IReadOnlyList<string> References, string? Model = null,
-                                 int? Width = null, int? Height = null, bool Publish = true);
+                                 int? Width = null, int? Height = null, bool Publish = true, string? NegativePrompt = null);
 
 public sealed record VideoGenerationRequest(string Prompt, string? Model = null, int Duration = 5, string AspectRatio = "16:9",
-                                  IReadOnlyList<string>? Attachments = null, Action<string>? Progress = null, bool Publish = true);
+                                  IReadOnlyList<string>? Attachments = null, Action<string>? Progress = null, bool Publish = true,
+                                  string? NegativePrompt = null, string? SystemPrompt = null);
 
 // Language: kod z StudioDefaults.SpeechLanguages (tekst jest najpierw tłumaczony); Stage dostaje "translating" i "synthesizing"
 public sealed record SpeechRequest(string Text, string? Model = null, string? Voice = null, double? Speed = null, string Format = "mp3",
@@ -85,8 +88,9 @@ public sealed record DefaultsInfo(string Provider, string ProviderName, IReadOnl
 // Progress dostaje komunikaty wideo
 public sealed record RepeatRequest(string Id, string? Model = null, Action<string>? Progress = null, bool Publish = true);
 
-// Entry: opis wyniku (plik w magazynie, model, koszt); Bytes: bajty obrazu (tylko dla obrazów, null dla wideo i dźwięku)
-public sealed record StudioResult(GalleryEntry Entry, byte[]? Bytes = null);
+// Entry: opis wyniku (plik w magazynie, model, koszt); Bytes: bajty obrazu (tylko dla obrazów, null dla wideo i dźwięku);
+// Warnings: ostrzeżenia (np. negative prompt niewysłany, bo model go nie potwierdza), null = brak
+public sealed record StudioResult(GalleryEntry Entry, byte[]? Bytes = null, IReadOnlyList<string>? Warnings = null);
 
 public sealed record AudioModelSummary(string Id, string? Owner, string Price);
 

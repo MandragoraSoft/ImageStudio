@@ -17,7 +17,7 @@
         <DockPanel x:Name="PresetBar" Grid.Row="0" Margin="0,0,0,10">
             <Button x:Name="OverwriteButton" DockPanel.Dock="Right" Content="{loc:T prompt.overwrite}" Padding="12,4" Margin="8,0,0,0" Click="Overwrite_Click"
                     IsEnabled="False" ToolTip="{loc:T prompt.overwrite.tip}"/>
-            <Button DockPanel.Dock="Right" Content="{loc:T common.load}" Padding="12,4" Margin="8,0,0,0" Click="LoadPreset_Click"
+            <Button x:Name="LoadPresetButton" DockPanel.Dock="Right" Content="{loc:T common.load}" Padding="12,4" Margin="8,0,0,0" Click="LoadPreset_Click"
                     ToolTip="{loc:T prompt.load.tip}"/>
             <TextBlock DockPanel.Dock="Left" Text="{loc:T prompt.saved}" VerticalAlignment="Center" Margin="0,0,8,0"
                        Style="{StaticResource MutedTextBlock}"/>
@@ -37,34 +37,47 @@
                 <ColumnDefinition Width="360"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Lewa kolumna: konfiguracja (gdy jest), potem koncept, który wypełnia resztę -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+            <!-- Lewa kolumna: system (gdy jest), REQUEST i opcjonalny negative prompt -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <StackPanel x:Name="SystemSection" Grid.Row="0" Margin="0,0,0,10">
-                    <DockPanel>
-                        <TextBlock x:Name="SystemCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
-                        <TextBlock Text="{loc:T prompt.config}" Style="{StaticResource SectionHeader}"/>
+                    <StackPanel x:Name="SystemSection" Grid.Row="0" Margin="0,0,0,10">
+                        <DockPanel>
+                            <TextBlock x:Name="SystemCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+                            <TextBlock Text="{loc:T prompt.config}" Style="{StaticResource SectionHeader}"/>
+                        </DockPanel>
+                        <TextBox x:Name="SystemBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="110"
+                                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"
+                                 TextChanged="Box_TextChanged"/>
+                        <TextBlock Text="{loc:T prompt.config.tip}" Style="{StaticResource MutedTextBlock}" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <DockPanel Grid.Row="1">
+                        <TextBlock x:Name="PromptCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+                        <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"
+                                   ToolTip="{loc:T prompt.concept.tip}"/>
                     </DockPanel>
-                    <TextBox x:Name="SystemBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="130"
-                             VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"
+                    <TextBox x:Name="PromptBox" Grid.Row="2" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14" MinHeight="140"
                              TextChanged="Box_TextChanged"/>
-                    <TextBlock Text="{loc:T prompt.config.tip}" Style="{StaticResource MutedTextBlock}" Margin="0,2,0,0"/>
-                </StackPanel>
 
-                <DockPanel Grid.Row="1">
-                    <TextBlock x:Name="PromptCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
-                    <TextBlock x:Name="PromptHeader" Style="{StaticResource SectionHeader}"
-                               ToolTip="{loc:T prompt.concept.tip}"/>
-                </DockPanel>
-                <TextBox x:Name="PromptBox" Grid.Row="2" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="14" MinHeight="140"
-                         TextChanged="Box_TextChanged"/>
-            </Grid>
+                    <StackPanel x:Name="NegativeSection" Grid.Row="3" Margin="0,10,0,0">
+                        <DockPanel>
+                            <TextBlock x:Name="NegativeCounter" DockPanel.Dock="Right" Style="{StaticResource MutedTextBlock}"/>
+                            <TextBlock Text="{loc:T prompt.negative}" Style="{StaticResource SectionHeader}"/>
+                        </DockPanel>
+                        <TextBox x:Name="NegativeBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="80"
+                                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"
+                                 TextChanged="Box_TextChanged" ToolTip="{loc:T prompt.negative.tip}"/>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
 
             <!-- Prawa kolumna: opis obrazów i przebudowa; przy braku obu ta kolumna ma szerokość 0 (code-behind) -->
             <!-- Wysokość kolumny jest co najmniej wysokością okna przewijania: pole instrukcji (wiersz *) wypełnia wolne miejsce,

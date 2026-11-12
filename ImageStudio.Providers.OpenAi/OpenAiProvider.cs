@@ -143,9 +143,9 @@ public sealed class OpenAiProvider : IAiProvider
     public Task<ImageResult> GenerateImageAsync(string model, string prompt, string size, ImageOptions? options,
                                                 CancellationToken ct = default)
     {
+        // Brak potwierdzonego natywnego parametru: ostrzegamy i nie dopisujemy tekstu do promptu
+        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt)) options.NegativeNotice?.Invoke(NegativePromptOutcome.Unsupported);
         var text = prompt;
-        if (!string.IsNullOrWhiteSpace(options?.NegativePrompt))
-            text += $"\n\nAvoid: {options.NegativePrompt}.";
 
         var body = new Dictionary<string, object>
         {
