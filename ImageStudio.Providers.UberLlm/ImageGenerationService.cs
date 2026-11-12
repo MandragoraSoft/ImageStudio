@@ -182,13 +182,12 @@ public sealed class ImageGenerationService : IDisposable
 
 
 
-    // Rozdział promptu: część konfiguracyjną (styl, technika, format) od konceptu (co ma być na obrazie).
-    // Model zwraca JSON; przy błędzie parsowania koncept to surowa odpowiedź, a system zostaje bez zmian.
+    // Przebudowa trzech części promptu; błędna odpowiedź jest odrzucana.
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
-                                                CancellationToken ct = default) =>
-        OpenAiCompat.EnhanceAsync(_http, "/v1/chat/completions", model, instruction, system, concept, parameters, history, jsonMode: false, ct);
+                                                CancellationToken ct = default, string negative = "") =>
+        OpenAiCompat.EnhanceAsync(_http, "/v1/chat/completions", model, instruction, system, concept, parameters, history, jsonMode: false, ct, negative);
 
 
 

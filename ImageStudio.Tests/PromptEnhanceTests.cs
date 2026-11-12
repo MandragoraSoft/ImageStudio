@@ -8,16 +8,16 @@ namespace ImageStudio.Tests;
 
 public sealed class PromptEnhanceTests
 {
-    private const string Reply = """{"choices":[{"message":{"content":"{\"system\":\"styl: foto\",\"concept\":\"kot na dachu\",\"changes\":\"dodano dach\"}"}}]}""";
+    private const string Reply = """{"choices":[{"message":{"content":"{\"system\":\"styl: foto\",\"concept\":\"kot na dachu\",\"negative\":\"tekst\",\"changes\":\"dodano dach\"}"}}]}""";
 
     private static HttpClient Client(HttpMessageHandler handler) => new(handler) { BaseAddress = new Uri("https://example.test") };
 
-    private static PromptRevision Step(int i) => new($"s{i}", $"c{i}", $"S{i}", $"C{i}", $"instr{i}", $"zmiana{i}");
+    private static PromptRevision Step(int i) => new($"s{i}", $"c{i}", $"S{i}", $"C{i}", $"instr{i}", $"zmiana{i}", $"n{i}", $"N{i}");
 
     [Fact]
     public void Messages_replay_history_as_turns_and_keep_config_separate_from_concept()
     {
-        var messages = OpenAiCompat.BuildEnhanceMessages("popraw", "styl", "kot", [Step(1), Step(2)]);
+        var messages = OpenAiCompat.BuildEnhanceMessages("popraw", "styl", "kot", [Step(1), Step(2)], "napis");
 
         var json = JsonSerializer.SerializeToElement(messages);
         Assert.Equal(6, json.GetArrayLength());  // system + 2 x (user, assistant) + bieżący stan
@@ -26,17 +26,24 @@ public sealed class PromptEnhanceTests
         Assert.Contains("EXPECTED RESULT", json[0].GetProperty("content").GetString());
         Assert.Equal("assistant", json[2].GetProperty("role").GetString());
         Assert.Contains("\"concept\":\"C1\"", json[2].GetProperty("content").GetString());
+        Assert.Contains("(negative):\nn1", json[1].GetProperty("content").GetString());
+        Assert.Contains("\"negative\":\"N1\"", json[2].GetProperty("content").GetString());
         var last = json[5].GetProperty("content").GetString()!;
         Assert.Contains("INSTRUCTION: popraw", last);
         Assert.Contains("(system):\nstyl", last);
         Assert.Contains("(concept):\nkot", last);
+        Assert.Contains("(negative):\nnapis", last);
     }
 
     [Fact]
     public void Contract_lets_the_instruction_change_language_for_both_parts()
     {
         Assert.Contains("unless the instruction asks for another one", OpenAiCompat.SplitFormat);
-        Assert.Contains("both parts", OpenAiCompat.SplitFormat);
+        Assert.Contains("all three parts", OpenAiCompat.SplitFormat);
+        Assert.Contains("valid JSON object", OpenAiCompat.SplitFormat);
+        Assert.Contains("\"system\"", OpenAiCompat.SplitFormat);
+        Assert.Contains("\"concept\"", OpenAiCompat.SplitFormat);
+        Assert.Contains("\"negative\"", OpenAiCompat.SplitFormat);
     }
 
     [Fact]
@@ -61,6 +68,7 @@ public sealed class PromptEnhanceTests
 
         Assert.Equal("kot na dachu", parts.Concept);
         Assert.Equal("styl: foto", parts.System);
+        Assert.Equal("tekst", parts.Negative);
         Assert.Equal("dodano dach", parts.Changes);
         using var body = JsonDocument.Parse(handler.RequestBody!);
         Assert.Equal("json_object", body.RootElement.GetProperty("response_format").GetProperty("type").GetString());
@@ -100,7 +108,7 @@ public sealed class PromptEnhanceTests
         {
             var provider = new FakeProvider
             {
-                Enhance = (_, _, concept) => new PromptParts("styl", concept + "+", "dopisano"),
+                EnhanceWithNegative = (_, _, concept, negative) => new PromptParts("styl", concept + "+", "dopisano", negative + "+"),
             };
             var dialogs = new FakeDialogs();
             var vm = TestApp.CreateVm(provider: provider, dialogs: dialogs);
@@ -108,14 +116,67 @@ public sealed class PromptEnhanceTests
             vm.SelectedEnhancerModel = "m";
             vm.EditGeneratePromptCommand.Execute(null);
 
-            var first = dialogs.LastRebuild!(new PromptEdit("", "kot", "dodaj światło")).GetAwaiter().GetResult();
+            var first = dialogs.LastRebuild!(new PromptEdit("", "kot", "dodaj światło", NegativePrompt: "bez")).GetAwaiter().GetResult();
             var second = dialogs.LastRebuild!(first with { Instruction = "więcej detali" }).GetAwaiter().GetResult();
 
             Assert.Single(first.History!);
             Assert.Equal("dopisano", first.History![0].Changes);
+            Assert.Equal("bez", first.History[0].InNegative);
+            Assert.Equal("bez+", first.History[0].OutNegative);
+            Assert.Equal("bez++", second.NegativePrompt);
+            Assert.Equal("bez+", provider.LastEnhanceNegative);
             Assert.Equal(2, second.History!.Count);
             Assert.Equal("kot+", provider.LastHistory!.Single().OutConcept);
             Assert.Equal("więcej detali", second.History[1].Instruction);
+        });
+    }
+
+    [Fact]
+    public void Old_history_without_negative_fields_remains_usable()
+    {
+        var old = new PromptRevision("s", "c", "S", "C", "i");
+        var messages = JsonSerializer.SerializeToElement(OpenAiCompat.BuildEnhanceMessages("i", "s", "c", [old]));
+        using var output = JsonDocument.Parse(messages[2].GetProperty("content").GetString()!);
+        Assert.Equal("", output.RootElement.GetProperty("negative").GetString());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Rebuild_in_generation_and_editing_passes_and_returns_all_fields(bool generate)
+    {
+        Sta.Run(() =>
+        {
+            var provider = new FakeProvider { EnhanceWithNegative = (_, system, concept, negative) =>
+                new PromptParts(system + "+", concept + "+", "zmiana", negative + "+") };
+            var dialogs = new FakeDialogs();
+            var vm = TestApp.CreateVm(provider, dialogs);
+            vm.EnhancerModels.Add("m");
+            vm.SelectedEnhancerModel = "m";
+            if (generate) vm.EditGeneratePromptCommand.Execute(null);
+            else vm.EditEditPromptCommand.Execute(null);
+            var result = dialogs.LastRebuild!(new PromptEdit("s", "c", "i", NegativePrompt: "n")).GetAwaiter().GetResult();
+            Assert.Equal(("s+", "c+", "n+"), (result.System, result.Prompt, result.NegativePrompt));
+            Assert.Equal("n", provider.LastEnhanceNegative);
+            Assert.Equal(("n", "n+"), (result.History![0].InNegative, result.History[0].OutNegative));
+            dialogs.PromptEditResult = result;
+            if (generate)
+            {
+                vm.EditGeneratePromptCommand.Execute(null);
+                Assert.Equal(("s+", "c+", "n+"), (vm.GenerateSystemPrompt, vm.GeneratePrompt, vm.NegativePrompt));
+                vm.EditGeneratePromptCommand.Execute(null);
+            }
+            else
+            {
+                vm.EditEditPromptCommand.Execute(null);
+                Assert.Equal(("s+", "c+", "n+"), (vm.EditSystemPrompt, vm.EditPrompt, vm.EditNegativePrompt));
+                vm.EditEditPromptCommand.Execute(null);
+            }
+            Assert.Equal("n+", dialogs.LastInitial!.History![0].OutNegative);
+
+            var hidden = dialogs.LastRebuild!(new PromptEdit(null, "c", "i")).GetAwaiter().GetResult();
+            Assert.Null(hidden.System);
+            Assert.Null(hidden.NegativePrompt);
         });
     }
 

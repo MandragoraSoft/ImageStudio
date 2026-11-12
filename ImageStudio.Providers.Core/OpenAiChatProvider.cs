@@ -70,8 +70,8 @@ public abstract class OpenAiChatProvider : IAiProvider
     public virtual Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
-                                                CancellationToken ct = default) =>
-        OpenAiCompat.EnhanceAsync(Http, ChatPath, model, instruction, system, concept, parameters, history, jsonMode: true, ct);
+                                                CancellationToken ct = default, string negative = "") =>
+        OpenAiCompat.EnhanceAsync(Http, ChatPath, model, instruction, system, concept, parameters, history, jsonMode: true, ct, negative);
 
     public virtual void Dispose() => Http.Dispose();
 

@@ -348,7 +348,8 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var instruction = string.IsNullOrWhiteSpace(request.Instruction) ? StudioDefaults.PromptInstruction : request.Instruction;
         using var _ = activity?.Begin("Przebudowa promptu");
         return await provider().EnhancePromptAsync(id, instruction, request.SystemPrompt ?? "", request.Prompt,
-                                                   request.Parameters ?? new Dictionary<string, object>(), request.History, ct);
+                                                   request.Parameters ?? new Dictionary<string, object>(), request.History, ct,
+                                                   request.NegativePrompt ?? "");
     }
 
     public async Task<string> DescribeImagesAsync(DescribeRequest request, CancellationToken ct = default)

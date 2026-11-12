@@ -201,13 +201,13 @@ public enum NegativePromptOutcome { Unsupported, Unconfirmed, Rejected }
 public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality,
                                   Action<NegativePromptOutcome>? NegativeNotice = null);
 
-// Prompt rozdzielony: System = konfiguracja (styl, technika), Concept = treść wskazana przez użytkownika
+// Prompt rozdzielony: System = konfiguracja, Concept = treść, Negative = elementy niepożądane
 // Changes: jednozdaniowe podsumowanie, co model zmienił (opcjonalne)
-public sealed record PromptParts(string System, string Concept, string? Changes = null);
+public sealed record PromptParts(string System, string Concept, string? Changes = null, string Negative = "");
 
 // Jeden krok przebudowy promptu przez model: wejście, wynik i polecenie; lista takich kroków to kontekst kolejnych przebudów
 public sealed record PromptRevision(string InSystem, string InConcept, string OutSystem, string OutConcept,
-                                    string Instruction, string? Changes = null);
+                                    string Instruction, string? Changes = null, string? InNegative = null, string? OutNegative = null);
 
 // Cena z rynku: PriceNow za jednostkę (Unit), reszta to dane pomocnicze do wyświetlenia
 public sealed record ModelPricing(

@@ -74,6 +74,41 @@ public sealed class AudioProviderTests
 
     private static UberLlmProvider Uber(Api api) => new(api.Url, "klucz", api.Url);
 
+    private sealed class TestTextProvider(string url) : OpenAiChatProvider(url + "/", "k", "chat")
+    {
+        public override string Id => "test";
+        public override string DisplayName => "test";
+        public override Task<IReadOnlyList<ChatModelInfo>> GetChatModelsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<ChatModelInfo>>([]);
+    }
+
+    [Theory]
+    [InlineData("openai", true)]
+    [InlineData("openrouter", true)]
+    [InlineData("uber", false)]
+    [InlineData("text", true)]
+    public async Task Rebuild_providers_propagate_negative_and_history(string kind, bool jsonMode)
+    {
+        const string reply = """{"choices":[{"message":{"content":"{\"system\":\"S\",\"concept\":\"C\",\"negative\":\"N\",\"changes\":\"zmiana\"}"}}]}""";
+        using var api = new Api((_, _) => Reply.Json(reply));
+        using IAiProvider provider = kind switch
+        {
+            "openai" => new OpenAiProvider(api.Url, "k"),
+            "openrouter" => new OpenRouterProvider("k", api.Url),
+            "uber" => Uber(api),
+            _ => new TestTextProvider(api.Url),
+        };
+        var history = new[] { new PromptRevision("s0", "c0", "S0", "C0", "i0", null, "n0", "N0") };
+        var result = await provider.EnhancePromptAsync("m", "i", "s", "c", new Dictionary<string, object>(), history, negative: "n");
+        Assert.Equal(new PromptParts("S", "C", "zmiana", "N"), result);
+        var request = api.Requests.Single().Json;
+        Assert.Equal(jsonMode, request.TryGetProperty("response_format", out _));
+        var messages = request.GetProperty("messages");
+        Assert.Contains("(negative):\nn0", messages[1].GetProperty("content").GetString());
+        Assert.Contains("\"negative\":\"N0\"", messages[2].GetProperty("content").GetString());
+        Assert.Contains("(negative):\nn", messages[3].GetProperty("content").GetString());
+    }
+
     [Fact]
     public async Task UberLlm_speech_models_are_the_available_ones_with_price_from_the_listing()
     {

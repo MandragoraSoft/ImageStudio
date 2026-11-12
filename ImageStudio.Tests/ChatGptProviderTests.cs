@@ -193,6 +193,29 @@ public sealed class ChatGptProviderTests
     private static string Sse(params string[] events) => string.Join("\n\n", events.Select(e => "data: " + e)) + "\n\n";
 
     [Fact]
+    public async Task Rebuild_uses_three_fields_and_history_in_responses_api()
+    {
+        var content = """{"system":"S","concept":"C","negative":"N","changes":"zmiana"}""";
+        var delta = JsonSerializer.Serialize(new { type = "response.output_text.delta", delta = content });
+        using var server = new Server((_, _) => (200, "text/event-stream",
+            Sse(delta, """{"type":"response.completed","response":{}}""")));
+        var session = new ChatGptSession("h", "c", "tok", "r", DateTimeOffset.UtcNow.AddHours(1)).ToJson();
+        using IAiProvider provider = new ChatGptProvider(session, null, null, server.Url + "/");
+        var history = new[] { new PromptRevision("s0", "c0", "S0", "C0", "i0", null, "n0", "N0") };
+
+        var result = await provider.EnhancePromptAsync("m", "i", "s", "c", new Dictionary<string, object>(), history, negative: "n");
+
+        Assert.Equal(new PromptParts("S", "C", "zmiana", "N"), result);
+        var body = server.Requests.Single().Body;
+        using var json = JsonDocument.Parse(body);
+        Assert.Contains("negative", json.RootElement.GetProperty("instructions").GetString());
+        var inputs = json.RootElement.GetProperty("input").EnumerateArray().ToArray();
+        Assert.Contains("(negative):\nn0", inputs[0].GetProperty("content").GetString());
+        Assert.Contains("\"negative\":\"N0\"", inputs[1].GetProperty("content").GetString());
+        Assert.Contains("(negative):\nn", inputs[2].GetProperty("content").GetString());
+    }
+
+    [Fact]
     public async Task Chat_streams_text_collects_calls_and_usage_and_refreshes_an_expiring_token()
     {
         var stream = Sse(

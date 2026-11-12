@@ -60,6 +60,41 @@ public sealed class PromptEditorWindowTests
     }
 
     [Fact]
+    public void Rebuild_updates_all_fields_and_undo_restores_fields_and_history()
+    {
+        WpfHost.Run(() =>
+        {
+            var oldHistory = new[] { new PromptRevision("a", "b", "c", "d", "i") };
+            var initial = new PromptEdit("system", "koncept", "instrukcja", oldHistory, "negatywny");
+            var newHistory = oldHistory.Append(new PromptRevision("system", "koncept", "S", "C", "i", null, "negatywny", "N")).ToArray();
+            var window = new PromptEditorWindow("Edytor", initial,
+                edit => Task.FromResult(edit with { System = "S", Prompt = "C", NegativePrompt = "N", History = newHistory }));
+
+            Named<Button>(window, "RebuildButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(("S", "C", "N"), (window.Result.System, window.Result.Prompt, window.Result.NegativePrompt));
+            Assert.Equal(2, window.Result.History!.Count);
+            Named<Button>(window, "UndoButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(("system", "koncept", "negatywny"), (window.Result.System, window.Result.Prompt, window.Result.NegativePrompt));
+            Assert.Equal(oldHistory, window.Result.History);
+        });
+    }
+
+    [Fact]
+    public void Failed_rebuild_does_not_change_fields_or_history()
+    {
+        WpfHost.Run(() =>
+        {
+            var history = new[] { new PromptRevision("a", "b", "c", "d", "i") };
+            var initial = new PromptEdit("system", "koncept", "instrukcja", history, "negatywny");
+            var window = new PromptEditorWindow("Edytor", initial,
+                _ => Task.FromException<PromptEdit>(new InvalidOperationException("błędny JSON")));
+            Named<Button>(window, "RebuildButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(initial, window.Result);
+            Assert.Contains("błędny JSON", Named<TextBlock>(window, "StatusText").Text);
+        });
+    }
+
+    [Fact]
     public void Loading_generate_preset_updates_visible_negative_prompt()
     {
         WpfHost.Run(() =>

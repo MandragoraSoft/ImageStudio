@@ -112,5 +112,6 @@ public interface IAiProvider : IDisposable
 
     Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                          IReadOnlyDictionary<string, object> parameters,
-                                         IReadOnlyList<PromptRevision>? history = null, CancellationToken ct = default);
+                                         IReadOnlyList<PromptRevision>? history = null, CancellationToken ct = default,
+                                         string negative = "");
 }

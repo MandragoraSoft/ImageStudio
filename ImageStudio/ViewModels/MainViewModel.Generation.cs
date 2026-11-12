@@ -161,10 +161,13 @@ public sealed partial class MainViewModel
         var instruction = string.IsNullOrWhiteSpace(current.Instruction) ? DefaultInstruction : current.Instruction;
         var parts = await Studio.RebuildPromptAsync(new PromptRebuildRequest(current.Prompt, current.System, instruction,
                                                                               EnhancerModelOrThrow(requestedModel),
-                                                                              parameters ?? EnhancerParameterValues(), current.History));
-        var step = new PromptRevision(current.System ?? "", current.Prompt, parts.System, parts.Concept, instruction, parts.Changes);
+                                                                              parameters ?? EnhancerParameterValues(), current.History,
+                                                                              current.NegativePrompt));
+        var step = new PromptRevision(current.System ?? "", current.Prompt, parts.System, parts.Concept, instruction, parts.Changes,
+                                      current.NegativePrompt, parts.Negative);
         var history = (current.History ?? []).Append(step).TakeLast(OpenAiCompat.MaxHistory).ToList();
-        return current with { System = parts.System, Prompt = parts.Concept, History = history };
+        return current with { System = current.System is null ? null : parts.System, Prompt = parts.Concept,
+                              NegativePrompt = current.NegativePrompt is null ? null : parts.Negative, History = history };
     }
 
     // --- Edycja / generowanie z referencjami ---

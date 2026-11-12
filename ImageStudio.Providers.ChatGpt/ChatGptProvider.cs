@@ -128,22 +128,20 @@ public sealed class ChatGptProvider : OpenAiChatProvider
         return parser.Finish();
     }
 
-    // Przebudowa promptu: ten sam kontrakt co w pozostałych dostawcach (JSON system/concept), ale bez trybu JSON i parametrów
+    // Przebudowa promptu: ten sam kontrakt JSON co w pozostałych dostawcach, ale bez trybu JSON i parametrów
     // próbkowania, których trasa nie przyjmuje
     public override async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                                IReadOnlyDictionary<string, object> parameters,
                                                                IReadOnlyList<PromptRevision>? history = null,
-                                                               CancellationToken ct = default)
+                                                               CancellationToken ct = default, string negative = "")
     {
-        var wire = JsonSerializer.SerializeToElement(OpenAiCompat.BuildEnhanceMessages(instruction, system, concept, history));
+        var wire = JsonSerializer.SerializeToElement(OpenAiCompat.BuildEnhanceMessages(instruction, system, concept, history, negative));
         var messages = wire.EnumerateArray()
             .Select(m => new ChatMessage(m.GetProperty("role").GetString()!, m.GetProperty("content").GetString() ?? ""))
             .ToList();
 
         var reply = await ChatAsync(model, messages, null, ct);
-        var parts = OpenAiCompat.ParseSplit(reply.Content, system, concept);
-        if (string.IsNullOrWhiteSpace(parts.Concept)) throw new InvalidOperationException("Model nie zwrócił promptu.");
-        return parts;
+        return OpenAiCompat.ParseSplit(reply.Content);
     }
 
     // Ciało żądania Responses: role system wędrują do instructions, wywołania i wyniki narzędzi to osobne pozycje wejścia

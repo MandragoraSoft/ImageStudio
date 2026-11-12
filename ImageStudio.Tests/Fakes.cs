@@ -118,13 +118,16 @@ internal class FakeProvider : IAiProvider
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
-                                                CancellationToken ct = default)
+                                                CancellationToken ct = default, string negative = "")
     {
         LastHistory = history;
-        return Enhance?.Invoke(instruction, system, concept) is { } parts ? Task.FromResult(parts) : throw new NotSupportedException();
+        LastEnhanceNegative = negative;
+        return (EnhanceWithNegative?.Invoke(instruction, system, concept, negative) ?? Enhance?.Invoke(instruction, system, concept)) is { } parts
+            ? Task.FromResult(parts) : throw new NotSupportedException();
     }
 
     public IReadOnlyList<PromptRevision>? LastHistory { get; private set; }
+    public string? LastEnhanceNegative { get; private set; }
 
     // Dźwięk: katalogi i odpowiedzi zadane przez test; domyślnie dostawca "nie ma dźwięku" (puste listy)
     public List<AudioModelInfo> SpeechCatalog { get; } = [];
@@ -159,6 +162,7 @@ internal class FakeProvider : IAiProvider
     }
 
     public Func<string, string, string, PromptParts?>? Enhance { get; set; }
+    public Func<string, string, string, string, PromptParts?>? EnhanceWithNegative { get; set; }
 
     public void Dispose()
     {

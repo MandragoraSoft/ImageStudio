@@ -244,8 +244,8 @@ public sealed class OpenRouterProvider : IAiProvider
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
-                                                CancellationToken ct = default) =>
-        OpenAiCompat.EnhanceAsync(_http, ChatPath, model, instruction, system, concept, parameters, history, jsonMode: true, ct);
+                                                CancellationToken ct = default, string negative = "") =>
+        OpenAiCompat.EnhanceAsync(_http, ChatPath, model, instruction, system, concept, parameters, history, jsonMode: true, ct, negative);
 
     public void Dispose()
     {

@@ -83,8 +83,8 @@ public sealed class ActivityAiProvider(IAiProvider inner, IActivityTracker activ
     public Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
-                                                CancellationToken ct = default) =>
-        Track(Loc.T("activity.enhance"), () => inner.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct));
+                                                CancellationToken ct = default, string negative = "") =>
+        Track(Loc.T("activity.enhance"), () => inner.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct, negative));
 
     public void Dispose() => inner.Dispose();
 }

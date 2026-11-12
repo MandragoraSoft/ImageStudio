@@ -68,8 +68,8 @@ public sealed class UberLlmProvider : IAiProvider
     public async Task<PromptParts> EnhancePromptAsync(string model, string instruction, string system, string concept,
                                                       IReadOnlyDictionary<string, object> parameters,
                                                       IReadOnlyList<PromptRevision>? history = null,
-                                                      CancellationToken ct = default) =>
-        await _api.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct);
+                                                      CancellationToken ct = default, string negative = "") =>
+        await _api.EnhancePromptAsync(model, instruction, system, concept, parameters, history, ct, negative);
 
     public Task<IReadOnlyList<AudioModelInfo>> GetSpeechModelsAsync(CancellationToken ct = default) => _api.GetSpeechModelsAsync(ct);
 

@@ -1140,4 +1140,32 @@ public sealed class PresetAssistTests
             Assert.Equal(dirty, app.Vm.PresetDirty);
         });
     }
+
+    [Fact]
+    public void Preset_editor_rebuild_uses_all_fields_without_touching_main_prompts()
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            app.Vm.EnhancerModels.Add("test-rebuild");
+            app.Vm.SelectedEnhancerModel = "test-rebuild";
+            app.Vm.GeneratePrompt = "główny";
+            app.Provider.EnhanceWithNegative = (_, system, concept, negative) =>
+                new PromptParts(system + "+", concept + "+", "zmiana", negative + "+");
+            PresetsContext? context = null;
+            app.Dialogs.OnShowPresets = c => { context = c; return null; };
+            app.Vm.OpenPresetsCommand.Execute(null);
+            var initial = new PromptEdit("s", "c", "i", [], "n");
+            var request = new PresetPromptEditRequest("t", initial, "test-rebuild", new Dictionary<string, ParamState>());
+            context!.EditPrompt!(request);
+            var rebuilt = app.Dialogs.LastRebuild!(initial).GetAwaiter().GetResult();
+            app.Dialogs.PromptEditResult = rebuilt;
+            var result = context.EditPrompt(request);
+
+            Assert.Equal(("s+", "c+", "n+"), (result!.System, result.Prompt, result.NegativePrompt));
+            Assert.Equal("n", app.Provider.LastEnhanceNegative);
+            Assert.Equal("główny", app.Vm.GeneratePrompt);
+        });
+    }
 }

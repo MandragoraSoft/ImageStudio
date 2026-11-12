@@ -213,16 +213,18 @@ public sealed class StudioTools : IMcpToolSet
             Needs: ["video"]);
 
         yield return new Tool("rebuild_prompt",
-            "Przebudowuje prompt modelem tekstowym i zwraca nowe pola (system_prompt, prompt) do użycia w kolejnym wywołaniu; nic nie zmienia w aplikacji.",
+            "Przebudowuje prompt modelem tekstowym i zwraca nowe pola (system_prompt, prompt, negative_prompt) do użycia w kolejnym wywołaniu; nic nie zmienia w aplikacji.",
             Schema(("prompt", """{"type":"string","description":"Koncept do ulepszenia"}""", true),
                    ("system_prompt", """{"type":"string","description":"Obecna część konfiguracyjna"}""", false),
+                   ("negative_prompt", """{"type":"string","description":"Obecny prompt negatywny"}""", false),
                    ("instruction", """{"type":"string","description":"Własne polecenie przebudowy (domyślne z aplikacji)"}""", false),
                    ("model", """{"type":"string","description":"Model tekstowy; pominięty = domyślny"}""", false)),
             false, async args =>
             {
                 var parts = await _studio.RebuildPromptAsync(new PromptRebuildRequest(
-                    RequiredString(args, "prompt"), OptString(args, "system_prompt"), OptString(args, "instruction"), OptString(args, "model")));
-                return Serialize(new { system_prompt = parts.System, prompt = parts.Concept, changes = parts.Changes });
+                    RequiredString(args, "prompt"), OptString(args, "system_prompt"), OptString(args, "instruction"), OptString(args, "model"),
+                    NegativePrompt: OptString(args, "negative_prompt")));
+                return Serialize(new { system_prompt = parts.System, prompt = parts.Concept, negative_prompt = parts.Negative, changes = parts.Changes });
             }, Needs: ["chat"]);
 
         yield return new Tool("describe_images",

@@ -459,13 +459,14 @@ public sealed class StudioApiTests : IDisposable
     [Fact]
     public async Task Rebuild_prompt_passes_parameters_and_history_and_changes_nothing()
     {
-        _provider.Enhance = (instruction, system, concept) => new PromptParts(system + "+", concept + "!", instruction);
+        _provider.EnhanceWithNegative = (instruction, system, concept, negative) => new PromptParts(system + "+", concept + "!", instruction, negative + "!");
         var history = new List<PromptRevision> { new("a", "b", "c", "d", "e") };
 
         var custom = await _studio.RebuildPromptAsync(new PromptRebuildRequest("kot", Instruction: "po swojemu", Model: "inny"));
-        var parts = await _studio.RebuildPromptAsync(new PromptRebuildRequest("kot", "styl", null, null, History: history));
+        var parts = await _studio.RebuildPromptAsync(new PromptRebuildRequest("kot", "styl", null, null, History: history, NegativePrompt: "tekst"));
 
-        Assert.Equal(new PromptParts("styl+", "kot!", StudioDefaults.PromptInstruction), parts);
+        Assert.Equal(new PromptParts("styl+", "kot!", StudioDefaults.PromptInstruction, "tekst!"), parts);
+        Assert.Equal("tekst", _provider.LastEnhanceNegative);
         Assert.Equal("po swojemu", custom.Changes);
         Assert.Equal(history, _provider.LastHistory);
         Assert.Empty(_library.MediaItems);
@@ -735,7 +736,7 @@ internal sealed class RecordingStudio : IStudioApi
     public Task<PromptParts> RebuildPromptAsync(PromptRebuildRequest request, CancellationToken ct = default)
     {
         Requests.Add(request);
-        return Task.FromResult(new PromptParts("s", "c"));
+        return Task.FromResult(new PromptParts("s", "c", "zmiana", "n"));
     }
 
     public Task<string> DescribeImagesAsync(DescribeRequest request, CancellationToken ct = default)
@@ -809,7 +810,12 @@ public sealed class StudioToolsContractTests
     [Fact]
     public async Task Prompt_description_preset_and_gallery_tools_build_the_expected_requests()
     {
-        await _tools.CallAsync("rebuild_prompt", """{"prompt":"kot","system_prompt":"styl","instruction":"ładniej","model":"t"}""", false);
+        var rebuilt = await _tools.CallAsync("rebuild_prompt", """{"prompt":"kot","system_prompt":"styl","negative_prompt":"bez","instruction":"ładniej","model":"t"}""", false);
+        using var rebuiltJson = JsonDocument.Parse(rebuilt);
+        Assert.Equal("s", rebuiltJson.RootElement.GetProperty("system_prompt").GetString());
+        Assert.Equal("c", rebuiltJson.RootElement.GetProperty("prompt").GetString());
+        Assert.Equal("n", rebuiltJson.RootElement.GetProperty("negative_prompt").GetString());
+        Assert.Equal("zmiana", rebuiltJson.RootElement.GetProperty("changes").GetString());
         await _tools.CallAsync("describe_images", """{"images":["a.png"],"model":"vision"}""", false);
         await _tools.CallAsync("save_preset", """{"name":"Z","kind":"edit","prompt":"p","width":640,"height":480,"seed":2}""", false);
         await _tools.CallAsync("remove_gallery_entry", """{"id":"1"}""", false);
@@ -819,7 +825,7 @@ public sealed class StudioToolsContractTests
 
         Assert.Equal(
         [
-            new PromptRebuildRequest("kot", "styl", "ładniej", "t"),
+            new PromptRebuildRequest("kot", "styl", "ładniej", "t", NegativePrompt: "bez"),
             new DescribeRequest(["a.png"], "vision", 1536),
             new SavePresetRequest("Z", "edit", "p", null, null, 640, 480, new ImageOptions(2, null, null)),
             "remove:1", "delete:2", "clear:voice", "export:3:C:\\x.png",

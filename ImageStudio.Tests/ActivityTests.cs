@@ -143,9 +143,10 @@ public sealed class ActivityTests
         };
         IAiProvider provider = new ActivityAiProvider(fake, tracker);
 
-        await provider.EnhancePromptAsync("m", "i", "s", "kot", new Dictionary<string, object>());
+        await provider.EnhancePromptAsync("m", "i", "s", "kot", new Dictionary<string, object>(), negative: "bez");
 
         Assert.True(sawActive);
+        Assert.Equal("bez", fake.LastEnhanceNegative);
         Assert.Equal(["Przebudowa promptu"], tracker.Started);
     }
 

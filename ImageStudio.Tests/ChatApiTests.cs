@@ -58,36 +58,34 @@ public class ChatApiTests
     [Fact]
     public void ParseSplit_reads_plain_json()
     {
-        var parts = OpenAiCompat.ParseSplit("""{"system":" styl ","concept":" kot "}""", "stary", "oryginał");
+        var parts = OpenAiCompat.ParseSplit("""{"system":" styl ","concept":" kot ","negative":" tekst "}""");
 
         Assert.Equal("styl", parts.System);
         Assert.Equal("kot", parts.Concept);
+        Assert.Equal("tekst", parts.Negative);
+    }
+
+    [Theory]
+    [InlineData("nie JSON")]
+    [InlineData("\"tekst\"")]
+    [InlineData("[]")]
+    [InlineData("```json\n{\"system\":\"s\",\"concept\":\"c\",\"negative\":\"n\"}\n```")]
+    [InlineData("""{"concept":"c","negative":"n"}""")]
+    [InlineData("""{"system":"s","negative":"n"}""")]
+    [InlineData("""{"system":"s","concept":"c"}""")]
+    [InlineData("""{"system":null,"concept":"c","negative":"n"}""")]
+    [InlineData("""{"system":"s","concept":2,"negative":"n"}""")]
+    [InlineData("""{"system":"s","concept":"c","negative":[]}""")]
+    [InlineData("""{"system":"","concept":"   ","negative":""}""")]
+    public void ParseSplit_rejects_invalid_or_incomplete_responses(string reply)
+    {
+        Assert.Throws<InvalidOperationException>(() => OpenAiCompat.ParseSplit(reply));
     }
 
     [Fact]
-    public void ParseSplit_strips_code_fences()
+    public void ParseSplit_accepts_empty_system_and_negative()
     {
-        var parts = OpenAiCompat.ParseSplit("```json\n{\"system\":\"s\",\"concept\":\"c\"}\n```", "stary", "oryginał");
-
-        Assert.Equal("s", parts.System);
-        Assert.Equal("c", parts.Concept);
-    }
-
-    [Fact]
-    public void ParseSplit_falls_back_to_raw_reply_when_not_json()
-    {
-        var parts = OpenAiCompat.ParseSplit("  \"ładny zachód słońca\"  ", "stary system", "oryginał");
-
-        Assert.Equal("stary system", parts.System);
-        Assert.Equal("ładny zachód słońca", parts.Concept);
-    }
-
-    [Fact]
-    public void ParseSplit_keeps_fallback_system_when_json_has_only_concept()
-    {
-        var parts = OpenAiCompat.ParseSplit("""{"concept":"tylko koncept"}""", "  stary system ", "oryginał");
-
-        Assert.Equal("stary system", parts.System);
-        Assert.Equal("tylko koncept", parts.Concept);
+        Assert.Equal(new PromptParts("", "kot", null, ""),
+                     OpenAiCompat.ParseSplit("""{"system":"","concept":"kot","negative":""}"""));
     }
 }

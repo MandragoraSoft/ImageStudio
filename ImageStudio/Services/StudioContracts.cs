@@ -62,7 +62,7 @@ public sealed record TranscriptionRequest(string Path, string? Model = null, str
 
 public sealed record PromptRebuildRequest(string Prompt, string? SystemPrompt = null, string? Instruction = null, string? Model = null,
                                           IReadOnlyDictionary<string, object>? Parameters = null,
-                                          IReadOnlyList<PromptRevision>? History = null);
+                                          IReadOnlyList<PromptRevision>? History = null, string? NegativePrompt = null);
 
 // Opis obrazów modelem tekstowym, który je przyjmuje; obrazy większe niż MaxSide są zmniejszane
 public sealed record DescribeRequest(IReadOnlyList<string> Images, string Model, int MaxSide);
