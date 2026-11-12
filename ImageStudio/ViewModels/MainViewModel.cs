@@ -125,6 +125,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Trwające operacje sieciowe (spinner w stopce, przyciemnione okno odpowiedzi)
     public IActivityTracker Activity { get; }
+    public OutgoingRequestsViewModel OutgoingRequests { get; }
 
     // Wszystkie zależności przychodzą z kontenera DI (patrz Composition/ServiceCollectionExtensions)
     public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
@@ -133,8 +134,20 @@ public sealed partial class MainViewModel : ObservableObject
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
                          IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills)
+        : this(provider, providers, dialogs, downloads, settings, settingsStore, stateStore, galleryStore, presetStore,
+               secrets, prefs, toolHost, mcp, themes, activity, chatSessions, audioPlayer, audioRecorder,
+               voiceGallery, memory, storage, skills, null) { }
+
+    public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
+                         ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
+                         IUserStateStore stateStore, IGalleryStore galleryStore, IPresetStore presetStore,
+                         ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
+                         IActivityTracker activity, IChatSessionStore chatSessions, IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills,
+                         OutgoingRequestRegistry? requests)
     {
         _storage = storage;
+        _requests = requests;
         _provider = provider;
         _providers = providers;
         _dialogs = dialogs;
@@ -150,6 +163,7 @@ public sealed partial class MainViewModel : ObservableObject
         _mcp = mcp;
         _themes = themes;
         Activity = activity;
+        OutgoingRequests = new OutgoingRequestsViewModel(requests);
 
         // Ostatnio wpisane prompty i wybory wracają po uruchomieniu
         _state = _stateStore.Load();

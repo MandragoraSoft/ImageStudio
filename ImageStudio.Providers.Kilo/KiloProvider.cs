@@ -15,7 +15,8 @@ public sealed class KiloProvider : OpenAiChatProvider
 
     private const string ModelsPath = "models";
 
-    public KiloProvider(string apiKey) : base("https://ai-gateway.kilo.ai/api/v1/", apiKey, "chat/completions")
+    public KiloProvider(string apiKey) : this(apiKey, null) { }
+    public KiloProvider(string apiKey, System.Net.Http.HttpMessageHandler? handler) : base("https://ai-gateway.kilo.ai/api/v1/", apiKey, "chat/completions", handler)
     {
     }
 

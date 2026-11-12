@@ -29,16 +29,19 @@ public sealed class OpenAiProvider : IAiProvider
     private readonly HttpClient _http;
 
     // Obrazy zwracane jako URL pobieramy bez klucza OpenAI
-    private readonly HttpClient _files = new() { Timeout = TimeSpan.FromMinutes(2) };
+    private readonly HttpClient _files;
 
     // Ścisły JSON Schema tylko przy oficjalnym adresie OpenAI (patrz SupportsStrictSchema)
     private readonly bool _officialApi;
 
-    public OpenAiProvider(string baseUrl, string apiKey)
+    public OpenAiProvider(string baseUrl, string apiKey) : this(baseUrl, apiKey, null) { }
+
+    public OpenAiProvider(string baseUrl, string apiKey, Func<HttpMessageHandler>? handlerFactory)
     {
         var root = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.Trim();
         _officialApi = IsOfficial(root);
-        _http = new HttpClient
+        _files = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler()) { Timeout = TimeSpan.FromMinutes(2) };
+        _http = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler())
         {
             BaseAddress = new Uri(root.TrimEnd('/') + "/"),
             Timeout = TimeSpan.FromMinutes(5),

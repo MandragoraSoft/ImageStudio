@@ -19,7 +19,7 @@ public sealed class OpenRouterProvider : IAiProvider
     private readonly HttpClient _http;
 
     // Obrazy zwrócone jako URL: pobierane bez klucza OpenRouter (nie wysyłamy go na obce hosty)
-    private readonly HttpClient _files = new() { Timeout = TimeSpan.FromMinutes(2) };
+    private readonly HttpClient _files;
 
     // Modele zwracające wyłącznie obraz (FLUX, Recraft...): wymagają modalities ["image"], bez "text"
     private readonly HashSet<string> _imageOnly = [];
@@ -34,9 +34,12 @@ public sealed class OpenRouterProvider : IAiProvider
                                    decimal? PromptUsd = null, decimal? CompletionUsd = null, int? ContextLength = null);
 
     // baseUrl podmieniają tylko testy (lokalny serwer zamiast openrouter.ai)
-    public OpenRouterProvider(string apiKey, string baseUrl = "https://openrouter.ai")
+    public OpenRouterProvider(string apiKey, string baseUrl = "https://openrouter.ai") : this(apiKey, baseUrl, null) { }
+
+    public OpenRouterProvider(string apiKey, string baseUrl, Func<HttpMessageHandler>? handlerFactory)
     {
-        _http = new HttpClient
+        _files = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler()) { Timeout = TimeSpan.FromMinutes(2) };
+        _http = new HttpClient(handlerFactory?.Invoke() ?? new HttpClientHandler())
         {
             BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromMinutes(5),

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ImageStudio.Storage.Local\ImageStudio.Storage.Local.csproj" />
+    <ProjectReference Include="..\ImageStudio.Shared\ImageStudio.Shared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -117,28 +117,28 @@ public static class OpenAiCompat
         body["stream"] = true;
         body["stream_options"] = new { include_usage = true };
 
-        var response = await SendStreamAsync(http, path, body, ct);
-        if (!response.IsSuccessStatusCode)
+        using (var response = await SendStreamAsync(http, path, body, ct))
         {
+            if (response.IsSuccessStatusCode)
+                return await ReadChatStreamAsync(response, onDelta, ct);
+
             // Nie każde API zna stream_options (zużycie tokenów): ponawiamy bez nich
             var error = await response.Content.ReadAsStringAsync(ct);
-            var status = response.StatusCode;
-            response.Dispose();
-            if (!error.Contains("stream_options", StringComparison.OrdinalIgnoreCase)) throw ApiErrors.Failure(status, error);
-
-            body.Remove("stream_options");
-            response = await SendStreamAsync(http, path, body, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                var retryError = await response.Content.ReadAsStringAsync(ct);
-                var retryStatus = response.StatusCode;
-                response.Dispose();
-                throw ApiErrors.Failure(retryStatus, retryError);
-            }
+            if (!error.Contains("stream_options", StringComparison.OrdinalIgnoreCase)) throw ApiErrors.Failure(response.StatusCode, error);
         }
 
-        using var _ = response;
+        body.Remove("stream_options");
+        using var retryResponse = await SendStreamAsync(http, path, body, ct);
+        if (!retryResponse.IsSuccessStatusCode)
+        {
+            var retryError = await retryResponse.Content.ReadAsStringAsync(ct);
+            throw ApiErrors.Failure(retryResponse.StatusCode, retryError);
+        }
+        return await ReadChatStreamAsync(retryResponse, onDelta, ct);
+    }
 
+    private static async Task<ChatReply> ReadChatStreamAsync(HttpResponseMessage response, Action<ChatDelta> onDelta, CancellationToken ct)
+    {
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         var content = new StringBuilder();

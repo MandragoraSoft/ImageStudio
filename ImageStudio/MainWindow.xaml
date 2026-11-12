@@ -61,7 +61,7 @@
             <MenuItem Header="{loc:T menu.help}" Command="{Binding OpenAboutCommand}"/>
         </Menu>
 
-        <!-- Stopka: status, aktywny dostawca i spinner z opisem trwającej operacji sieciowej -->
+        <!-- Jeden spinner dla operacji logicznych i wychodzących żądań HTTP -->
         <StatusBar DockPanel.Dock="Bottom">
             <StatusBar.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -81,9 +81,57 @@
                 <TextBlock Style="{StaticResource MutedTextBlock}"><Run Text="{loc:T status.provider}"/><Run Text="{Binding ProviderName, Mode=OneWay}"/></TextBlock>
             </StatusBarItem>
             <StatusBarItem Grid.Column="2" MinWidth="220">
-                <StackPanel Orientation="Horizontal" Visibility="{Binding Activity.IsActive, Converter={StaticResource BoolToVis}}">
+                <StackPanel x:Name="ActivityIndicator" Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Activity.IsActive}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding OutgoingRequests.HasRequests}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <shared:Spinner Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding Activity.Label}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Activity.Label}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ToggleButton x:Name="RequestsToggle" Style="{StaticResource FilterToggleButton}" Padding="8,3"
+                                  IsChecked="{Binding OutgoingRequests.IsOpen, Mode=TwoWay}"
+                                  Visibility="{Binding OutgoingRequests.HasRequests, Converter={StaticResource BoolToVis}}">
+                        <TextBlock><Run Text="{loc:T status.requests}"/><Run Text="{Binding OutgoingRequests.Count, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <Popup x:Name="RequestsPopup" Placement="Top" PlacementTarget="{Binding ElementName=RequestsToggle}"
+                           IsOpen="{Binding IsChecked, ElementName=RequestsToggle, Mode=TwoWay}" StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}"
+                                BorderThickness="1" CornerRadius="6" Padding="8" Width="440"
+                                DataContext="{Binding DataContext, ElementName=RequestsToggle}">
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="RequestsList" ItemsSource="{Binding OutgoingRequests.Requests}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding Info.Method, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding Info.Host, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Style="{StaticResource MutedTextBlock}" Text="{Binding StartedLocal, StringFormat={}{0:T}}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Padding="8,3"
+                                                        Content="{loc:T status.cancelRequest}" Command="{Binding CancelCommand}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

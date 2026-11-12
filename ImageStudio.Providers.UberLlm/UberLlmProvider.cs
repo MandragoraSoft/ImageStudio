@@ -8,10 +8,12 @@ public sealed class UberLlmProvider : IAiProvider
     private readonly ImageGenerationService _api;
     private readonly MarketService _market;
 
-    public UberLlmProvider(string baseUrl, string apiKey, string marketUrl)
+    public UberLlmProvider(string baseUrl, string apiKey, string marketUrl) : this(baseUrl, apiKey, marketUrl, null) { }
+
+    public UberLlmProvider(string baseUrl, string apiKey, string marketUrl, Func<System.Net.Http.HttpMessageHandler>? handlerFactory)
     {
-        _api = new ImageGenerationService(baseUrl, apiKey);
-        _market = new MarketService(marketUrl);
+        _api = new ImageGenerationService(baseUrl, apiKey, handlerFactory);
+        _market = new MarketService(marketUrl, handlerFactory);
     }
 
     public string Id => Identifier;

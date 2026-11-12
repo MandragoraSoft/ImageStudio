@@ -2,6 +2,8 @@
 
 _Kiedy czytać: dotykasz galerii obrazów i wideo, odtwarzania wideo, miniatur, zakładki Głos (mowa, rozpoznawanie, mikrofon, galeria głosu)._
 
+Magazyny chmurowe korzystają z centralnego transportu HTTP także przy OAuth. Anulowanie pojedynczego żądania synchronizacji w tle ponawia zadanie z narastającym opóźnieniem (maks. 30 s); zwykłe błędy i timeouty nadal trafiają do statusu. Operacje dla tej samej nazwy są kolejkowane, aby ponowiona wysyłka nie wyprzedziła późniejszego usunięcia. Kolejka zadań jest tylko w pamięci, jak dotychczas. Anulowanie odpowiedzi na obrót tokenu OAuth po stronie serwera może wymagać ponownego logowania, jeśli serwer zdążył unieważnić stary token.
+
 ## Galeria i wideo w panelu wyniku
 
 Kliknięcie miniatury tylko pokazuje wynik (opis jest w dymku: prompt, rodzaj, koszt; nie wpisujemy go do stopki). Prawy przycisk na miniaturze: `ArchiveGalleryEntryCommand` (lokalny wynik obrazu/wideo), `RemoveGalleryEntryCommand` (plik zostaje), `DeleteGalleryEntryFileCommand` (po potwierdzeniu; wyświetlane wideo najpierw zwalnia odtwarzacz, plik zajęty = wpis zostaje i błąd w statusie), `CopyGalleryPromptCommand`. Miniatura wideo to klatka z powłoki Windows (`VideoThumbnail`, `IShellItemImageFactory`; WIC nie czyta mp4) z pamięcią podręczną w `thumbs\` (klucz: ścieżka, długość, czas zapisu); bez niej kafelek pokazuje ikonę wideo, a każde wideo ma znaczek odtwarzania. Wideo w `OutputPanel` ma `LoadedBehavior="Manual"` i pasek sterowania w kodzie widoku (pauza/odtwórz ponownie, od początku, zapętlenie, przewijanie); odtwarzanie rusza po `MediaOpened`.

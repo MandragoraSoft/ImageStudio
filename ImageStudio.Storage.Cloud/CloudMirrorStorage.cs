@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.Json;
 using ImageStudio.Storage.Local;
+using ImageStudio.Networking;
 
 namespace ImageStudio.Storage.Cloud;
 
@@ -14,15 +15,22 @@ namespace ImageStudio.Storage.Cloud;
 public abstract class CloudMirrorStorage : IMediaStoragePlugin
 {
     private readonly ConcurrentBag<Task> _pending = [];
+    private readonly object _backgroundGate = new();
+    private readonly Dictionary<string, Task> _byFile = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, string?> _env;
     private string? _lastError;
 
     // environment: odczyt zmiennych środowiska (testy podstawiają własny); domyślnie Environment
     protected CloudMirrorStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
+        : this(secrets, handler, environment, null) { }
+
+    protected CloudMirrorStorage(IStorageSecrets secrets, HttpMessageHandler? handler, Func<string, string?>? environment, TimeSpan? timeout)
     {
         Secrets = secrets;
         _env = environment ?? Environment.GetEnvironmentVariable;
-        Http = handler is null ? new HttpClient { Timeout = TimeSpan.FromMinutes(10) } : new HttpClient(handler);
+        Http = new HttpClient(handler ?? new HttpClientHandler());
+        if (timeout is { } value) Http.Timeout = value;
+        else if (handler is null) Http.Timeout = TimeSpan.FromMinutes(10);
         Flow = new OAuthFlow(Http, OpenBrowser);
     }
 
@@ -149,7 +157,7 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     {
         var path = await Cache.WriteAsync(kind, fileName, data, ct);
         var bytes = data.ToArray();
-        Background(async () =>
+        Background(Path.GetFileName(path), async () =>
         {
             if (await AccessTokenAsync(CancellationToken.None) is { } token)
                 await UploadAsync(token, Path.GetFileName(path), bytes, CancellationToken.None);
@@ -160,7 +168,7 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     public async Task DeleteAsync(string location, CancellationToken ct = default)
     {
         await Cache.DeleteAsync(location, ct);
-        Background(async () =>
+        Background(Path.GetFileName(location), async () =>
         {
             if (await AccessTokenAsync(CancellationToken.None) is { } token)
                 await DeleteRemoteAsync(token, Path.GetFileName(location), CancellationToken.None);
@@ -170,18 +178,53 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     // Czeka na zakończenie wysyłek w tle (testy i zamykanie aplikacji)
     public Task FlushAsync() => Task.WhenAll(_pending);
 
-    private void Background(Func<Task> work) => _pending.Add(Task.Run(async () =>
+    private void Background(string fileName, Func<Task> work)
+    {
+        lock (_backgroundGate)
+        {
+            _byFile.TryGetValue(fileName, out var previous);
+            var task = Task.Run(async () =>
+            {
+                if (previous is not null) await previous;
+                await RunBackgroundAsync(work);
+            });
+            _byFile[fileName] = task;
+            _pending.Add(task);
+            _ = task.ContinueWith(_ =>
+            {
+                lock (_backgroundGate)
+                    if (_byFile.GetValueOrDefault(fileName) == task) _byFile.Remove(fileName);
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+    }
+
+    private async Task RunBackgroundAsync(Func<Task> work)
     {
         try
         {
-            await work();
+            var delay = TimeSpan.FromMilliseconds(250);
+            while (true)
+            {
+                try
+                {
+                    await work();
+                    break;
+                }
+                catch (UserCanceledRequestException ex)
+                {
+                    // Anulowanie dotyczy jednego HTTP, nie zapisanego lokalnie zadania synchronizacji.
+                    _lastError = ex.Message;
+                    await Task.Delay(delay);
+                    delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 30_000));
+                }
+            }
             _lastError = null;
         }
         catch (Exception ex)
         {
             _lastError = ex.Message;
         }
-    }));
+    }
 
     // Plik z chmury po nazwie (null: brak pliku albo niezalogowany); używane też do sprawdzenia, co faktycznie wysłano
     public async Task<byte[]?> ReadRemoteAsync(string fileName, CancellationToken ct = default) =>

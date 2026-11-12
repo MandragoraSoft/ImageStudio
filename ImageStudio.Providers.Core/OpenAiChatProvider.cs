@@ -12,10 +12,12 @@ public abstract class OpenAiChatProvider : IAiProvider
     protected string ChatPath { get; }
 
     // baseAddress kończy się "/", ścieżki względne (chatPath, katalog modeli) dokleja pochodna
-    protected OpenAiChatProvider(string baseAddress, string apiKey, string chatPath)
+    protected OpenAiChatProvider(string baseAddress, string apiKey, string chatPath) : this(baseAddress, apiKey, chatPath, null) { }
+
+    protected OpenAiChatProvider(string baseAddress, string apiKey, string chatPath, HttpMessageHandler? handler)
     {
         ChatPath = chatPath;
-        Http = new HttpClient { BaseAddress = new Uri(baseAddress), Timeout = TimeSpan.FromMinutes(5) };
+        Http = new HttpClient(handler ?? new HttpClientHandler()) { BaseAddress = new Uri(baseAddress), Timeout = TimeSpan.FromMinutes(5) };
         if (!string.IsNullOrWhiteSpace(apiKey))
             Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("ImageStudio/1.0");

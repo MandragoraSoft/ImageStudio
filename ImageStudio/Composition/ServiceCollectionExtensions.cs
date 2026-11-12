@@ -24,6 +24,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddImageStudioCore(this IServiceCollection services)
     {
         services.AddSingleton<IActivityTracker, ActivityTracker>();
+        services.AddSingleton<OutgoingRequestRegistry>();
+        services.AddTransient<OutgoingRequestHandler>();
         services.AddSingleton<ImageDownloadService>();
         services.AddSingleton<McpToolHost>();
         services.AddSingleton<LegacyPromptImporter>();
@@ -32,9 +34,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<LocalMediaStorage>();
         services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<LocalMediaStorage>());
         services.AddSingleton<IStorageSecrets, StorageSecrets>();
-        services.AddSingleton<OneDriveStorage>();
+        services.AddSingleton(sp => new OneDriveStorage(sp.GetRequiredService<IStorageSecrets>(), sp.GetRequiredService<OutgoingRequestRegistry>().CreateHandler(), TimeSpan.FromMinutes(10)));
         services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<OneDriveStorage>());
-        services.AddSingleton<GoogleDriveStorage>();
+        services.AddSingleton(sp => new GoogleDriveStorage(sp.GetRequiredService<IStorageSecrets>(), sp.GetRequiredService<OutgoingRequestRegistry>().CreateHandler(), TimeSpan.FromMinutes(10)));
         services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<GoogleDriveStorage>());
         services.AddSingleton<MediaStorageHost>();
         services.TryAddSingleton(new McpOptions());

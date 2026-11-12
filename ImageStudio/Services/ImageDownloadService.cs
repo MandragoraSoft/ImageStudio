@@ -11,7 +11,12 @@ public sealed class ImageDownloadService
 {
     private const long MaxBytes = 25L * 1024 * 1024;
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(60) };
+    private readonly HttpClient _http;
+
+    public ImageDownloadService() : this(null) { }
+    public ImageDownloadService(OutgoingRequestRegistry? requests) : this(requests, null) { }
+    public ImageDownloadService(OutgoingRequestRegistry? requests, HttpMessageHandler? inner) =>
+        _http = new HttpClient(requests?.CreateHandler(inner) ?? inner ?? new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(60) };
 
     public async Task<string> DownloadAsync(string url, CancellationToken ct = default)
     {

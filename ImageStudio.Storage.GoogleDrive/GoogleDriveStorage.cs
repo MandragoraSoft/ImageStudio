@@ -9,9 +9,13 @@ namespace ImageStudio.Storage.GoogleDrive;
 // Google Drive przez API v3. Zakres drive.file: aplikacja widzi tylko pliki, które sama utworzyła (folder ImageStudio
 // w Moim dysku). Rejestracja w Google Cloud: klient OAuth typu "Aplikacja komputerowa" (Client ID i sekret), włączone
 // Google Drive API
-public sealed class GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
-    : CloudMirrorStorage(secrets, handler, environment)
+public sealed class GoogleDriveStorage : CloudMirrorStorage
 {
+    public GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
+        : base(secrets, handler, environment) { }
+
+    public GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandler handler, TimeSpan timeout)
+        : base(secrets, handler, null, timeout) { }
     public const string FolderName = "ImageStudio";
     private const string Api = "https://www.googleapis.com/drive/v3/files";
 

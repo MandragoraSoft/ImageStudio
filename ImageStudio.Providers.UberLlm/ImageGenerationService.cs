@@ -16,9 +16,13 @@ public sealed class ImageGenerationService : IDisposable
     private const string NegativeField = "negative_prompt";
 
     private HttpClient _http;
+    private readonly Func<HttpMessageHandler>? _handlerFactory;
 
-    public ImageGenerationService(string baseUrl, string apiKey)
+    public ImageGenerationService(string baseUrl, string apiKey) : this(baseUrl, apiKey, null) { }
+
+    public ImageGenerationService(string baseUrl, string apiKey, Func<HttpMessageHandler>? handlerFactory)
     {
+        _handlerFactory = handlerFactory;
         _http = CreateClient(baseUrl, apiKey);
     }
 
@@ -29,9 +33,9 @@ public sealed class ImageGenerationService : IDisposable
         _http = CreateClient(baseUrl, apiKey);
     }
 
-    private static HttpClient CreateClient(string baseUrl, string apiKey)
+    private HttpClient CreateClient(string baseUrl, string apiKey)
     {
-        var client = new HttpClient
+        var client = new HttpClient(_handlerFactory?.Invoke() ?? new HttpClientHandler())
         {
             BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromMinutes(5)

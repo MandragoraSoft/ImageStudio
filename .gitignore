@@ -6,7 +6,13 @@ bin/
 obj/
 .vs/
 *.user
+TestResults/
+publish/
+
+# Tymczasowe katalogi pracy i weryfikacji
+/.agent-work/
+/.artifacts-verify/
+.agent-build/
 
 # Lokalny obraz testowy (dane użytkownika)
 /747614082_18057541964770098_7004108407124322667_n.jpg
-publish/

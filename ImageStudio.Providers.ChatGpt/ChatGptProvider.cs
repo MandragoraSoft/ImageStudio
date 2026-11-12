@@ -18,18 +18,23 @@ public sealed class ChatGptProvider : OpenAiChatProvider
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromMinutes(2);
 
     private readonly ChatGptAuth _auth;
+    private readonly HttpClient? _authHttp;
     private readonly Action<string> _saveSession;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private ChatGptSession _session;
 
     // saveSession dostaje JSON sesji po każdym odświeżeniu (refresh token jest wymieniany, więc stary przestaje być ważny)
     public ChatGptProvider(string sessionJson, Action<string>? saveSession = null, ChatGptAuth? auth = null,
-                           string baseAddress = ChatGptAuth.Resource + "/")
-        : base(baseAddress, "", "responses")
+                           string baseAddress = ChatGptAuth.Resource + "/") : this(sessionJson, saveSession, auth, baseAddress, null) { }
+
+    public ChatGptProvider(string sessionJson, Action<string>? saveSession, ChatGptAuth? auth,
+                           string baseAddress, HttpMessageHandler? handler, HttpMessageHandler? authHandler = null)
+        : base(baseAddress, "", "responses", handler)
     {
         _session = ChatGptSession.Parse(sessionJson);
         _saveSession = saveSession ?? (_ => { });
-        _auth = auth ?? new ChatGptAuth();
+        _authHttp = authHandler is null ? null : new HttpClient(authHandler) { Timeout = TimeSpan.FromSeconds(30) };
+        _auth = auth ?? new ChatGptAuth(_authHttp);
     }
 
     public override string Id => Identifier;
@@ -88,31 +93,31 @@ public sealed class ChatGptProvider : OpenAiChatProvider
                                                           IReadOnlyList<ToolDefinition>? tools, Action<ChatDelta> onDelta,
                                                           CancellationToken ct = default, ChatOptions? options = null)
     {
-        var response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools, options)),
-                                       HttpCompletionOption.ResponseHeadersRead, ct);
-        if (!response.IsSuccessStatusCode)
+        using (var response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools, options)),
+                                              HttpCompletionOption.ResponseHeadersRead, ct))
         {
+            if (response.IsSuccessStatusCode)
+                return await ReadChatStreamAsync(response, onDelta, ct);
+
             var error = await response.Content.ReadAsStringAsync(ct);
-            var status = response.StatusCode;
-            response.Dispose();
 
             // Model bez rozumowania odrzuca parametr reasoning: ponawiamy raz bez niego (jak z innymi odrzuconymi parametrami)
             if (options is not { Enabled: true } || !error.Contains("reasoning", StringComparison.OrdinalIgnoreCase))
-                throw ApiErrors.Failure(status, error);
-
-            response = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools)),
-                                       HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                var retryError = await response.Content.ReadAsStringAsync(ct);
-                var retryStatus = response.StatusCode;
-                response.Dispose();
-                throw ApiErrors.Failure(retryStatus, retryError);
-            }
+                throw ApiErrors.Failure(response.StatusCode, error);
         }
 
-        using var _ = response;
+        using var retryResponse = await SendAsync(HttpMethod.Post, ChatPath, JsonContent.Create(BuildBody(model, messages, tools)),
+                                                  HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!retryResponse.IsSuccessStatusCode)
+        {
+            var retryError = await retryResponse.Content.ReadAsStringAsync(ct);
+            throw ApiErrors.Failure(retryResponse.StatusCode, retryError);
+        }
+        return await ReadChatStreamAsync(retryResponse, onDelta, ct);
+    }
 
+    private static async Task<ChatReply> ReadChatStreamAsync(HttpResponseMessage response, Action<ChatDelta> onDelta, CancellationToken ct)
+    {
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         var parser = new ResponsesStream(onDelta);
@@ -234,6 +239,7 @@ public sealed class ChatGptProvider : OpenAiChatProvider
     public override void Dispose()
     {
         _refreshGate.Dispose();
+        _authHttp?.Dispose();
         base.Dispose();
     }
 

@@ -7,9 +7,13 @@ namespace ImageStudio.Services;
 public sealed class MarketService : IDisposable
 {
     private HttpClient _http;
+    private readonly Func<HttpMessageHandler>? _handlerFactory;
 
-    public MarketService(string marketUrl)
+    public MarketService(string marketUrl) : this(marketUrl, null) { }
+
+    public MarketService(string marketUrl, Func<HttpMessageHandler>? handlerFactory)
     {
+        _handlerFactory = handlerFactory;
         _http = CreateClient(marketUrl);
     }
 
@@ -20,7 +24,7 @@ public sealed class MarketService : IDisposable
         _http = CreateClient(marketUrl);
     }
 
-    private static HttpClient CreateClient(string marketUrl) => new()
+    private HttpClient CreateClient(string marketUrl) => new(_handlerFactory?.Invoke() ?? new HttpClientHandler())
     {
         BaseAddress = new Uri(marketUrl),
         Timeout = TimeSpan.FromSeconds(30)

@@ -7,9 +7,13 @@ namespace ImageStudio.Storage.OneDrive;
 // OneDrive (konto osobiste lub służbowe) przez Microsoft Graph. Zakres Files.ReadWrite.AppFolder: aplikacja widzi tylko
 // własny folder Aplikacje\<nazwa rejestracji> (nie cały dysk). Rejestracja w Azure: aplikacja publiczna ("Mobile and
 // desktop"), adres przekierowania http://localhost, uprawnienie delegowane Files.ReadWrite.AppFolder
-public sealed class OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
-    : CloudMirrorStorage(secrets, handler, environment)
+public sealed class OneDriveStorage : CloudMirrorStorage
 {
+    public OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
+        : base(secrets, handler, environment) { }
+
+    public OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler handler, TimeSpan timeout)
+        : base(secrets, handler, null, timeout) { }
     public const string GraphRoot = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/";
 
     public override string Id => "onedrive";

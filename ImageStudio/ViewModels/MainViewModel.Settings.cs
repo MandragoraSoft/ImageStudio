@@ -16,6 +16,7 @@ namespace ImageStudio.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private readonly OutgoingRequestRegistry? _requests;
     // --- Przeglądarka modeli ---
 
     [RelayCommand(CanExecute = nameof(CanPickOrCopy))]
@@ -120,8 +121,12 @@ public sealed partial class MainViewModel
     }
 
     // Logowanie "Sign in with ChatGPT" z okna ustawień: strona logowania w przeglądarce systemowej, powrót na 127.0.0.1
-    private Task<ChatGptSession> SignInToChatGptAsync(ChatGptSession? previous, CancellationToken ct) =>
-        new ChatGptAuth().SignInAsync(previous, "ImageStudio", _dialogs.OpenFile, Loc.T("provider.chatgpt.done"), ct);
+    private async Task<ChatGptSession> SignInToChatGptAsync(ChatGptSession? previous, CancellationToken ct)
+    {
+        using var http = new System.Net.Http.HttpClient(_requests?.CreateHandler() ?? new System.Net.Http.HttpClientHandler())
+            { Timeout = TimeSpan.FromSeconds(30) };
+        return await new ChatGptAuth(http).SignInAsync(previous, "ImageStudio", _dialogs.OpenFile, Loc.T("provider.chatgpt.done"), ct);
+    }
 
     // Jedyne miejsce wymiany providera: zwalnia starego, odświeża bindowane właściwości i listy modeli.
     // Filtry i wybory z poprzedniego providera są zerowane, bo inaczej ukryłyby wszystkie nowe modele.

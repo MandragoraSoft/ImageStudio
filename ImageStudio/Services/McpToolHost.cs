@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Net.Http;
 using ImageStudio.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -10,9 +11,19 @@ namespace ImageStudio.Services;
 // Nazwy narzędzi dla modelu to "serwer__narzędzie" (API modeli dopuszcza tylko [a-zA-Z0-9_-], do 64 znaków).
 public sealed partial class McpToolHost : IAsyncDisposable
 {
+    private readonly OutgoingRequestRegistry? _requests;
+    private readonly Func<HttpMessageHandler>? _innerFactory;
+
+    public McpToolHost() : this(null) { }
+    public McpToolHost(OutgoingRequestRegistry? requests) : this(requests, null) { }
+    public McpToolHost(OutgoingRequestRegistry? requests, Func<HttpMessageHandler>? innerFactory)
+    {
+        _requests = requests;
+        _innerFactory = innerFactory;
+    }
     private const int MaxResultChars = 20_000;
 
-    private sealed record Connection(McpClient Client, List<ToolDefinition> Tools, List<string> ModelNames);
+    private sealed record Connection(McpClient Client, IClientTransport Transport, List<ToolDefinition> Tools, List<string> ModelNames);
 
     private readonly Dictionary<string, Connection> _connections = [];
     private readonly Dictionary<string, (McpClient Client, string Tool)> _routes = [];
@@ -34,7 +45,7 @@ public sealed partial class McpToolHost : IAsyncDisposable
                 Name = name,
                 Endpoint = new Uri(url),
                 AdditionalHeaders = config.Headers,
-            })
+            }, new HttpClient(_requests?.CreateHandler(_innerFactory?.Invoke()) ?? _innerFactory?.Invoke() ?? new HttpClientHandler()), ownsHttpClient: true)
             : new StdioClientTransport(new StdioClientTransportOptions
             {
                 Name = name,
@@ -49,9 +60,10 @@ public sealed partial class McpToolHost : IAsyncDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
 
-        var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
+        McpClient? client = null;
         try
         {
+            client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
             var definitions = new List<ToolDefinition>();
             var names = new List<string>();
             foreach (var tool in await client.ListToolsAsync(cancellationToken: timeout.Token))
@@ -67,12 +79,13 @@ public sealed partial class McpToolHost : IAsyncDisposable
                 _routes[modelName] = (client, tool.Name);
             }
 
-            _connections[name] = new Connection(client, definitions, names);
+            _connections[name] = new Connection(client, transport, definitions, names);
             return definitions.Count;
         }
         catch
         {
-            await client.DisposeAsync();
+            if (client is not null) await client.DisposeAsync();
+            if (transport is IAsyncDisposable disposable) await disposable.DisposeAsync();
             throw;
         }
     }
@@ -82,7 +95,11 @@ public sealed partial class McpToolHost : IAsyncDisposable
         if (!_connections.Remove(name, out var connection)) return;
 
         foreach (var modelName in connection.ModelNames) _routes.Remove(modelName);
-        await connection.Client.DisposeAsync();
+        try { await connection.Client.DisposeAsync(); }
+        finally
+        {
+            if (connection.Transport is IAsyncDisposable disposable) await disposable.DisposeAsync();
+        }
     }
 
     public async Task<string> CallAsync(ToolCall call, CancellationToken ct = default)

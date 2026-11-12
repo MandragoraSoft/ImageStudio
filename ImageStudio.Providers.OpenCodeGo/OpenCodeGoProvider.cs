@@ -12,7 +12,8 @@ public sealed class OpenCodeGoProvider : OpenAiChatProvider
 
     private const string ModelsPath = "v1/models";
 
-    public OpenCodeGoProvider(string apiKey) : base("https://opencode.ai/inference/go/", apiKey, "openai/v1/chat/completions")
+    public OpenCodeGoProvider(string apiKey) : this(apiKey, null) { }
+    public OpenCodeGoProvider(string apiKey, System.Net.Http.HttpMessageHandler? handler) : base("https://opencode.ai/inference/go/", apiKey, "openai/v1/chat/completions", handler)
     {
         Http.DefaultRequestHeaders.Add("x-opencode-session", Guid.NewGuid().ToString("N"));
     }

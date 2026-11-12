@@ -1,4 +1,5 @@
 using ImageStudio.Configuration;
+using System.Net.Http;
 
 namespace ImageStudio.Services;
 
@@ -22,15 +23,18 @@ public static class ProviderRegistry
     ];
 
     // secrets (opcjonalne): dostawca z sesją OAuth (ChatGPT) zapisuje w nim odświeżone tokeny
-    public static IAiProvider Create(string id, AppSettings settings, ISecretStore? secrets = null) => id switch
+    public static IAiProvider Create(string id, AppSettings settings, ISecretStore? secrets = null) => Create(id, settings, secrets, null);
+
+    public static IAiProvider Create(string id, AppSettings settings, ISecretStore? secrets, Func<HttpMessageHandler>? handlerFactory) => id switch
     {
-        UberLlmProvider.Identifier => new UberLlmProvider(settings.BaseUrl, settings.ApiKey, settings.MarketUrl),
-        OpenRouterProvider.Identifier => new OpenRouterProvider(settings.OpenRouterKey),
-        OpenAiProvider.Identifier => new OpenAiProvider(settings.OpenAiBaseUrl, settings.OpenAiKey),
-        ChatGptProvider.Identifier => new ChatGptProvider(settings.ChatGptSession, json => secrets?.Save(json, ChatGptSecret)),
-        MistralProvider.Identifier => new MistralProvider(settings.MistralKey),
-        KiloProvider.Identifier => new KiloProvider(settings.KiloKey),
-        OpenCodeGoProvider.Identifier => new OpenCodeGoProvider(settings.OpenCodeGoKey),
+        UberLlmProvider.Identifier => new UberLlmProvider(settings.BaseUrl, settings.ApiKey, settings.MarketUrl, handlerFactory),
+        OpenRouterProvider.Identifier => new OpenRouterProvider(settings.OpenRouterKey, "https://openrouter.ai", handlerFactory),
+        OpenAiProvider.Identifier => new OpenAiProvider(settings.OpenAiBaseUrl, settings.OpenAiKey, handlerFactory),
+        ChatGptProvider.Identifier => new ChatGptProvider(settings.ChatGptSession, json => secrets?.Save(json, ChatGptSecret),
+            null, ChatGptAuth.Resource + "/", handlerFactory?.Invoke(), handlerFactory?.Invoke()),
+        MistralProvider.Identifier => new MistralProvider(settings.MistralKey, handlerFactory?.Invoke()),
+        KiloProvider.Identifier => new KiloProvider(settings.KiloKey, handlerFactory?.Invoke()),
+        OpenCodeGoProvider.Identifier => new OpenCodeGoProvider(settings.OpenCodeGoKey, handlerFactory?.Invoke()),
         _ => throw new InvalidOperationException($"Nieznany provider: {id}"),
     };
 }

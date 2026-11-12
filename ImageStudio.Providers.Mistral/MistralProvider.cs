@@ -13,7 +13,8 @@ public sealed class MistralProvider : OpenAiChatProvider
     private const string ModelsPath = "v1/models";
     private const string Owner = "mistral";
 
-    public MistralProvider(string apiKey) : base("https://api.mistral.ai/", apiKey, "v1/chat/completions")
+    public MistralProvider(string apiKey) : this(apiKey, null) { }
+    public MistralProvider(string apiKey, System.Net.Http.HttpMessageHandler? handler) : base("https://api.mistral.ai/", apiKey, "v1/chat/completions", handler)
     {
     }
 
