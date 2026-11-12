@@ -6,6 +6,8 @@ _Kiedy czytać: dotykasz menu, stopki, kolorów, `ModelPicker`, filtrów modeli,
 
 Klasyczne menu u góry (te same polecenia co przyciski) i stopka (`StatusBar`): status, aktywny dostawca oraz spinner z opisem trwającej operacji. Stopkę zasila `IActivityTracker` (`MainViewModel.Activity`). Każde wywołanie API zgłasza się samo, bo `ProviderFactory` opakowuje każdego dostawcę w `ActivityAiProvider` (dekorator); wywołania spoza dostawcy (pobranie obrazu z linku, narzędzia MCP w czacie) zgłaszają się przez `Activity.Begin("...")` w `using`. W czasie operacji okno odpowiedzi (wynik / rozmowa) ma `Opacity` 0.45. Nowe wywołania sieciowe idące poza `IAiProvider` muszą same wołać `Begin`.
 
+Pozycja Pomoc otwiera modalne okno O aplikacji przez `OpenAboutCommand` i `IDialogService`. Teksty okna są powiązane z lokalizacją, a numer wersji pochodzi z `AssemblyInformationalVersion` aplikacji (zachowuje także prerelease i metadane kompilacji). Domyślna wersja projektów jest w `Directory.Build.props` jako `Version`; wydanie nadpisuje ją przez `-p:Version=...`.
+
 ## Kolory kontrolek
 
 Paleta (`ThemeService`, klucze w `App.xaml`) ma osobne `ControlBrush`/`ControlHoverBrush`/`ControlBorderBrush` dla przycisków drugorzędnych, przełączników, pól tekstowych, list rozwijanych i nagłówka selektora modelu: wypełnienie odróżnia je od panelu, a obrys ma kontrast co najmniej 3:1 w obu motywach (pilnuje tego `ThemeContrastTests`). `SurfaceAltBrush` jest za bliski `SurfaceBrush` (1,08:1), żeby służyć za tło kontrolki. Nowy kolor dodawaj do obu palet.

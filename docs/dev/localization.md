@@ -37,7 +37,7 @@ Skrypt i testy `LocalizationTests` sprawdzają to samo z dwóch stron: skrypt da
 
 ## Co jest przetłumaczone
 
-Całe okno główne (menu, stopka, wszystkie zakładki lewego panelu, panel wyniku i galeria, czat, narzędzia MCP), okna Ustawień, Edytora promptu, Zestawów, Zapisu zestawu i Przeglądarki modeli, selektor modeli i filtry, komunikaty ViewModeli (statusy, potwierdzenia, nazwy czynności w stopce), okna dialogowe plików, domyślne urządzenie audio, parametry modeli czatu (`ParamSpec` trzyma klucze, `ModelParameter.Label/Hint` czytają słownik).
+Całe okno główne (menu, stopka, wszystkie zakładki lewego panelu, panel wyniku i galeria, czat, narzędzia MCP), okna O aplikacji, Ustawień, Edytora promptu, Zestawów, Zapisu zestawu i Przeglądarki modeli, selektor modeli i filtry, komunikaty ViewModeli (statusy, potwierdzenia, nazwy czynności w stopce), okna dialogowe plików, domyślne urządzenie audio, parametry modeli czatu (`ParamSpec` trzyma klucze, `ModelParameter.Label/Hint` czytają słownik).
 
 ## Pułapki
 

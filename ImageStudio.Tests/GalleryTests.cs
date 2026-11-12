@@ -11,9 +11,33 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ImageStudio.Tests;
 
-// Galeria: kliknięcie tylko pokazuje wynik, prawy przycisk usuwa; wideo da się odtworzyć ponownie
+// Galeria: kliknięcie pokazuje wynik, menu kontekstowe archiwizuje/usuwa; wideo da się odtworzyć ponownie
 public sealed class GalleryTests : IDisposable
 {
+    private sealed class FailingArchiveStore(GalleryEntry entry) : IGalleryStore
+    {
+        public IReadOnlyList<GalleryEntry> Load() => [entry];
+        public void Save(IEnumerable<GalleryEntry> entries)
+        {
+            if (!entries.Contains(entry)) throw new IOException("store unavailable");
+        }
+    }
+
+    private sealed class FailingRecoveryStore(GalleryEntry entry) : IGalleryStore
+    {
+        public IReadOnlyList<GalleryEntry> Load() => [entry];
+        public void Save(IEnumerable<GalleryEntry> entries)
+        {
+            if (!entries.Contains(entry))
+            {
+                File.WriteAllText(entry.FilePath, "occupied during rollback");
+                throw new IOException("initial gallery save failed");
+            }
+
+            throw new IOException("recovery gallery save failed");
+        }
+    }
+
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "is-gallery-" + Guid.NewGuid().ToString("N"));
 
     public GalleryTests() => Directory.CreateDirectory(_dir);
@@ -27,21 +51,24 @@ public sealed class GalleryTests : IDisposable
     {
         var path = Path.Combine(_dir, name);
         File.WriteAllBytes(path, TestImages.Png(8, 8));
-        return new GalleryEntry { Prompt = prompt, Kind = "generate", FilePath = path, CostUsd = 0.004m };
+        return new GalleryEntry { Prompt = prompt, Kind = "generate", FilePath = path, CostUsd = 0.004m, StorageId = "local" };
     }
 
     private GalleryEntry Video(string name = "v.mp4")
     {
         var path = Path.Combine(_dir, name);
         File.WriteAllBytes(path, [0, 0, 0, 0]);
-        return new GalleryEntry { Prompt = "fala", Kind = "video", FilePath = path, CostUsd = 0.1m };
+        return new GalleryEntry { Prompt = "fala", Kind = "video", FilePath = path, CostUsd = 0.1m, StorageId = "local" };
     }
 
-    private static TestApp AppWith(params GalleryEntry[] entries)
+    private TestApp AppWith(params GalleryEntry[] entries)
     {
         var store = new MemoryGalleryStore();
         store.Entries.AddRange(entries);
-        return TestApp.Create(s => s.AddSingleton<IGalleryStore>(store));
+        var app = TestApp.Create(s => s.AddSingleton<IGalleryStore>(store));
+        app.Get<ImageStudio.Storage.Local.LocalMediaStorage>().Roots[ImageStudio.Storage.MediaKind.Image] = _dir;
+        app.Get<ImageStudio.Storage.Local.LocalMediaStorage>().Roots[ImageStudio.Storage.MediaKind.Video] = _dir;
+        return app;
     }
 
     // ---- kliknięcie ----
@@ -130,6 +157,161 @@ public sealed class GalleryTests : IDisposable
     }
 
     [Fact]
+    public void Archive_moves_local_file_without_overwriting_and_removes_entry_only_after_success()
+    {
+        Sta.Run(() =>
+        {
+            var entry = Image();
+            using var app = AppWith(entry);
+            var archive = Path.Combine(_dir, "archive");
+            app.State.State.GalleryArchiveFolder = archive;
+
+            app.Vm.ArchiveGalleryEntryCommand.Execute(app.Vm.Gallery[0]);
+
+            var archived = Path.Combine(archive, Path.GetFileName(entry.FilePath));
+            Assert.False(File.Exists(entry.FilePath));
+            Assert.True(File.Exists(archived));
+            Assert.Empty(app.Vm.Gallery);
+            Assert.Empty(app.Get<IGalleryStore>().Load());
+            Assert.Equal(0, app.Dialogs.ConfirmCount);
+
+            var collision = Image("collision.png");
+            using var appWithCollision = AppWith(collision);
+            var collisionArchive = Path.Combine(_dir, "collision-archive");
+            Directory.CreateDirectory(collisionArchive);
+            var existing = Path.Combine(collisionArchive, Path.GetFileName(collision.FilePath));
+            File.WriteAllText(existing, "must remain untouched");
+            appWithCollision.State.State.GalleryArchiveFolder = collisionArchive;
+
+            appWithCollision.Vm.ArchiveGalleryEntryCommand.Execute(appWithCollision.Vm.Gallery[0]);
+
+            Assert.Equal("must remain untouched", File.ReadAllText(existing));
+            Assert.True(File.Exists(collision.FilePath));
+            Assert.Single(appWithCollision.Vm.Gallery);
+            Assert.Single(appWithCollision.Get<IGalleryStore>().Load());
+            Assert.Contains("Nie udało się przenieść", appWithCollision.Vm.Status);
+        });
+    }
+
+    [Fact]
+    public void Archive_refuses_cloud_and_requires_confirmation_for_unknown_legacy_origin()
+    {
+        Sta.Run(() =>
+        {
+            var cloud = Image("cloud.png");
+            cloud.StorageId = "onedrive";
+            var legacy = Image("legacy.png");
+            legacy.StorageId = null;
+            using var app = AppWith(cloud, legacy);
+            app.State.State.GalleryArchiveFolder = Path.Combine(_dir, "archive");
+            app.Dialogs.ConfirmAnswer = false;
+
+            foreach (var entry in app.Vm.Gallery.ToList())
+            {
+                app.Vm.ArchiveGalleryEntryCommand.Execute(entry);
+                Assert.True(File.Exists(entry.FilePath));
+            }
+
+            Assert.Equal(1, app.Dialogs.ConfirmCount);
+            Assert.Contains("nie można ustalić pochodzenia", app.Dialogs.LastConfirmationText!.ToLowerInvariant());
+            Assert.Equal("Potwierdź archiwizację starszego wpisu", app.Dialogs.LastConfirmationTitle);
+            Assert.Equal(2, app.Vm.Gallery.Count);
+            Assert.Equal(2, app.Get<IGalleryStore>().Load().Count);
+
+            app.Dialogs.ConfirmAnswer = true;
+            app.Vm.ArchiveGalleryEntryCommand.Execute(legacy);
+
+            Assert.Equal(2, app.Dialogs.ConfirmCount);
+            Assert.False(File.Exists(legacy.FilePath));
+            Assert.True(File.Exists(Path.Combine(app.State.State.GalleryArchiveFolder, Path.GetFileName(legacy.FilePath))));
+            Assert.Single(app.Vm.Gallery);
+            Assert.Equal("onedrive", Assert.Single(app.Vm.Gallery).StorageId);
+        });
+    }
+
+    [Fact]
+    public void Archiving_the_displayed_video_releases_it_and_moves_the_file()
+    {
+        Sta.Run(() =>
+        {
+            var entry = Video();
+            using var app = AppWith(entry);
+            app.State.State.GalleryArchiveFolder = Path.Combine(_dir, "video-archive");
+            app.Vm.SelectedGalleryEntry = app.Vm.Gallery[0];
+            Assert.True(app.Vm.ShowVideo);
+
+            app.Vm.ArchiveGalleryEntryCommand.Execute(app.Vm.Gallery[0]);
+
+            Assert.False(app.Vm.ShowVideo);
+            Assert.Null(app.Vm.VideoSource);
+            Assert.False(File.Exists(entry.FilePath));
+            Assert.True(File.Exists(Path.Combine(app.State.State.GalleryArchiveFolder, Path.GetFileName(entry.FilePath))));
+            Assert.Empty(app.Vm.Gallery);
+        });
+    }
+
+    [Fact]
+    public void Locked_file_stays_in_the_gallery_when_archiving_fails()
+    {
+        Sta.Run(() =>
+        {
+            var entry = Image();
+            using var app = AppWith(entry);
+            app.State.State.GalleryArchiveFolder = Path.Combine(_dir, "locked-archive");
+            using var locked = new FileStream(entry.FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+            app.Vm.ArchiveGalleryEntryCommand.Execute(app.Vm.Gallery[0]);
+
+            Assert.True(File.Exists(entry.FilePath));
+            Assert.Single(app.Vm.Gallery);
+            Assert.Single(app.Get<IGalleryStore>().Load());
+            Assert.Contains("Nie udało się przenieść", app.Vm.Status);
+        });
+    }
+
+    [Fact]
+    public void Failed_gallery_save_rolls_the_file_back_and_keeps_the_entry()
+    {
+        Sta.Run(() =>
+        {
+            var entry = Image();
+            var store = new FailingArchiveStore(entry);
+            using var app = TestApp.Create(s => s.AddSingleton<IGalleryStore>(store));
+            app.Get<ImageStudio.Storage.Local.LocalMediaStorage>().Roots[ImageStudio.Storage.MediaKind.Image] = _dir;
+            app.State.State.GalleryArchiveFolder = Path.Combine(_dir, "save-failure-archive");
+
+            app.Vm.ArchiveGalleryEntryCommand.Execute(app.Vm.Gallery[0]);
+
+            Assert.True(File.Exists(entry.FilePath));
+            Assert.False(File.Exists(Path.Combine(app.State.State.GalleryArchiveFolder, Path.GetFileName(entry.FilePath))));
+            Assert.Single(app.Vm.Gallery);
+            Assert.Single(store.Load());
+            Assert.Contains("Nie udało się przenieść", app.Vm.Status);
+        });
+    }
+
+    [Fact]
+    public void Failed_recovery_save_is_included_in_the_report_when_file_rollback_fails()
+    {
+        Sta.Run(() =>
+        {
+            var entry = Image();
+            var store = new FailingRecoveryStore(entry);
+            using var app = TestApp.Create(s => s.AddSingleton<IGalleryStore>(store));
+            app.Get<ImageStudio.Storage.Local.LocalMediaStorage>().Roots[ImageStudio.Storage.MediaKind.Image] = _dir;
+            app.State.State.GalleryArchiveFolder = Path.Combine(_dir, "recovery-failure-archive");
+
+            app.Vm.ArchiveGalleryEntryCommand.Execute(app.Vm.Gallery[0]);
+
+            Assert.True(File.Exists(entry.FilePath));
+            Assert.True(File.Exists(Path.Combine(app.State.State.GalleryArchiveFolder, Path.GetFileName(entry.FilePath))));
+            Assert.Single(app.Vm.Gallery);
+            Assert.Contains("initial gallery save failed", app.Vm.Status);
+            Assert.Contains("recovery gallery save failed", app.Vm.Status);
+        });
+    }
+
+    [Fact]
     public void Deleting_the_file_of_the_video_being_shown_releases_the_player_first()
     {
         Sta.Run(() =>
@@ -211,7 +393,7 @@ public sealed class GalleryTests : IDisposable
             Flush(window.Dispatcher);
 
             var tile = FindAll<StackPanel>(panel).Single(p => p.ContextMenu is not null);
-            Assert.Equal(["Powtórz", null, "Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj prompt"],
+            Assert.Equal(["Powtórz", null, "Przenieś do archiwum", null, "Usuń z galerii", "Usuń z galerii i z dysku...", null, "Kopiuj prompt"],
                          tile.ContextMenu!.Items.Cast<object>().Select(i => (i as MenuItem)?.Header as string));
             var tip = (StackPanel)tile.ToolTip;
             Assert.Contains("Prompt", tip.Children.OfType<TextBlock>().Select(t => System.Windows.Data.BindingOperations.GetBinding(t, TextBlock.TextProperty)?.Path.Path).ToList());

@@ -32,6 +32,45 @@ internal sealed class MemoryLibrary : IStudioLibrary
 // Operacje bez okna: dostawca-atrapa, magazyn w katalogu tymczasowym, biblioteka w pamięci
 public sealed class StudioApiTests : IDisposable
 {
+    private sealed class PausedStorage(string id) : IMediaStoragePlugin
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string Id => id;
+        public string DisplayName => id;
+        public IReadOnlyList<StorageSetting> Settings => [];
+        public Task Started => _started.Task;
+        public int Writes { get; private set; }
+        public MediaKind? WrittenKind { get; private set; }
+        public void Configure(IReadOnlyDictionary<string, string> values) { }
+        public void Release() => _release.TrySetResult();
+
+        public async Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default)
+        {
+            Writes++;
+            WrittenKind = kind;
+            _started.TrySetResult();
+            await _release.Task.WaitAsync(ct);
+            return $"{id}:{fileName}";
+        }
+
+        public Task<byte[]> ReadAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task DeleteAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    private sealed class PlainStorage(IMediaStorage inner) : IMediaStorage
+    {
+        public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            inner.WriteAsync(kind, fileName, data, ct);
+        public Task<byte[]> ReadAsync(string location, CancellationToken ct = default) => inner.ReadAsync(location, ct);
+        public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => inner.ExistsAsync(location, ct);
+        public Task DeleteAsync(string location, CancellationToken ct = default) => inner.DeleteAsync(location, ct);
+        public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => inner.GetLocalPathAsync(location, ct);
+    }
+
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "is-studio-" + Guid.NewGuid().ToString("N"));
     private readonly FakeProvider _provider = new();
     private readonly MemoryLibrary _library = new();
@@ -107,8 +146,59 @@ public sealed class StudioApiTests : IDisposable
         Assert.True(File.Exists(entry.FilePath));
         Assert.Equal(0.04m, entry.CostUsd);
         Assert.Equal("Fake", entry.Provider);  // dostawca trafia do wpisu (dymek galerii)
+        Assert.Equal("local", entry.StorageId);
         Assert.NotNull(result.Bytes);
         Assert.Same(entry, Assert.Single(_library.MediaItems));
+    }
+
+    [Theory]
+    [InlineData(MediaKind.Image)]
+    [InlineData(MediaKind.Video)]
+    [InlineData(MediaKind.Audio)]
+    public async Task Switching_storage_during_write_keeps_the_writer_and_its_identity(MediaKind kind)
+    {
+        var cloud = new PausedStorage("cloud");
+        var local = new PausedStorage("local");
+        var host = new MediaStorageHost([cloud, local]);
+        var studio = new StudioApi(() => _provider, host, _library, _presets) { Catalog = Catalog() };
+
+        var operation = kind switch
+        {
+            MediaKind.Image => studio.GenerateImageAsync(new ImageRequest("kot", Publish: false)),
+            MediaKind.Video => studio.GenerateVideoAsync(new VideoGenerationRequest("fala", Publish: false)),
+            _ => studio.SpeakAsync(new SpeechRequest("cześć", Publish: false)),
+        };
+        try
+        {
+            await cloud.Started.WaitAsync(TimeSpan.FromSeconds(5));
+            host.Apply("local", null);
+        }
+        finally
+        {
+            cloud.Release();
+            local.Release();
+        }
+
+        var result = await operation.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("cloud", result.Entry.StorageId);
+        Assert.StartsWith("cloud:", result.Entry.FilePath);
+        Assert.Equal(kind, cloud.WrittenKind);
+        Assert.Equal(1, cloud.Writes);
+        Assert.Equal(0, local.Writes);
+    }
+
+    [Fact]
+    public async Task Non_plugin_storage_remains_supported_without_an_identifier()
+    {
+        var backing = new PausedStorage("backing");
+        backing.Release();
+        var studio = new StudioApi(() => _provider, new PlainStorage(backing), _library, _presets) { Catalog = Catalog() };
+
+        var result = await studio.GenerateImageAsync(new ImageRequest("kot", Publish: false));
+
+        Assert.Null(result.Entry.StorageId);
+        Assert.StartsWith("backing:", result.Entry.FilePath);
+        Assert.Equal(1, backing.Writes);
     }
 
     [Fact]

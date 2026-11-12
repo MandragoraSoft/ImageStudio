@@ -195,6 +195,8 @@ internal sealed class FakeDialogs : IDialogService
     public void OpenFile(string path) => (OpenError is null ? Opened : throw OpenError).Add(path);
     public string? ChooseSaveFileAs(string suggestedFileName, string title, string filter) => SaveAsAnswer;
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
+    public int AboutCount { get; private set; }
+    public void ShowAbout() => AboutCount++;
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
     public IReadOnlyList<ISettingsTab>? LastSettingsTabs { get; private set; }
@@ -229,7 +231,15 @@ internal sealed class FakeDialogs : IDialogService
     public bool ConfirmToolCall(ToolCall call) => true;
     public bool ConfirmAnswer { get; set; } = true;
     public int ConfirmCount { get; private set; }
-    public bool Confirm(string text, string title) { ConfirmCount++; return ConfirmAnswer; }
+    public string? LastConfirmationText { get; private set; }
+    public string? LastConfirmationTitle { get; private set; }
+    public bool Confirm(string text, string title)
+    {
+        ConfirmCount++;
+        LastConfirmationText = text;
+        LastConfirmationTitle = title;
+        return ConfirmAnswer;
+    }
     public Action<ModelBrowserViewModel>? OnShowModelBrowser { get; set; }
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         (OnShowModelBrowser ?? throw new NotSupportedException()).Invoke(viewModel);

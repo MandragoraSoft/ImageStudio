@@ -2,6 +2,10 @@
 
 _Kiedy czytać: dotykasz edytora promptu, przebudowy promptu, opisu obrazu przez AI albo zestawów._
 
+## Obrazy wejściowe edycji
+
+Panel edycji pokazuje wszystkie `MainViewModel.References` jako przewijane miniatury. Kolejność zmienia przeciąganie kafelków lub przyciski strzałek; pierwszy obraz jest podstawowy. Zmiana pierwszej pozycji aktualizuje `SourceImage` i proporcje wyjścia, a wysyłka oraz opis obrazów używają kolejności kolekcji. Miniatury są wczytywane ze ścieżek referencji z ograniczeniem rozmiaru dekodowania i bez blokowania plików. Pliki, linki, schowek i App Control korzystają z tej samej listy.
+
 ## Przebudowa promptu przez AI
 
 (`IAiProvider.EnhancePromptAsync` -> `OpenAiCompat.EnhanceAsync`): prompt ma dwie osobne części, `system` (konfiguracja generowania: jak wykonać) i `concept` (oczekiwany wynik: co pokazać). Model odpowiada JSON-em o stałej strukturze `{system, concept, changes}`; OpenAI i OpenRouter dostają `response_format` (z ponowieniem bez niego, gdy endpoint go odrzuci), UberLLM nie, bo API odrzuca nieznane klucze. Poprzednie przebudowy (`PromptRevision`, ostatnie 6) są dołączane jako kontekst rozmowy; historia żyje w `PromptEdit.History` i w `MainViewModel` osobno dla zakładek Generowanie i Edycja.

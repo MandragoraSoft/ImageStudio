@@ -22,6 +22,8 @@ public sealed class GalleryEntry
     public decimal? CostUsd { get; set; }
     public bool CostEstimated { get; set; }
     public string FilePath { get; set; } = "";
+    // Magazyn, który zapisał wynik; brak w starszych wpisach oznacza nieznane pochodzenie
+    public string? StorageId { get; set; }
 
     // Wejścia operacji (referencje, załączniki wideo: ścieżki albo adresy) i parametry potrzebne do jej powtórzenia
     // (width, height, seed, negative, quality, duration, aspect, voice, speed, format, language, hint); null w starszych wpisach

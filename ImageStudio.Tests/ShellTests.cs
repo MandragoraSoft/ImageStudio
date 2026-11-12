@@ -47,7 +47,7 @@ public sealed class ShellTests
             Flush(window.Dispatcher);
 
             var menu = FindAll<Menu>(window).Single();
-            Assert.Equal(["Plik", "Zestawy", "Modele", "Narzędzia"],
+            Assert.Equal(["Plik", "Zestawy", "Modele", "Narzędzia", "Pomoc"],
                          menu.Items.OfType<MenuItem>().Select(m => ((string)m.Header).Replace("_", "")));
 
             var items = AllItems(menu).ToList();
@@ -58,6 +58,10 @@ public sealed class ShellTests
             Assert.Same(vm.SaveImageAsCommand, Item("Zapisz jako...").Command);
             Assert.Same(vm.ClearResultCommand, Item("Wyczyść wynik").Command);
             Assert.Same(vm.OpenPresetsCommand, Item("Zestawy...").Command);
+            var help = Item("Pomoc");
+            Assert.Same(vm.OpenAboutCommand, help.Command);
+            help.Command.Execute(null);
+            Assert.Equal(1, app.Dialogs.AboutCount);
             window.Close();
         });
     }

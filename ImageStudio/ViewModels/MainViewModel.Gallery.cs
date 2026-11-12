@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -22,15 +23,15 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private GalleryEntry? _selectedGalleryEntry;
 
-    // Etykiety liczone w kodzie nie mają powiązania ze słownikiem: po zmianie języka odświeżamy je ręcznie
-    private void RefreshLanguageTexts()
-    {
-        OnPropertyChanged(nameof(GalleryTotalLabel));
-        OnPropertyChanged(nameof(VideoEstimateLabel));
-        OnPropertyChanged(nameof(VideoHint));
-        Voice.RefreshLanguageTexts();
-    }
-
+    // Etykiety liczone w kodzie nie mają powiązania ze słownikiem: po zmianie języka odświeżamy je ręcznie
+    private void RefreshLanguageTexts()
+    {
+        OnPropertyChanged(nameof(GalleryTotalLabel));
+        OnPropertyChanged(nameof(VideoEstimateLabel));
+        OnPropertyChanged(nameof(VideoHint));
+        Voice.RefreshLanguageTexts();
+    }
+
     public string GalleryTotalLabel
     {
         get
@@ -125,6 +126,118 @@ public sealed partial class MainViewModel
         RemoveFromGallery(entry);
         Status = Loc.T("gallery.msg.removed");
     }
+
+    // Starsze wpisy bez identyfikatora magazynu wymagają osobnego potwierdzenia ich lokalnego pochodzenia.
+    [RelayCommand]
+    private void ArchiveGalleryEntry(GalleryEntry? entry)
+    {
+        if (entry is null || !Gallery.Contains(entry)) return;
+        if (!TryGetLocalArchivePaths(entry, out var source, out var destination, out var pathError))
+        {
+            Status = pathError is null
+                ? Loc.T("gallery.msg.archiveLocalOnly")
+                : Loc.T("gallery.msg.archiveFailed", pathError);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.StorageId)
+            && !_dialogs.Confirm(Loc.T("gallery.confirmArchiveLegacy", entry.FilePath),
+                                 Loc.T("gallery.confirmArchiveLegacy.title")))
+            return;
+
+        var showingVideo = ShowVideo && VideoSource?.LocalPath == entry.FilePath;
+        var wasSelected = SelectedGalleryEntry == entry;
+        if (showingVideo) ClearResult();
+
+        var moved = false;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Move(source, destination);
+            moved = true;
+            _galleryStore.Save(Gallery.Where(e => !ReferenceEquals(e, entry)).ToList());
+        }
+        catch (Exception ex) when (IsArchiveFailure(ex))
+        {
+            if (moved)
+            {
+                try
+                {
+                    File.Move(destination, source);
+                }
+                catch (Exception rollbackError) when (IsArchiveFailure(rollbackError))
+                {
+                    // Utrzymujemy poprawną ścieżkę w widocznym wpisie, jeśli nie udało się cofnąć przeniesienia.
+                    entry.FilePath = destination;
+                    entry.Thumbnail = GalleryStore.Thumbnail(destination);
+                    string? saveErrorMessage = null;
+                    try
+                    {
+                        _galleryStore.Save(Gallery);
+                    }
+                    catch (Exception saveError)
+                    {
+                        saveErrorMessage = saveError.Message;
+                    }
+
+                    Status = saveErrorMessage is null
+                        ? Loc.T("gallery.msg.archiveRollbackFailed", ex.Message, rollbackError.Message)
+                        : Loc.T("gallery.msg.archiveRollbackSaveFailed", ex.Message, rollbackError.Message, saveErrorMessage);
+                    return;
+                }
+            }
+
+            if (showingVideo) SelectedGalleryEntry = entry;
+            Status = Loc.T("gallery.msg.archiveFailed", ex.Message);
+            return;
+        }
+
+        if (wasSelected) SelectedGalleryEntry = null;
+        Gallery.Remove(entry);
+        OnPropertyChanged(nameof(GalleryTotalLabel));
+        Status = Loc.T("gallery.msg.archived");
+    }
+
+    private bool TryGetLocalArchivePaths(GalleryEntry entry, out string source, out string destination, out string? error)
+    {
+        source = destination = "";
+        error = null;
+        if (!string.IsNullOrWhiteSpace(entry.StorageId) && entry.StorageId != "local") return false;
+        if (entry.Kind is not ("generate" or "edit" or "video")) return false;
+
+        var kind = entry.Kind == "video" ? MediaKind.Video : MediaKind.Image;
+        var localStorage = _storage.Plugins.FirstOrDefault(p => p.Id == "local");
+        var root = localStorage?.LocalFolder(kind);
+        if (string.IsNullOrWhiteSpace(root)) return false;
+        if (string.IsNullOrWhiteSpace(_state.GalleryArchiveFolder))
+        {
+            error = Loc.T("gallery.msg.archiveFolderMissing");
+            return false;
+        }
+
+        try
+        {
+            if (!Path.IsPathFullyQualified(entry.FilePath)) return false;
+            source = Path.GetFullPath(entry.FilePath);
+            var rootPath = Path.GetFullPath(root);
+            var relative = Path.GetRelativePath(rootPath, source);
+            if (relative == "." || Path.IsPathRooted(relative)
+                || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                return false;
+
+            destination = Path.Combine(Path.GetFullPath(_state.GalleryArchiveFolder), Path.GetFileName(source));
+            return true;
+        }
+        catch (Exception ex) when (IsArchiveFailure(ex))
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool IsArchiveFailure(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException
+            or System.Security.SecurityException or System.Text.Json.JsonException;
 
     // Usuwa wpis razem z plikiem na dysku, po potwierdzeniu
     [RelayCommand]

@@ -13,6 +13,16 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
                               ImageDownloadService? downloads = null, IActivityTracker? activity = null,
                               IStudioDefaults? defaults = null, Func<IReadOnlySet<string>>? preferred = null) : IStudioApi
 {
+    // Magazyn wybieramy raz: przełączenie hosta podczas zapisu nie może zmienić pochodzenia wyniku.
+    private async Task<(string Path, string? StorageId)> WriteResultAsync(MediaKind kind, string fileName,
+                                                                           ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        var target = storage is MediaStorageHost host ? host.Active : storage;
+        var storageId = (target as IMediaStoragePlugin)?.Id;
+        var path = await target.WriteAsync(kind, fileName, data, ct);
+        return (path, storageId);
+    }
+
     public ProviderCatalog? Catalog { get; set; }
 
     public async Task<ProviderCatalog> CatalogAsync(CancellationToken ct = default) =>
@@ -102,10 +112,11 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         using var _ = activity?.Begin("Synteza mowy");
         var speed = request.Speed is { } s && Math.Abs(s - 1.0) > 0.001 ? s : (double?)null;
         var result = await provider().SynthesizeAsync(id, text, request.Voice, speed, request.Format, ct);
-        var path = await storage.WriteAsync(MediaKind.Audio, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}", result.Bytes, ct);
+        var (path, storageId) = await WriteResultAsync(MediaKind.Audio, $"{DateTime.Now:yyyyMMdd-HHmmss}.{result.Extension}", result.Bytes, ct);
         var entry = new GalleryEntry
         {
-            Kind = "speech", Prompt = text, Model = id, Provider = provider().DisplayName, Size = note ?? "", FilePath = path, CostUsd = result.CostUsd ?? estimate,
+            Kind = "speech", Prompt = text, Model = id, Provider = provider().DisplayName, Size = note ?? "", FilePath = path,
+            StorageId = storageId, CostUsd = result.CostUsd ?? estimate,
             Params = Params(("voice", request.Voice), ("speed", speed), ("format", request.Format)),
             CostEstimated = result.CostUsd is null && estimate is not null,
         };
@@ -194,10 +205,11 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
 
         using var _ = activity?.Begin("Generowanie wideo");
         var result = await provider().GenerateVideoAsync(id, request.Prompt, request.Duration, request.AspectRatio, files, request.Progress, ct);
-        var path = await storage.WriteAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes, ct);
+        var (path, storageId) = await WriteResultAsync(MediaKind.Video, $"{DateTime.Now:yyyyMMdd-HHmmss}.mp4", result.Bytes, ct);
         var entry = new GalleryEntry
         {
             Kind = "video", Prompt = request.Prompt, Model = id, Provider = provider().DisplayName, FilePath = path,
+            StorageId = storageId,
             Size = $"{request.AspectRatio} · {request.Duration} s" + (files.Count > 0 ? $" · {files.Count} zał." : ""),
             Inputs = request.Attachments is { Count: > 0 } attachments ? attachments.ToList() : null,
             Params = Params(("duration", request.Duration), ("aspect", request.AspectRatio)),
@@ -211,11 +223,12 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
                                                     bool publish, List<string>? inputs, Dictionary<string, string>? parameters, CancellationToken ct)
     {
         var ext = result.Bytes is [0xFF, 0xD8, ..] ? "jpg" : "png";
-        var path = await storage.WriteAsync(MediaKind.Image, $"{DateTime.Now:yyyyMMdd-HHmmss}.{ext}", result.Bytes, ct);
+        var (path, storageId) = await WriteResultAsync(MediaKind.Image, $"{DateTime.Now:yyyyMMdd-HHmmss}.{ext}", result.Bytes, ct);
         var estimate = Catalog?.Pricing.GetValueOrDefault(model)?.PerResult;
         var entry = new GalleryEntry
         {
             Kind = kind, Prompt = prompt, Model = model, Provider = provider().DisplayName, Size = size, FilePath = path, Inputs = inputs, Params = parameters,
+            StorageId = storageId,
             CostUsd = result.CostUsd ?? estimate, CostEstimated = result.CostUsd is null && estimate is not null,
         };
         if (publish) library.AddMedia(entry);

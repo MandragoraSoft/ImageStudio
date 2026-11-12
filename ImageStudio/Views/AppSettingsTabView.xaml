@@ -15,6 +15,17 @@
             <TextBlock Text="{loc:T settings.maxSide}" Style="{StaticResource SectionHeader}"/>
             <TextBox Text="{Binding MaxSide, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left"/>
 
+            <TextBlock Text="{loc:T settings.galleryArchive}" Style="{StaticResource SectionHeader}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Text="{Binding GalleryArchiveFolder, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T settings.galleryArchive.tip}"/>
+                <Button Grid.Column="1" Content="{loc:T settings.galleryArchive.browse}" Margin="6,0,0,0" Padding="10,2"
+                        Click="BrowseArchive_Click" Style="{StaticResource SecondaryButton}"/>
+            </Grid>
+
             <TextBlock Text="{loc:T settings.chat}" Style="{StaticResource SectionHeader}"/>
             <CheckBox Content="{loc:T settings.streaming}" IsChecked="{Binding UseStreaming}"
                       ToolTip="{loc:T settings.streaming.tip}"/>

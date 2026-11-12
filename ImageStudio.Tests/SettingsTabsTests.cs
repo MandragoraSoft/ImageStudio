@@ -56,6 +56,17 @@ public sealed class SettingsTabsTests
         Assert.Equal("openrouter", result.ProviderId);
     }
 
+    [Fact]
+    public void App_tab_preserves_the_configured_gallery_archive_folder()
+    {
+        var current = Current() with { GalleryArchiveFolder = @"D:\Obrazy\Archiwum" };
+        var app = new AppSettingsTab(current);
+
+        var result = app.Apply(current);
+
+        Assert.Equal(@"D:\Obrazy\Archiwum", result.GalleryArchiveFolder);
+    }
+
     private static void Flush(Dispatcher dispatcher) => dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
     private static T? Find<T>(DependencyObject root) where T : DependencyObject

@@ -110,14 +110,15 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void RemoveReference(ReferenceItem? item)
     {
-        if (item is null || !References.Remove(item)) return;
+        var index = ReferenceIndex(item);
+        if (index < 0) return;
+        References.RemoveAt(index);
 
         if (References.Count == 0)
         {
-            _primaryPath = null;
             SourceImage = null;
         }
-        else if (item.Path == _primaryPath)
+        else if (index == 0)
         {
             // Usunięto podstawowy: nowym podstawowym staje się następny na liście
             LoadPrimary();
@@ -125,11 +126,68 @@ public sealed partial class MainViewModel
         Status = Loc.T("ref.msg.count", References.Count);
     }
 
+    private int ReferenceIndex(ReferenceItem? item)
+    {
+        for (var i = 0; i < References.Count; i++)
+            if (ReferenceEquals(References[i], item)) return i;
+        return -1;
+    }
+
+    private bool CanMoveReferenceLeft(ReferenceItem? item) => ReferenceIndex(item) > 0;
+    private bool CanMoveReferenceRight(ReferenceItem? item)
+    {
+        var index = ReferenceIndex(item);
+        return index >= 0 && index < References.Count - 1;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMoveReferenceLeft))]
+    private void MoveReferenceLeft(ReferenceItem? item)
+    {
+        var index = ReferenceIndex(item);
+        if (index > 0) MoveReference([index, index - 1]);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMoveReferenceRight))]
+    private void MoveReferenceRight(ReferenceItem? item)
+    {
+        var index = ReferenceIndex(item);
+        if (index >= 0 && index < References.Count - 1) MoveReference([index, index + 1]);
+    }
+
+    [RelayCommand]
+    private void MoveReference(int[]? indices)
+    {
+        if (indices is not { Length: 2 }) return;
+        var from = indices[0];
+        var to = indices[1];
+        if (from < 0 || from >= References.Count || to < 0 || to >= References.Count || from == to) return;
+
+        // Wczytanie przed zmianą kolejności pozwala zachować spójny stan, jeśli plik zniknął.
+        BitmapImage? primary = null;
+        if (from == 0 || to == 0)
+        {
+            var newPrimary = from == 0 ? References[1] : References[from];
+            try { primary = LoadImage(File.ReadAllBytes(newPrimary.Path)); }
+            catch (Exception ex)
+            {
+                Status = Loc.T("ref.msg.loadFailed", ex.Message);
+                Log.LogError("{Message}", Status);
+                return;
+            }
+        }
+
+        References.Move(from, to);
+        if (primary is not null)
+        {
+            SourceImage = primary;
+            ApplyAspectFrom(primary.PixelWidth, primary.PixelHeight);
+        }
+    }
+
     [RelayCommand]
     private void ClearReferences()
     {
         References.Clear();
-        _primaryPath = null;
         SourceImage = null;
         Status = Loc.T("ref.msg.cleared");
     }
@@ -137,8 +195,7 @@ public sealed partial class MainViewModel
     // Podgląd i proporcje z pierwszego obrazu (podstawowego)
     private void LoadPrimary()
     {
-        _primaryPath = References[0].Path;
-        var source = LoadImage(File.ReadAllBytes(_primaryPath));
+        var source = LoadImage(File.ReadAllBytes(References[0].Path));
         SourceImage = source;
         ApplyAspectFrom(source.PixelWidth, source.PixelHeight);
     }

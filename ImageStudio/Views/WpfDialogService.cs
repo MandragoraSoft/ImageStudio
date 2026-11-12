@@ -71,6 +71,9 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
         return window.ShowDialog() == true ? viewModel.ToResult() : null;
     }
 
+    public void ShowAbout() =>
+        new AboutWindow { DataContext = new AboutViewModel(), Owner = OwnerWindow() }.ShowDialog();
+
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null)
     {
         var viewModel = new PresetSaveViewModel(defaultName, prompt, suggest);

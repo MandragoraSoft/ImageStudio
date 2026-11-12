@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.Localization;
 
@@ -40,13 +41,26 @@ public sealed partial class AppSettingsTab : ObservableObject, ISettingsTab
     [ObservableProperty]
     private bool _useStreaming;
 
+    [ObservableProperty]
+    private string _galleryArchiveFolder;
+
     public AppSettingsTab(SettingsResult current)
     {
         _maxSide = current.MaxSide;
         _selectedTheme = current.Theme;
         _useStreaming = current.UseStreaming;
         _selectedLanguage = current.Language;
+        _galleryArchiveFolder = string.IsNullOrWhiteSpace(current.GalleryArchiveFolder)
+            ? UserState.DefaultGalleryArchiveFolder
+            : current.GalleryArchiveFolder;
     }
 
-    public SettingsResult Apply(SettingsResult result) => result with { MaxSide = MaxSide, Theme = SelectedTheme, UseStreaming = UseStreaming, Language = SelectedLanguage };
+    public SettingsResult Apply(SettingsResult result) => result with
+    {
+        MaxSide = MaxSide,
+        Theme = SelectedTheme,
+        UseStreaming = UseStreaming,
+        Language = SelectedLanguage,
+        GalleryArchiveFolder = GalleryArchiveFolder,
+    };
 }

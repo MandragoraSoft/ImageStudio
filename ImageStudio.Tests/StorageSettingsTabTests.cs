@@ -8,6 +8,19 @@ namespace ImageStudio.Tests;
 public sealed class StorageSettingsTabTests
 {
     [Fact]
+    public async Task Gallery_archive_folder_is_saved_in_user_state_from_settings()
+    {
+        using var app = TestApp.Create();
+        const string folder = @"D:\Galeria\Archiwum";
+        app.Dialogs.SettingsAnswer = current =>
+            new AppSettingsTab(current) { GalleryArchiveFolder = folder }.Apply(current);
+
+        await app.Vm.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(folder, app.State.State.GalleryArchiveFolder);
+    }
+
+    [Fact]
     public async Task Changed_folder_is_applied_to_new_files_and_remembered_in_the_user_state()
     {
         using var app = TestApp.Create();

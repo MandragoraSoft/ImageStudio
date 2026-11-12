@@ -12,6 +12,9 @@ public sealed class ParamState
 // Ostatnio wybrane modele i parametry; zapis w %LOCALAPPDATA%\ImageStudio\state.json
 public sealed class UserState
 {
+    public static string DefaultGalleryArchiveFolder =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "ImageStudio", "Archiwum");
+
     // Ostatnio wpisane prompty (przywracane po starcie); zestawy zapisane osobno jako Preset
     public string? GeneratePrompt { get; set; }
     public string? EditPrompt { get; set; }
@@ -62,6 +65,7 @@ public sealed class UserState
     // Magazyn wyników (wtyczka IMediaStoragePlugin): wybrana wtyczka i jej ustawienia po Id wtyczki; null = domyślna
     public string? StorageId { get; set; }
     public Dictionary<string, Dictionary<string, string>> StorageConfig { get; set; } = [];
+    public string GalleryArchiveFolder { get; set; } = DefaultGalleryArchiveFolder;
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
     public string? Quality { get; set; }

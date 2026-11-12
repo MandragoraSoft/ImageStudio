@@ -21,7 +21,8 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    string? StorageId = null,
                                    IReadOnlyDictionary<string, Dictionary<string, string>>? StorageConfig = null,
                                    int McpMaxTools = McpLimits.DefaultMaxTools, int McpListLimit = McpLimits.DefaultListLimit,
-                                   int McpMaxListLimit = McpLimits.DefaultMaxListLimit);
+                                   int McpMaxListLimit = McpLimits.DefaultMaxListLimit,
+                                   string? GalleryArchiveFolder = null);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);
@@ -46,6 +47,7 @@ public interface IDialogService
     BitmapSource? GetClipboardImage();
 // Zakładki okna są wstrzykiwane (ISettingsTab); wynik składa się z wartości wszystkich zakładek
     SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs);
+    void ShowAbout();
     // prompt: podgląd w oknie; suggest (opcjonalny) proponuje nazwę i opis przez AI
     PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null);
 

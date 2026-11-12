@@ -230,7 +230,12 @@ public sealed partial class MainViewModel : ObservableObject
         Loc.LanguageChanged += RefreshLanguageTexts;
 
 
-        References.CollectionChanged += (_, _) => EditCommand.NotifyCanExecuteChanged();
+        References.CollectionChanged += (_, _) =>
+        {
+            EditCommand.NotifyCanExecuteChanged();
+            MoveReferenceLeftCommand.NotifyCanExecuteChanged();
+            MoveReferenceRightCommand.NotifyCanExecuteChanged();
+        };
         VideoAttachments.CollectionChanged += (_, _) =>
         {
             GenerateVideoCommand.NotifyCanExecuteChanged();
@@ -284,7 +289,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Obrazy referencyjne; pierwszy jest podstawowy
     public ObservableCollection<ReferenceItem> References { get; } = [];
-    private string? _primaryPath;
 
     // Zmiany wyboru modeli zapisują stan od razu
     partial void OnSelectedModelChanged(ModelOption? value) => OnPresetInputChanged();

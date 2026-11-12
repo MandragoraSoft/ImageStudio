@@ -91,7 +91,7 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <!-- Opis tylko w dymku (prompt, rodzaj, koszt); prawy przycisk: usuń, usuń z dysku, kopiuj prompt -->
+                            <!-- Opis tylko w dymku (prompt, rodzaj, koszt); menu: archiwizuj, usuń, usuń z dysku, kopiuj prompt -->
                             <StackPanel Width="132" Margin="0,0,8,0" Background="Transparent"
                                         Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                 <StackPanel.ToolTip>
@@ -122,6 +122,10 @@
                                     <ContextMenu>
                                         <MenuItem Header="{loc:T gallery.repeat}"
                                                   Command="{Binding PlacementTarget.Tag.RepeatGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="{loc:T gallery.archive}"
+                                                  Command="{Binding PlacementTarget.Tag.ArchiveGalleryEntryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                         <Separator/>
                                         <MenuItem Header="{loc:T gallery.remove}"

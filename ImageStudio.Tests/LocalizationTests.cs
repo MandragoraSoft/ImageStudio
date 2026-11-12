@@ -273,6 +273,7 @@ public sealed class LocalizationTests
             var tabs = (TabControl)window.FindName("MainTabs");
             var menu = FindAll<Menu>(window).Single();
             Assert.Equal("_Plik", ((MenuItem)menu.Items[0]).Header);
+            Assert.Equal("P_omoc", ((MenuItem)menu.Items[4]).Header);
             Assert.Equal(["Generowanie", "Edycja", "Wideo", "Czat", "Głos"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
             Assert.Contains("Dostawca: ", FindAll<TextBlock>(window).SelectMany(t => t.Inlines.OfType<System.Windows.Documents.Run>()).Select(r => r.Text));
 
@@ -283,6 +284,7 @@ public sealed class LocalizationTests
 
                 Assert.Equal("_File", ((MenuItem)menu.Items[0]).Header);
                 Assert.Equal("_Models", ((MenuItem)menu.Items[2]).Header);
+                Assert.Equal("_Help", ((MenuItem)menu.Items[4]).Header);
                 Assert.Equal(["Generate", "Edit", "Video", "Chat", "Voice"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
                 Assert.Contains("Provider: ", FindAll<TextBlock>(window).SelectMany(t => t.Inlines.OfType<System.Windows.Documents.Run>()).Select(r => r.Text));
 
@@ -298,6 +300,7 @@ public sealed class LocalizationTests
                 Loc.Set(Loc.Polish);
                 Flush(window.Dispatcher);
                 Assert.Equal("_Plik", ((MenuItem)menu.Items[0]).Header);
+                Assert.Equal("P_omoc", ((MenuItem)menu.Items[4]).Header);
                 Assert.Contains("Generuj mowę", FindAll<Button>(panel).Select(b => b.Content as string));
             }
             finally
