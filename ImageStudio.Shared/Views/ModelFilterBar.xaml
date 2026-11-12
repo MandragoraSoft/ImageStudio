@@ -1,6 +1,7 @@
 <UserControl x:Class="ImageStudio.Views.ModelFilterBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:ImageStudio.Localization"
+             xmlns:views="clr-namespace:ImageStudio.Views">
     <Border Style="{StaticResource Panel}">
         <StackPanel>
             <TextBlock Text="{loc:T filter.title}" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
@@ -20,11 +21,13 @@
                 <ComboBox Grid.Column="1" ItemsSource="{Binding Providers, RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItem="{Binding ActiveProvider, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <CheckBox Content="{loc:T filter.image}" IsChecked="{Binding InputImageOnly}" Margin="0,0,16,0"
+            <WrapPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox Content="{loc:T filter.image}" IsChecked="{Binding InputImageOnly}" Margin="0,0,16,6"
                           Visibility="{Binding ShowImageFilter, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"/>
-                <CheckBox Content="{loc:T filter.nsfw}" IsChecked="{Binding HideNsfw}"/>
-            </StackPanel>
+                <views:TriStateToggle Value="{Binding Nsfw}" Label="{loc:T filter.nsfw}"
+                                      OnlyText="{loc:T filter.tri.only}" AnyText="{loc:T filter.tri.any}" ExcludeText="{loc:T filter.tri.exclude}"
+                                      OnlyTip="{loc:T filter.tri.only.tip}" AnyTip="{loc:T filter.tri.any.tip}" ExcludeTip="{loc:T filter.tri.exclude.tip}"/>
+            </WrapPanel>
 
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>

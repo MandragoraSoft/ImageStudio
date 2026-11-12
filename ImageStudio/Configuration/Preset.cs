@@ -19,6 +19,9 @@ public sealed class Preset
     public string Prompt { get; set; } = "";
     public string SystemPrompt { get; set; } = "";
     public string? Model { get; set; }
+
+    // Id dostawcy, z którego pochodzi model; null w zestawach zapisanych przed tym polem
+    public string? Provider { get; set; }
     public int Width { get; set; } = 1024;
     public int Height { get; set; } = 1024;
     public string? SeedText { get; set; }

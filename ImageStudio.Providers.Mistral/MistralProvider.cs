@@ -40,7 +40,7 @@ public sealed class MistralProvider : OpenAiChatProvider
                 if (caps.ValueKind == JsonValueKind.Object && Flag(caps, "function_calling")) supported.Add("tools");
                 var description = m.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
                 return new ChatModelInfo(m.GetProperty("id").GetString()!, supported, vision, Owner,
-                                         vision ? ["text", "image"] : ["text"], description);
+                                         vision ? ["text", "image"] : ["text"], description, OpenAiCompat.ReadContextLength(m));
             })
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();

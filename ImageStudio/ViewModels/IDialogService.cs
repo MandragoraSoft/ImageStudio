@@ -70,6 +70,6 @@ public interface IDialogService
     // Modalna przeglądarka modeli z opisami i dodawaniem do preferowanych
     void ShowModelBrowser(ModelBrowserViewModel viewModel);
 
-    // Zarządzanie zestawami; zwraca zestaw do wczytania albo null
-    Preset? ShowPresets();
+    // Zarządzanie zestawami; zwraca zestaw do wczytania albo null. Kontekst daje modele i selektory z głównego okna
+    Preset? ShowPresets(PresetsContext? context = null);
 }

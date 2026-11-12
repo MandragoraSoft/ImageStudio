@@ -22,11 +22,6 @@ public sealed partial class MainViewModel : ObservableObject
     private const string DefaultGeneration = "venice/z-image-turbo";
     private const string DefaultEdit = "venice/grok-imagine-edit";
 
-    private static readonly (string Label, double Ratio)[] AspectRatios =
-    [
-        ("1:1", 1.0), ("4:3", 4.0 / 3), ("3:2", 1.5), ("16:9", 16.0 / 9), ("9:16", 9.0 / 16),
-    ];
-
     private static readonly ILogger Log = AppLog.For<MainViewModel>();
 
     private IAiProvider _provider;
@@ -178,10 +173,10 @@ public sealed partial class MainViewModel : ObservableObject
                                                  _dialogs.ConfirmToolCall, skills: skills);
         Tools = new ToolsViewModel(_toolHost, _state.UseTools, _state.RequireToolApproval ?? true, _state.McpEnabled,
                                    _mcp.ConfigPath, appTools, _state.AppControlEnabled, server, builtin,
-                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools, Limits, skills);
+                                   _state.BuiltinToolsEnabled ?? true, memory, _state.DisabledTools, Limits, skills, _state.ToolProfiles);
         Tools.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(ToolsViewModel.DisabledTools)) SaveState();
+            if (e.PropertyName is nameof(ToolsViewModel.DisabledTools) or nameof(ToolsViewModel.Profiles)) SaveState();
         };
         Tools.Permissions.Load(_state.AlwaysAllowedTools);
         Tools.Permissions.Changed += SaveState;
@@ -222,7 +217,9 @@ public sealed partial class MainViewModel : ObservableObject
         EditModelsView = CollectionViewSource.GetDefaultView(EditModels);
         VideoModelsView = CollectionViewSource.GetDefaultView(VideoModels);
         // Selektor ulepszania ma własny widok tych samych modeli (widok domyślny należy do czatu)
-        ChatModelsView = new CollectionViewSource { Source = ChatModelOptions }.View;
+        // Widok tworzony wprost, nie przez tymczasowy CollectionViewSource: gdy ten zostaje zebrany przez GC, WPF odłącza
+        // jego widok od kolekcji i następne Refresh() rzuca NullReferenceException (ListCollectionView.PrepareLocalArray)
+        ChatModelsView = new ListCollectionView(ChatModelOptions);
         GenerateFilter = BindFilter(true, ModelsView);
         EditFilter = BindFilter(true, EditModelsView);
         VideoFilter = BindFilter(true, VideoModelsView);
@@ -282,8 +279,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<string> EnhancerModels { get; } = [];
     public ObservableCollection<ModelParameter> EnhancerParameters { get; } = [];
 
-    public IReadOnlyList<string> QualityOptions { get; } = ["auto", "low", "medium", "high"];
-    public IReadOnlyList<string> AspectPresets { get; } = ["1:1", "4:3", "3:2", "16:9", "9:16"];
+    public IReadOnlyList<string> QualityOptions { get; } = StudioDefaults.Qualities;
+    public IReadOnlyList<string> AspectPresets { get; } = StudioDefaults.ImageAspects;
 
     // Obrazy referencyjne; pierwszy jest podstawowy
     public ObservableCollection<ReferenceItem> References { get; } = [];
@@ -328,13 +325,7 @@ public sealed partial class MainViewModel : ObservableObject
     // Nazwa proporcji, jeśli W:H pasuje do jednego z presetów (null = dowolna); używana do podświetlania
     public string? AspectLabel
     {
-        get
-        {
-            if (Height == 0) return null;
-            var ratio = Width / (double)Height;
-            var match = AspectRatios.FirstOrDefault(p => Math.Abs(ratio - p.Ratio) < 0.02);
-            return match.Label;
-        }
+        get => ImageAspect.LabelFor(Width, Height);
         set
         {
             if (value is not null) SetAspect(value);
@@ -495,6 +486,7 @@ public sealed partial class MainViewModel : ObservableObject
         _state.AppControlEnabled = Tools.AppControlEnabled;
         _state.BuiltinToolsEnabled = Tools.BuiltinEnabled;
         _state.DisabledTools = Tools.DisabledTools.ToList();
+        _state.ToolProfiles = Tools.Profiles.ToDictionary(p => p.Key, p => p.Value.ToList());
         _state.McpServerEnabled = Tools.Server?.Enabled ?? false;
         _state.McpServerPort = Tools.Server?.Port;
         _state.EnhancerInstruction = EnhancerInstruction;

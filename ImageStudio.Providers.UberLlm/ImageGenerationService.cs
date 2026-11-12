@@ -164,7 +164,8 @@ public sealed class ImageGenerationService : IDisposable
                 m.TryGetProperty("input_modalities", out var inputs) && inputs.ValueKind == JsonValueKind.Array
                     ? inputs.EnumerateArray().Select(x => x.GetString()).OfType<string>().ToList()
                     : null,
-                Describe(m)))
+                Describe(m),
+                OpenAiCompat.ReadContextLength(m)))
             .OrderBy(m => m.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

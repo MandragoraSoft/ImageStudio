@@ -36,7 +36,7 @@ $dictDir = Join-Path $Root 'ImageStudio.Shared/Localization'
 $languages = @('pl', 'en')
 $keyPattern = '^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)+$'
 $dynamicPrefixes = @('lang.')                       # klucze składane w kodzie, np. $"lang.{Code}"
-$sameInBothLanguages = @('settings.language.pl', 'settings.language.en', 'voice.format', 'voice.stop', 'common.model', 'common.prompt', 'gen.seed', 'presets.auto', 'tools.port', 'chat.incognito', 'chat.stop', 'param.seed', 'param.topk', 'param.topp', 'settings.tab.mcp')   # nazwy własne i skróty
+$sameInBothLanguages = @('settings.language.pl', 'settings.language.en', 'voice.format', 'voice.stop', 'common.model', 'common.prompt', 'gen.seed', 'presets.auto', 'tools.port', 'chat.incognito', 'chat.stop', 'param.seed', 'param.topk', 'param.topp', 'settings.tab.mcp', 'filter.nsfw')   # nazwy własne i skróty
 
 $errors = [System.Collections.Generic.List[string]]::new()
 $warnings = [System.Collections.Generic.List[string]]::new()

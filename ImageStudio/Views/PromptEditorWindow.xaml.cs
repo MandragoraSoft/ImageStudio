@@ -38,6 +38,13 @@ public partial class PromptEditorWindow : Window
         PromptHeader.Text = Loc.T("prompt.header");
         SystemSection.Visibility = initial.System is null ? Visibility.Collapsed : Visibility.Visible;
         RebuildSection.Visibility = initial.Instruction is null || rebuild is null ? Visibility.Collapsed : Visibility.Visible;
+        // Bez opisu obrazów i bez przebudowy prawa kolumna jest pusta: zwijamy ją, prompt zajmuje całe okno
+        if (describeImages is null && RebuildSection.Visibility != Visibility.Visible)
+        {
+            SidebarHost.Visibility = Visibility.Collapsed;
+            BodyGrid.ColumnDefinitions[1].Width = new GridLength(0);
+            BodyGrid.ColumnDefinitions[2].Width = new GridLength(0);
+        }
         SystemBox.Text = initial.System ?? "";
         PromptBox.Text = initial.Prompt;
         _history = initial.History;
@@ -67,28 +74,35 @@ public partial class PromptEditorWindow : Window
         UpdateHistoryLabel();
     }
 
+    // Jedyny pasek statusu okna (pod edytorem); warning = błąd, pokazany kolorem ostrzeżenia
+    internal void SetStatus(string text, bool warning = false)
+    {
+        StatusText.Text = text;
+        if (warning) StatusText.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
+        else StatusText.ClearValue(TextBlock.ForegroundProperty);
+    }
+
     private async void Rebuild_Click(object sender, RoutedEventArgs e)
     {
         if (_rebuild is null || string.IsNullOrWhiteSpace(PromptBox.Text)) return;
 
         var before = Read();
-        SetBusy(true, "Model przebudowuje koncept...");
+        SetBusy(true);
+        SetStatus(Loc.T("prompt.msg.rewriting"));
         try
         {
             var rebuilt = await _rebuild(before);
             Show(rebuilt);
-            ChangesStatus.Text = rebuilt.History?.LastOrDefault()?.Changes is { Length: > 0 } changes ? $"Zmiany: {changes}" : "";
             _beforeRebuild = before;
-            UndoButton.IsEnabled = true;
-            RebuildStatus.Text = "";
+            SetStatus(rebuilt.History?.LastOrDefault()?.Changes is { Length: > 0 } changes ? Loc.T("prompt.changes", changes) : "");
         }
         catch (Exception ex)
         {
-            RebuildStatus.Text = Loc.T("prompt.msg.rewriteError", ex.Message);
+            SetStatus(Loc.T("prompt.msg.rewriteError", ex.Message), warning: true);
         }
         finally
         {
-            SetBusy(false, RebuildStatus.Text);
+            SetBusy(false);
         }
     }
 
@@ -97,45 +111,42 @@ public partial class PromptEditorWindow : Window
     {
         if (_describeImages is null || _busy) return;
 
-        SetBusy(true, "");
-        DescribeButton.IsEnabled = false;
-        DescribeStatus.Text = "Model opisuje obrazy...";
+        SetBusy(true);
+        SetStatus(Loc.T("prompt.msg.describing"));
         try
         {
             var text = await _describeImages();
             if (string.IsNullOrWhiteSpace(text))
             {
-                DescribeStatus.Text = "";
+                SetStatus("");
                 return;
             }
 
-            PromptBox.IsReadOnly = false;
             PromptBox.AppendText((PromptBox.Text.Length > 0 ? "\n\n" : "") + text);
             PromptBox.CaretIndex = PromptBox.Text.Length;
-            DescribeStatus.Text = Loc.T("prompt.msg.described");
+            SetStatus(Loc.T("prompt.msg.described"));
         }
         catch (Exception ex)
         {
-            DescribeStatus.Text = Loc.T("prompt.msg.describeError", ex.Message);
+            SetStatus(Loc.T("prompt.msg.describeError", ex.Message), warning: true);
         }
         finally
         {
-            SetBusy(false, "");
-            DescribeButton.IsEnabled = true;
+            SetBusy(false);
         }
     }
 
     private void UpdateHistoryLabel()
     {
         var count = _history?.Count ?? 0;
-        HistoryLabel.Text = count == 0 ? "Kontekst: brak poprzednich zmian" : $"Kontekst dla modelu: poprzednie zmiany ({count})";
+        HistoryLabel.Text = count == 0 ? Loc.T("prompt.context.none") : Loc.T("prompt.context.count", count);
         ClearHistoryButton.IsEnabled = count > 0;
     }
 
     private void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
         _history = null;
-        ChangesStatus.Text = "";
+        SetStatus("");
         UpdateHistoryLabel();
     }
 
@@ -145,19 +156,23 @@ public partial class PromptEditorWindow : Window
         Show(_beforeRebuild);
         _beforeRebuild = null;
         UndoButton.IsEnabled = false;
+        SetStatus("");
     }
 
     private void DefaultInstruction_Click(object sender, RoutedEventArgs e) => InstructionBox.Text = MainViewModel.DefaultInstruction;
 
-    private void SetBusy(bool busy, string status)
+    // Blokuje pola, które zmienia wynik przebudowy lub opisu; komunikat ustawia wywołujący przez SetStatus
+    private void SetBusy(bool busy)
     {
         _busy = busy;
         // W trakcie przebudowy wynik nadpisze pola, więc blokujemy wszystko, co je zmienia
         RebuildButton.IsEnabled = PresetBar.IsEnabled = ClearButton.IsEnabled = DescribeButton.IsEnabled = !busy;
         UndoButton.IsEnabled = !busy && _beforeRebuild is not null;
         PromptBox.IsReadOnly = SystemBox.IsReadOnly = InstructionBox.IsReadOnly = busy;
-        RebuildStatus.Text = status;
     }
+
+    private void PresetBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        OverwriteButton.IsEnabled = PresetBox.SelectedItem is not null;
 
     private void LoadPreset_Click(object sender, RoutedEventArgs e)
     {
@@ -185,11 +200,11 @@ public partial class PromptEditorWindow : Window
         try
         {
             _savePreset?.Invoke(preset);
-            PresetStatus.Text = $"Zapisano w zestawie „{preset.Name}”.";
+            SetStatus(Loc.T("prompt.msg.saved", preset.Name));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, Loc.T("prompt.msg.saveFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            SetStatus(Loc.T("prompt.msg.saveFailed", ex.Message), warning: true);
         }
     }
 

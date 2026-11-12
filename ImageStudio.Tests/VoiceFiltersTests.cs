@@ -173,7 +173,7 @@ public sealed class VoiceFiltersTests
             Flush(window.Dispatcher);
             var image = FindAll<CheckBox>(picker).Single(c => c.Content as string == "Przyjmuje obraz");
             Assert.False(image.IsVisible);
-            Assert.True(FindAll<CheckBox>(picker).Single(c => c.Content as string == "Ukryj NSFW").IsVisible);
+            Assert.True(FindAll<RadioButton>(picker).Single(r => r.Content as string == "Ukryj").IsVisible);
 
             // szukanie w panelu filtrów zawęża listę modeli mowy
             var search = FindAll<TextBox>(picker).First(t => t.ToolTip as string == "Szukaj po nazwie modelu");

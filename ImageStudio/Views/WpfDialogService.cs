@@ -102,9 +102,9 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         new ModelBrowserWindow { DataContext = viewModel, Owner = OwnerWindow() }.ShowDialog();
 
-    public Preset? ShowPresets()
+    public Preset? ShowPresets(PresetsContext? context = null)
     {
-        var viewModel = new PresetsViewModel(this, presets, importer);
+        var viewModel = new PresetsViewModel(this, presets, importer, context);
         var window = new PresetsWindow { DataContext = viewModel, Owner = OwnerWindow() };
         viewModel.CloseRequested += window.Close;
         window.ShowDialog();

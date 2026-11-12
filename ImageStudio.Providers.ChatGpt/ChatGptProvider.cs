@@ -56,10 +56,12 @@ public sealed class ChatGptProvider : OpenAiChatProvider
         if (root.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array)
             return models.EnumerateArray()
                 .Where(m => Text(m, "visibility") is null or "list" && Text(m, "slug") is not null)
-                .Select(m => new ChatModelInfo(Text(m, "slug")!, ReasoningParameters(m), null, "openai", ["text", "image"], Text(m, "display_name")))
+                .Select(m => new ChatModelInfo(Text(m, "slug")!, ReasoningParameters(m), null, "openai", ["text", "image"], Text(m, "display_name"),
+                                               OpenAiCompat.ReadContextLength(m)))
                 .ToList();
 
-        return ModelEntries(root).Select(m => new ChatModelInfo(m.GetProperty("id").GetString()!, [ReasoningParameter], null, "openai", ["text", "image"]))
+        return ModelEntries(root).Select(m => new ChatModelInfo(m.GetProperty("id").GetString()!, [ReasoningParameter], null, "openai", ["text", "image"],
+                                                                 ContextLength: OpenAiCompat.ReadContextLength(m)))
             .ToList();
     }
 

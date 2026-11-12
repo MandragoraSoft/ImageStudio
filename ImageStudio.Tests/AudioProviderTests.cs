@@ -307,6 +307,20 @@ public sealed class AudioProviderTests
     }
 
     [Fact]
+    public async Task OpenRouter_chat_models_carry_the_context_length_from_the_catalog()
+    {
+        using var api = new Api((_, path) => Reply.Json("""
+            {"data":[{"id":"openai/gpt-x","architecture":{"input_modalities":["text"],"output_modalities":["text"]},
+                      "supported_parameters":[],"context_length":200000}]}
+            """));
+        using var provider = new OpenRouterProvider("k", api.Url);
+
+        var models = await provider.GetChatModelsAsync();
+
+        Assert.Equal(200000, models.Single(m => m.Id == "openai/gpt-x").ContextLength);
+    }
+
+    [Fact]
     public async Task A_provider_without_audio_returns_empty_lists_and_refuses_to_synthesize()
     {
         using IAiProvider provider = new OpenRouterProvider("k");

@@ -72,7 +72,8 @@ public sealed partial class ModelBrowserViewModel : ObservableObject
         && (SelectedKind == All || i.KindList.Contains(SelectedKind))
         && (SelectedOwner == All || i.Option.OwnedBy == SelectedOwner)
         && (!AcceptsImageOnly || i.Option.AcceptsImage)
-        && (!HideNsfw || !i.Option.Nsfw)
+        && (Nsfw != TriState.Only || i.Option.Nsfw)
+        && (Nsfw != TriState.Exclude || !i.Option.Nsfw)
         && (string.IsNullOrWhiteSpace(SearchText)
             || i.Option.Id.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             || i.Description.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
@@ -102,14 +103,14 @@ public sealed partial class ModelBrowserViewModel : ObservableObject
     private bool _acceptsImageOnly;
 
     [ObservableProperty]
-    private bool _hideNsfw;
+    private TriState _nsfw = TriState.Any;
 
     partial void OnSearchTextChanged(string value) => View.Refresh();
     partial void OnOnlyPreferredChanged(bool value) => View.Refresh();
     partial void OnSelectedKindChanged(string value) => View.Refresh();
     partial void OnSelectedOwnerChanged(string value) => View.Refresh();
     partial void OnAcceptsImageOnlyChanged(bool value) => View.Refresh();
-    partial void OnHideNsfwChanged(bool value) => View.Refresh();
+    partial void OnNsfwChanged(TriState value) => View.Refresh();
 
     private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {

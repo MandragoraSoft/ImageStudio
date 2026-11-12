@@ -47,6 +47,8 @@ public sealed class UserState
     public bool? BuiltinToolsEnabled { get; set; }
     // Narzędzia czatu wyłączone przez użytkownika (nazwy widoczne dla modelu); null = pierwsze uruchomienie, wartości z flag wyżej
     public List<string>? DisabledTools { get; set; }
+    // Profile narzędzi czatu: nazwa profilu -> nazwy wyłączonych narzędzi
+    public Dictionary<string, List<string>> ToolProfiles { get; set; } = [];
     public bool McpServerEnabled { get; set; }
     public int? McpServerPort { get; set; }
 
@@ -63,6 +65,8 @@ public sealed class UserState
     public string? SeedText { get; set; }
     public string? NegativePrompt { get; set; }
     public string? Quality { get; set; }
+    // Okno zestawów: zapisywanie zmian bez pytania przy zmianie zestawu i zamykaniu okna
+    public bool PresetsAutoSave { get; set; }
     public Dictionary<string, ParamState> EnhancerParams { get; set; } = [];
 
     private static string FilePath => Path.Combine(AppPaths.UserDataDir, "state.json");
