@@ -23,7 +23,8 @@ public sealed record SettingsResult(string BaseUrl, string MarketUrl, int MaxSid
                                    int McpMaxTools = McpLimits.DefaultMaxTools, int McpListLimit = McpLimits.DefaultListLimit,
                                    int McpMaxListLimit = McpLimits.DefaultMaxListLimit,
                                    string? GalleryArchiveFolder = null,
-                                   PromptChatHistoryMode PromptChatHistory = PromptChatHistoryMode.Disk);
+                                   PromptChatHistoryMode PromptChatHistory = PromptChatHistoryMode.Disk,
+                                   bool HideToTrayOnClose = false);
 
 // Nazwa i opis nowego zestawu; null = anulowano
 public sealed record PresetDraft(string Name, string Description);
@@ -70,6 +71,7 @@ public interface IDialogService
 
     // Pytanie tak/nie; domyślnie odpowiedź "nie"
     bool Confirm(string text, string title);
+    void ShowError(string text, string title);
 
     // Zgoda na wywołanie narzędzia, o które poprosił model; false = odmowa
     bool ConfirmToolCall(ToolCall call);

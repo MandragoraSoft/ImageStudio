@@ -36,15 +36,21 @@ public static class SecretStore
             return;
         }
 
-        Directory.CreateDirectory(AppPaths.UserDataDir);
-        var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value), null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(FilePath(name), bytes);
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, FilePath(name), () =>
+        {
+            Directory.CreateDirectory(AppPaths.UserDataDir);
+            var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value), null, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(FilePath(name), bytes);
+        });
     }
 
     private static void Delete(string name)
     {
         var path = FilePath(name);
-        if (File.Exists(path)) File.Delete(path);
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, path, () =>
+        {
+            if (File.Exists(path)) File.Delete(path);
+        });
     }
 }
 

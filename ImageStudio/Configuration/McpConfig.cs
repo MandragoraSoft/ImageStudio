@@ -57,7 +57,10 @@ public sealed class McpConfig
         var file = path ?? DefaultPath;
         if (File.Exists(file)) return;
 
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        File.WriteAllText(file, "{\n  \"mcpServers\": {\n  }\n}\n");
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, file, () =>
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, "{\n  \"mcpServers\": {\n  }\n}\n");
+        });
     }
 }

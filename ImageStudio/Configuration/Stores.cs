@@ -37,7 +37,7 @@ public interface ISettingsStore
     void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
               string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true,
               string language = "system", string mistralKey = "", string kiloKey = "", string openCodeGoKey = "",
-              string chatGptSession = "");
+              string chatGptSession = "", bool hideToTrayOnClose = false);
 }
 
 // Zapisane sesje czatu (sesja incognito nigdy tu nie trafia)
@@ -92,9 +92,10 @@ public sealed class FileSettingsStore : ISettingsStore
 
     public void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
                      string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true, string language = "system",
-                     string mistralKey = "", string kiloKey = "", string openCodeGoKey = "", string chatGptSession = "") =>
+                     string mistralKey = "", string kiloKey = "", string openCodeGoKey = "", string chatGptSession = "",
+                     bool hideToTrayOnClose = false) =>
         AppSettings.Save(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey, useStreaming, language,
-                         mistralKey, kiloKey, openCodeGoKey, chatGptSession);
+                         mistralKey, kiloKey, openCodeGoKey, chatGptSession, hideToTrayOnClose);
 }
 
 public sealed class FileWindowStateStore : IWindowStateStore

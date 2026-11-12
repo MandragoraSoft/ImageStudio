@@ -67,6 +67,57 @@ public sealed class ShellTests
     }
 
     [Fact]
+    public void Closing_can_hide_to_tray_but_explicit_exit_closes_the_window()
+    {
+        WpfHost.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var window = app.Get<ImageStudio.MainWindow>();
+            window.ShowInTaskbar = false;
+            window.Show();
+            Flush(window.Dispatcher);
+
+            app.Vm.HideToTrayOnClose = true;
+            window.Close();
+            Assert.False(window.IsVisible);
+
+            window.ActivateFromTray();
+            Assert.True(window.IsVisible);
+
+            window.ExitApplication();
+            Assert.False(window.IsVisible);
+            Assert.Throws<InvalidOperationException>(window.ActivateFromTray);
+        });
+    }
+
+    [Fact]
+    public Task Settings_cannot_be_closed_while_cleanup_is_running() => WpfHost.RunAsync(async () =>
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = new SettingsResult("url", "market", 1024, "", "system");
+        var tab = new AppSettingsTab(result, _ => release.Task);
+        var window = new SettingsWindow
+        {
+            DataContext = new SettingsViewModel(result, [tab]),
+            ShowInTaskbar = false
+        };
+        window.Show();
+        var cleanup = tab.ClearSelectedDataCommand.ExecuteAsync(null);
+        try
+        {
+            Assert.False(((DockPanel)window.Content).IsEnabled);
+            window.Close();
+            Assert.True(window.IsVisible);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await cleanup;
+            window.Close();
+        }
+    });
+
+    [Fact]
     public void Footer_shows_the_spinner_and_label_only_while_an_operation_runs_and_dims_the_response_window()
     {
         WpfHost.Run(() =>

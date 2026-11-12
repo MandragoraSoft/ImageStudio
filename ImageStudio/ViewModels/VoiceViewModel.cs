@@ -570,6 +570,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsBusy))]
     private void Cancel() => _cts?.Cancel();
 
+    public void StopCurrentOperation() => Cancel();
+
     // --- Wyniki: odtwarzanie, zapis, kopiowanie ---
 
     [RelayCommand]

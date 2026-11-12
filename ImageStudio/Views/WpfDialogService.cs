@@ -99,6 +99,9 @@ public sealed class WpfDialogService(IPresetStore presets, LegacyPromptImporter 
         MessageBox.Show(OwnerWindow(), text, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No)
         == MessageBoxResult.Yes;
 
+    public void ShowError(string text, string title) =>
+        MessageBox.Show(OwnerWindow(), text, title, MessageBoxButton.OK, MessageBoxImage.Error);
+
     public bool ConfirmToolCall(ToolCall call) =>
         Confirm(Loc.T("dialog.toolCall", call.Name, call.ArgumentsJson),
                 Loc.T("dialog.toolCall.title"));

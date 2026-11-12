@@ -11,7 +11,7 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
                                  string OpenAiBaseUrl = "https://api.openai.com", string OpenAiKey = "",
                                  bool UseStreaming = true, string Language = "system",
                                  string MistralKey = "", string KiloKey = "", string OpenCodeGoKey = "",
-                                 string ChatGptSession = "")
+                                 string ChatGptSession = "", bool HideToTrayOnClose = false)
 {
     private static string UserSettingsPath => Path.Combine(AppPaths.UserDataDir, "settings.json");
 
@@ -35,6 +35,7 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
             OpenAiKey: Secret("OPENAI_API_KEY", "openai"),
             UseStreaming: !string.Equals(config["Ui:UseStreaming"], "false", StringComparison.OrdinalIgnoreCase),
             Language: config["Ui:Language"] is "pl" or "en" ? config["Ui:Language"]! : "system",
+            HideToTrayOnClose: string.Equals(config["Ui:HideToTrayOnClose"], "true", StringComparison.OrdinalIgnoreCase),
             MistralKey: Secret("MISTRAL_API_KEY", "mistral"),
             KiloKey: Secret("KILO_API_KEY", "kilo"),
             OpenCodeGoKey: Secret("OPENCODE_API_KEY", "opencodego"),
@@ -45,25 +46,28 @@ public sealed record AppSettings(string BaseUrl, string MarketUrl, int MaxSide, 
     public static string Secret(string envVar, string name) =>
         Environment.GetEnvironmentVariable(envVar) is { Length: > 0 } env ? env : SecretStore.Load(name) ?? "";
 
-    // Adresy, limit wymiarów, motyw i provider trafiają do settings.json użytkownika, klucz do sekretów
+    // Adresy, limit wymiarów, motyw, tryb okna i provider trafiają do settings.json; klucz do sekretów
     public static void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme,
                             string providerId = "uberllm", string openRouterKey = "",
                             string openAiBaseUrl = "https://api.openai.com", string openAiKey = "",
                             bool useStreaming = true, string language = "system",
                             string mistralKey = "", string kiloKey = "", string openCodeGoKey = "",
-                            string chatGptSession = "")
+                            string chatGptSession = "", bool hideToTrayOnClose = false)
     {
-        Directory.CreateDirectory(AppPaths.UserDataDir);
-        var json = JsonSerializer.Serialize(
-            new
-            {
-                Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide },
-                Ui = new { Theme = theme, UseStreaming = useStreaming, Language = language },
-                Ai = new { Provider = providerId },
-                OpenAi = new { BaseUrl = openAiBaseUrl },
-            },
-            new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(UserSettingsPath, json);
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, UserSettingsPath, () =>
+        {
+            Directory.CreateDirectory(AppPaths.UserDataDir);
+            var json = JsonSerializer.Serialize(
+                new
+                {
+                    Uberllm = new { BaseUrl = baseUrl, MarketUrl = marketUrl, MaxSide = maxSide },
+                    Ui = new { Theme = theme, UseStreaming = useStreaming, Language = language, HideToTrayOnClose = hideToTrayOnClose },
+                    Ai = new { Provider = providerId },
+                    OpenAi = new { BaseUrl = openAiBaseUrl },
+                },
+                new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(UserSettingsPath, json);
+        });
         SecretStore.Save(apiKey);
         SecretStore.Save(openRouterKey, "openrouter");
         SecretStore.Save(openAiKey, "openai");

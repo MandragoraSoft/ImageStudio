@@ -42,8 +42,11 @@ public static class WindowStateStore
     {
         try
         {
-            Directory.CreateDirectory(AppPaths.UserDataDir);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(Model, Options));
+            UserDataMutationGate.TryWrite(AppPaths.UserDataDir, FilePath, () =>
+            {
+                Directory.CreateDirectory(AppPaths.UserDataDir);
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(Model, Options));
+            });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

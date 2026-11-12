@@ -121,11 +121,12 @@ internal sealed class MemorySettingsStore(AppSettings initial) : ISettingsStore
 
     public void Save(string baseUrl, string marketUrl, int maxSide, string apiKey, string theme, string providerId,
                      string openRouterKey, string openAiBaseUrl, string openAiKey, bool useStreaming = true, string language = "system",
-                     string mistralKey = "", string kiloKey = "", string openCodeGoKey = "", string chatGptSession = "")
+                     string mistralKey = "", string kiloKey = "", string openCodeGoKey = "", string chatGptSession = "",
+                     bool hideToTrayOnClose = false)
     {
         SaveCalls++;
         Settings = new AppSettings(baseUrl, marketUrl, maxSide, apiKey, theme, providerId, openRouterKey, openAiBaseUrl, openAiKey,
-                                   useStreaming, language, mistralKey, kiloKey, openCodeGoKey, chatGptSession);
+                                   useStreaming, language, mistralKey, kiloKey, openCodeGoKey, chatGptSession, hideToTrayOnClose);
     }
 }
 
@@ -186,6 +187,9 @@ internal sealed class TestApp : IDisposable
         services.AddSingleton(dialogs ?? new FakeDialogs());
         services.AddSingleton<IDialogService>(sp => sp.GetRequiredService<FakeDialogs>());
         services.AddSingleton<IThemeService, FakeThemeService>();
+        services.AddSingleton<IUserDataCleanupService>(new UserDataCleanupService(_dir));
+        services.AddSingleton<FakeApplicationLifetime>();
+        services.AddSingleton<IApplicationLifetime>(sp => sp.GetRequiredService<FakeApplicationLifetime>());
         services.AddSingleton<IProviderFactory>(sp => new FakeProviderFactory(sp.GetRequiredService<FakeProvider>()));
         services.AddSingleton<IUserStateStore, MemoryUserStateStore>();
         services.AddSingleton<IGalleryStore, MemoryGalleryStore>();
@@ -228,6 +232,14 @@ internal sealed class TestApp : IDisposable
 
     public T Get<T>() where T : notnull => Services.GetRequiredService<T>();
     public MainViewModel Vm => Get<MainViewModel>();
+    public string DataDirectory => _dir;
+    public FakeApplicationLifetime Lifetime => Get<FakeApplicationLifetime>();
+    public void WriteData(string relativePath, string content = "test")
+    {
+        var path = Path.Combine(_dir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+    }
     public FakeProvider Provider => Get<FakeProvider>();
     public FakeDialogs Dialogs => Get<FakeDialogs>();
     public MemoryChatSessionStore ChatSessions => (MemoryChatSessionStore)Get<IChatSessionStore>();

@@ -37,6 +37,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ISecretStore _secrets;
     private readonly McpToolHost _toolHost;
     private readonly McpOptions _mcp;
+    private readonly IUserDataCleanupService _dataCleanup;
+    private readonly IApplicationLifetime _applicationLifetime;
     private readonly UserState _state;
     private readonly ModelPreferences _prefs;
     private readonly Dictionary<string, ChatModelInfo> _chatModels = [];
@@ -44,6 +46,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Stan zapisywany dopiero po wczytaniu modeli, żeby puste wartości startowe nie nadpisały zapamiętanych
     private bool _ready;
+    private bool _resetting;
 
 
     // Surowe bajty wyniku: zapis zachowuje oryginalny format (PNG/JPEG), bez ponownego kodowania
@@ -56,6 +59,9 @@ public sealed partial class MainViewModel : ObservableObject
     // --- Wynik i stan ---
     [ObservableProperty]
     private string _status = "Gotowy";
+
+    [ObservableProperty]
+    private bool _hideToTrayOnClose;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand), nameof(EditCommand), nameof(AddReferencesCommand),
@@ -134,10 +140,11 @@ public sealed partial class MainViewModel : ObservableObject
                          ISecretStore secrets, ModelPreferences prefs, McpToolHost toolHost, McpOptions mcp, IThemeService themes,
                          IActivityTracker activity, IChatSessionStore chatSessions, IPromptChatSessionStore promptChats,
                          IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
-                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills)
+                         IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills,
+                         IUserDataCleanupService dataCleanup, IApplicationLifetime applicationLifetime)
         : this(provider, providers, dialogs, downloads, settings, settingsStore, stateStore, galleryStore, presetStore,
                secrets, prefs, toolHost, mcp, themes, activity, chatSessions, promptChats, audioPlayer, audioRecorder,
-               voiceGallery, memory, storage, skills, null) { }
+               voiceGallery, memory, storage, skills, dataCleanup, applicationLifetime, null) { }
 
     public MainViewModel(IAiProvider provider, IProviderFactory providers, IDialogService dialogs,
                          ImageDownloadService downloads, AppSettings settings, ISettingsStore settingsStore,
@@ -146,6 +153,7 @@ public sealed partial class MainViewModel : ObservableObject
                          IActivityTracker activity, IChatSessionStore chatSessions, IPromptChatSessionStore promptChats,
                          IAudioPlayer audioPlayer, IAudioRecorder audioRecorder,
                          IVoiceGalleryStore voiceGallery, IMemoryStore memory, MediaStorageHost storage, ISkillStore skills,
+                         IUserDataCleanupService dataCleanup, IApplicationLifetime applicationLifetime,
                          OutgoingRequestRegistry? requests)
     {
         _promptChatDisk = promptChats;
@@ -156,6 +164,7 @@ public sealed partial class MainViewModel : ObservableObject
         _dialogs = dialogs;
         _downloads = downloads;
         _settings = settings;
+        _hideToTrayOnClose = settings.HideToTrayOnClose;
         _settingsStore = settingsStore;
         _stateStore = stateStore;
         _galleryStore = galleryStore;
@@ -164,6 +173,8 @@ public sealed partial class MainViewModel : ObservableObject
         _prefs = prefs;
         _toolHost = toolHost;
         _mcp = mcp;
+        _dataCleanup = dataCleanup;
+        _applicationLifetime = applicationLifetime;
         _themes = themes;
         Activity = activity;
         OutgoingRequests = new OutgoingRequestsViewModel(requests);
@@ -357,10 +368,10 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private bool CanGenerate => !IsBusy && !string.IsNullOrWhiteSpace(GeneratePrompt) && SelectedModel is not null;
-    private bool CanEdit => !IsBusy && !string.IsNullOrWhiteSpace(EditPrompt)
+    private bool CanGenerate => !_resetting && !IsBusy && !string.IsNullOrWhiteSpace(GeneratePrompt) && SelectedModel is not null;
+    private bool CanEdit => !_resetting && !IsBusy && !string.IsNullOrWhiteSpace(EditPrompt)
                             && References.Count > 0 && SelectedEditModel is not null;
-    private bool CanPickOrCopy => !IsBusy;
+    private bool CanPickOrCopy => !_resetting && !IsBusy;
     private bool HasImage => Image is not null;
     private bool HasSource => SourceImage is not null;
 
@@ -444,7 +455,8 @@ public sealed partial class MainViewModel : ObservableObject
     public void Shutdown()
     {
         SaveState();
-        Task.Run(() => Tools.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(3));
+        if (!_resetting)
+            Task.Run(() => Tools.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(3));
     }
 
     private void ApplyChatModels(IReadOnlyList<ChatModelInfo> chat, IReadOnlyDictionary<string, ModelPricing> pricing)
@@ -487,8 +499,12 @@ public sealed partial class MainViewModel : ObservableObject
     // Zapis wyborów, instrukcji, ostatnich promptów i parametrów; przy zmianach i przy zamykaniu
     public void SaveState()
     {
-        if (!_ready) return;
+        if (!_ready || _resetting) return;
+        SaveStateCore();
+    }
 
+    private void SaveStateCore()
+    {
         _state.GeneratePrompt = GeneratePrompt;
         _state.GenerateSystemPrompt = GenerateSystemPrompt;
         _state.EditPrompt = EditPrompt;

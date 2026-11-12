@@ -10,6 +10,8 @@ Niezależnie od operacji logicznych `OutgoingRequestRegistry` śledzi HTTP dosta
 
 Pozycja Pomoc otwiera modalne okno O aplikacji przez `OpenAboutCommand` i `IDialogService`. Teksty okna są powiązane z lokalizacją, a numer wersji pochodzi z `AssemblyInformationalVersion` aplikacji (zachowuje także prerelease i metadane kompilacji). Domyślna wersja projektów jest w `Directory.Build.props` jako `Version`; wydanie nadpisuje ją przez `-p:Version=...`.
 
+Aplikacja jest pojedynczą instancją w sesji Windows użytkownika: mutex w przestrzeni `Local\` serializuje starty równoczesne, a nazwany potok z `PipeOptions.CurrentUserOnly` przekazuje żądanie aktywacji. Serwer IPC startuje przed utworzeniem okna; żądania przychodzące wcześniej są kolejkowane do zdarzenia `Loaded`. „Ustawienia → Aplikacja → Ukrywaj aplikację do zasobnika…” (domyślnie wyłączone) zmienia zachowanie X/Alt+F4; menu Wyjście i menu ikony jawnie kończą aplikację. Zdarzenie kończenia sesji systemowej pomija ukrywanie. Ikona zasobnika i potok są zwalniane przy wyjściu, a etykiety ikony odświeżają się po zmianie języka.
+
 ## Kolory kontrolek
 
 Paleta (`ThemeService`, klucze w `App.xaml`) ma osobne `ControlBrush`/`ControlHoverBrush`/`ControlBorderBrush` dla przycisków drugorzędnych, przełączników, pól tekstowych, list rozwijanych i nagłówka selektora modelu: wypełnienie odróżnia je od panelu, a obrys ma kontrast co najmniej 3:1 w obu motywach (pilnuje tego `ThemeContrastTests`). `SurfaceAltBrush` jest za bliski `SurfaceBrush` (1,08:1), żeby służyć za tło kontrolki. Nowy kolor dodawaj do obu palet.

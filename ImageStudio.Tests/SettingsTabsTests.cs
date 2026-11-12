@@ -67,6 +67,30 @@ public sealed class SettingsTabsTests
         Assert.Equal(@"D:\Obrazy\Archiwum", result.GalleryArchiveFolder);
     }
 
+    [Fact]
+    public void App_tab_keeps_tray_hiding_off_by_default_and_applies_the_selected_value()
+    {
+        var current = Current();
+        var tab = new AppSettingsTab(current);
+
+        Assert.False(tab.HideToTrayOnClose);
+        tab.HideToTrayOnClose = true;
+
+        Assert.True(tab.Apply(current).HideToTrayOnClose);
+    }
+
+    [Fact]
+    public async Task Saving_the_application_setting_updates_the_running_window_preference()
+    {
+        using var app = TestApp.Create();
+        app.Dialogs.SettingsAnswer = result => result with { HideToTrayOnClose = true };
+
+        await app.Vm.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.True(app.Settings.Settings.HideToTrayOnClose);
+        Assert.True(app.Vm.HideToTrayOnClose);
+    }
+
     private static void Flush(Dispatcher dispatcher) => dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
     private static T? Find<T>(DependencyObject root) where T : DependencyObject

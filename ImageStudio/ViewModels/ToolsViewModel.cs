@@ -164,6 +164,10 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     private static readonly ILogger Log = AppLog.For<ToolsViewModel>();
 
     private readonly McpToolHost _host;
+    private readonly CancellationTokenSource _stop = new();
+    private int _disposed;
+    private readonly object _pendingChangesLock = new();
+    private readonly HashSet<Task> _pendingChanges = [];
     private readonly string? _configPath;
     private readonly HashSet<string> _enabledNames;
     private McpConfig _config = new();
@@ -520,14 +524,23 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
     }
 
     // Wczytuje listę serwerów i łączy zaznaczone; wywoływane raz po starcie aplikacji
-    public async Task InitializeAsync()
+    public Task InitializeAsync() => TrackChangeAsync(InitializeCoreAsync);
+
+    private async Task InitializeCoreAsync()
     {
-        if (_initialized) return;
+        if (_initialized || _stop.IsCancellationRequested) return;
         _initialized = true;
 
         LoadServers();
-        if (Server is not null) await Server.InitializeAsync();
-        await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
+        try
+        {
+            if (Server is not null) await Server.InitializeAsync();
+            _stop.Token.ThrowIfCancellationRequested();
+            await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(item => ConnectAsync(item, _stop.Token)));
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested)
+        {
+        }
     }
 
     private void LoadServers()
@@ -539,12 +552,16 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
             Servers.Add(new McpServerItem(name, server.Description, _enabledNames.Contains(name), OnServerToggled));
     }
 
-    private async void OnServerToggled(McpServerItem item)
+    private async void OnServerToggled(McpServerItem item) =>
+        await TrackChangeAsync(() => OnServerToggledCoreAsync(item));
+
+    private async Task OnServerToggledCoreAsync(McpServerItem item)
     {
+        if (_stop.IsCancellationRequested) return;
         if (item.IsEnabled)
         {
             _enabledNames.Add(item.Name);
-            await ConnectAsync(item);
+            await ConnectAsync(item, _stop.Token);
         }
         else
         {
@@ -556,14 +573,17 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
         }
     }
 
-    private async Task ConnectAsync(McpServerItem item)
+    private async Task ConnectAsync(McpServerItem item, CancellationToken ct = default)
     {
         item.Status = Loc.T("tools.connecting");
         try
         {
-            var count = await _host.ConnectAsync(item.Name, _config.McpServers[item.Name]);
+            var count = await _host.ConnectAsync(item.Name, _config.McpServers[item.Name], ct);
             item.Status = Loc.T("tools.connected", count);
             RebuildGroups();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
         }
         catch (Exception ex)
         {
@@ -578,13 +598,16 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 
     // Ponowne wczytanie mcp.json (po edycji) z połączeniem zaznaczonych serwerów od nowa
     [RelayCommand]
-    private async Task ReloadAsync()
+    private Task ReloadAsync() => TrackChangeAsync(ReloadCoreAsync);
+
+    private async Task ReloadCoreAsync()
     {
+        if (_stop.IsCancellationRequested) return;
         await _host.DisposeAsync();
         LoadServers();
         RebuildGroups();
         OnToolsChanged();
-        await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(ConnectAsync));
+        await Task.WhenAll(Servers.Where(s => s.IsEnabled).Select(item => ConnectAsync(item, _stop.Token)));
     }
 
     // Podgląd tego, co model zapamiętał (memory.json) i folderu, w którym czyta i zapisuje pliki
@@ -647,7 +670,29 @@ public sealed partial class ToolsViewModel : ObservableObject, IToolHost
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _stop.Cancel();
+        Task[] pending;
+        lock (_pendingChangesLock) pending = _pendingChanges.ToArray();
+        await Task.WhenAll(pending);
         await _host.DisposeAsync();
         if (Server is not null) await Server.DisposeAsync();
+    }
+
+    private async Task TrackChangeAsync(Func<Task> change)
+    {
+        Task pending;
+        lock (_pendingChangesLock)
+        {
+            if (Volatile.Read(ref _disposed) != 0) return;
+            pending = change();
+            _pendingChanges.Add(pending);
+        }
+
+        try { await pending; }
+        finally
+        {
+            lock (_pendingChangesLock) _pendingChanges.Remove(pending);
+        }
     }
 }

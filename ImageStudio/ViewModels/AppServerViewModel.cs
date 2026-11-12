@@ -20,6 +20,9 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     private readonly IDialogService _dialogs;
     private readonly Func<string> _token;
     private bool _silent;
+    private int _disposed;
+    private readonly object _pendingChangesLock = new();
+    private readonly HashSet<Task> _pendingChanges = [];
 
     // token: dostarcza (i przy pierwszym użyciu tworzy) sekret serwera; w aplikacji to SecretStore
     public AppServerViewModel(McpAppServer server, IDialogService dialogs, bool enabled, int port, Func<string>? token = null,
@@ -46,17 +49,17 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
     public string Endpoint => McpAppServer.EndpointFor(Port);
 
     // Po starcie aplikacji uruchamia serwer, jeśli był włączony
-    public Task InitializeAsync() => Enabled ? StartAsync() : Task.CompletedTask;
+    public Task InitializeAsync() => TrackChangeAsync(() => Enabled ? StartAsync() : Task.CompletedTask);
 
     partial void OnEnabledChanged(bool value)
     {
         if (_silent) return;
-        _ = value ? StartAsync() : StopAsync();
+        _ = TrackChangeAsync(() => value ? StartAsync() : StopAsync());
     }
 
     partial void OnPortChanged(int value)
     {
-        if (Enabled && !_silent) _ = StartAsync();
+        if (Enabled && !_silent) _ = TrackChangeAsync(StartAsync);
     }
 
     private async Task StartAsync()
@@ -103,7 +106,31 @@ public sealed partial class AppServerViewModel : ObservableObject, IAsyncDisposa
         Status = Loc.T("mcpServer.copied");
     }
 
-    public ValueTask DisposeAsync() => _server.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        Task[] pending;
+        lock (_pendingChangesLock) pending = _pendingChanges.ToArray();
+        await Task.WhenAll(pending);
+        await _server.DisposeAsync();
+    }
+
+    private async Task TrackChangeAsync(Func<Task> change)
+    {
+        Task pending;
+        lock (_pendingChangesLock)
+        {
+            if (Volatile.Read(ref _disposed) != 0) return;
+            pending = change();
+            _pendingChanges.Add(pending);
+        }
+
+        try { await pending; }
+        finally
+        {
+            lock (_pendingChangesLock) _pendingChanges.Remove(pending);
+        }
+    }
 
     private readonly ISecretStore _secrets;
 

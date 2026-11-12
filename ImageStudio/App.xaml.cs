@@ -14,6 +14,7 @@ namespace ImageStudio;
 public partial class App : Application
 {
     private IServiceProvider? _services;
+    private SingleInstanceCoordinator? _singleInstance;
 
     static App() => PluginResolver.Register();
 
@@ -21,13 +22,35 @@ public partial class App : Application
     // a McpToolHost zamyka MainViewModel.Shutdown (kontener zgłasza błąd przy synchronicznym Dispose usług IAsyncDisposable)
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.GetService<MainViewModel>()?.Shutdown();
-        base.OnExit(e);
+        try { _services?.GetService<MainViewModel>()?.Shutdown(); }
+        finally
+        {
+            try { _singleInstance?.Dispose(); }
+            finally { base.OnExit(e); }
+        }
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        Loc.Set(Loc.System);
+        try
+        {
+            _singleInstance = new SingleInstanceCoordinator();
+            if (!_singleInstance.AcquireOrActivate(TimeSpan.FromSeconds(15)))
+            {
+                Shutdown();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(Loc.T("app.instance.error", ex.Message), Loc.T("app.instance.title"),
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
+
         DotEnv.LoadDefaults();
 
         var services = new ServiceCollection().AddImageStudioCore().AddImageStudioInfrastructure()
@@ -40,7 +63,12 @@ public partial class App : Application
 
         var window = services.GetRequiredService<MainWindow>();
         var viewModel = services.GetRequiredService<MainViewModel>();
-        window.Loaded += async (_, _) => await viewModel.InitializeAsync();
+        _singleInstance.SetActivationHandler(action => window.Dispatcher.BeginInvoke(action), window.ActivateFromTray);
+        window.Loaded += async (_, _) =>
+        {
+            _singleInstance.MarkWindowReady();
+            await viewModel.InitializeAsync();
+        };
         window.Show();
     }
 }

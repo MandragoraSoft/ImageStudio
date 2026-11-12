@@ -79,21 +79,31 @@ public static class PresetStore
     // Nazwa pliku: data-czas plus krótki losowy znacznik, np. 20261031-134522-3fa9c1.json
     public static Preset Create(Preset preset)
     {
-        System.IO.Directory.CreateDirectory(Directory);
-        preset.FilePath = Path.Combine(Directory, $"{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..31] + ".json");
-        Save(preset);
+        var path = Path.Combine(Directory, $"{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..31] + ".json");
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, path, () =>
+        {
+            System.IO.Directory.CreateDirectory(Directory);
+            preset.FilePath = path;
+            Save(preset);
+        });
         return preset;
     }
 
     // Aktualizacja zapisuje w tym samym pliku; data zmiany przesuwa zestaw na górę listy
     public static void Save(Preset preset)
     {
-        preset.UpdatedUtc = DateTime.UtcNow;
-        File.WriteAllText(preset.FilePath, JsonSerializer.Serialize(preset, Options));
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, preset.FilePath, () =>
+        {
+            preset.UpdatedUtc = DateTime.UtcNow;
+            File.WriteAllText(preset.FilePath, JsonSerializer.Serialize(preset, Options));
+        });
     }
 
     public static void Delete(Preset preset)
     {
-        if (File.Exists(preset.FilePath)) File.Delete(preset.FilePath);
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, preset.FilePath, () =>
+        {
+            if (File.Exists(preset.FilePath)) File.Delete(preset.FilePath);
+        });
     }
 }

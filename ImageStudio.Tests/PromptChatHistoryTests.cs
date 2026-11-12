@@ -265,6 +265,28 @@ public sealed class PromptChatHistoryTests
     }
 
     [Fact]
+    public void Legacy_conversation_is_not_resumed_but_is_kept_on_disk()
+    {
+        Sta.Run(() =>
+        {
+            using var app = Create(PromptChatHistoryMode.Disk);
+            var old = new ChatSessionData
+            {
+                Messages = [new ChatMessageData { Role = "user", Content = "dane innej zakładki" }],
+            };
+            app.PromptChatSessions.Save(old);
+            app.State.State.PromptChatSessions["generate"] = old.Id;
+
+            var chat = OpenGenerate(app);
+            Assert.Empty(chat.Messages);
+            Send(chat, "nowa rozmowa");
+            Assert.Equal(old.Id, app.State.State.PromptChatSessions["generate"]);
+            Assert.Equal("dane innej zakładki", app.PromptChatSessions.Load(old.Id)!.Messages[0].Content);
+            Assert.Equal(["nowa rozmowa", "Odpowiedź"], OpenGenerate(app).Messages.Select(m => m.Content));
+        });
+    }
+
+    [Fact]
     public async Task Closing_the_editor_window_during_a_reply_rolls_back_the_turn_and_keeps_the_draft()
     {
         await WpfHost.RunAsync(async () =>

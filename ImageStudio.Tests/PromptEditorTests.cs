@@ -13,6 +13,29 @@ public sealed class PromptEditorTests
         return (vm, dialogs);
     }
 
+    [Theory]
+    [InlineData("generate")]
+    [InlineData("edit")]
+    public void Loading_a_preset_clears_only_its_own_tab_history(string kind)
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            var history = new[] { new PromptRevision("s", "c", "s2", "c2", "i", "zmiana") };
+            app.Dialogs.PromptEditResult = new PromptEdit("s", "c", History: history);
+            app.Vm.EditGeneratePromptCommand.Execute(null);
+            app.Vm.EditEditPromptCommand.Execute(null);
+            app.Dialogs.OnShowPresets = _ => new Preset { Kind = kind, Prompt = "zestaw" };
+            app.Vm.OpenPresetsCommand.Execute(null);
+            app.Dialogs.PromptEditResult = null;
+
+            app.Vm.EditGeneratePromptCommand.Execute(null);
+            Assert.Equal(kind == "generate" ? 0 : 1, app.Dialogs.LastInitial!.History?.Count ?? 0);
+            app.Vm.EditEditPromptCommand.Execute(null);
+            Assert.Equal(kind == "edit" ? 0 : 1, app.Dialogs.LastInitial!.History?.Count ?? 0);
+        });
+    }
+
     [Fact]
     public void Editor_result_replaces_system_and_concept_prompts()
     {

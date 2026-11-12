@@ -7,6 +7,32 @@ namespace ImageStudio.Tests;
 public sealed class OutgoingRequestHandlerTests
 {
     [Fact]
+    public async Task Stop_cancels_all_parallel_requests_and_rejects_later_requests()
+    {
+        var registry = new OutgoingRequestRegistry();
+        var started = new ConcurrentDictionary<string, TaskCompletionSource>();
+        started["one"] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        started["two"] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var client = CreateClient(registry, async (request, token) =>
+        {
+            started[request.RequestUri!.AbsolutePath.TrimStart('/')].SetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var one = client.GetAsync("https://example.test/one");
+        var two = client.GetAsync("https://example.test/two");
+        await Task.WhenAll(started.Values.Select(s => s.Task));
+
+        registry.StopAndCancelAll();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => one);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => two);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetAsync("https://example.test/three"));
+        Assert.True(await registry.WaitForIdleAsync(TimeSpan.FromSeconds(1)));
+        Assert.Empty(registry.ActiveRequests);
+    }
+
+    [Fact]
     public async Task TracksResponseUntilEofWithoutExposingUrlOrHeaders()
     {
         var registry = new OutgoingRequestRegistry();

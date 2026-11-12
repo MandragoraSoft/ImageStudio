@@ -257,7 +257,7 @@ public sealed class PromptEnhanceTests
             : "none";
 
     [Fact]
-    public void Editor_conversation_uses_current_fields_and_blocks_only_set_prompt()
+    public void Editor_conversation_uses_current_fields_and_limits_tools()
     {
         Sta.Run(() =>
         {
@@ -281,6 +281,9 @@ public sealed class PromptEnhanceTests
             Assert.Contains(vm.Tools.Tools, t => t.Name == "imagestudio__set_prompt");
             Assert.DoesNotContain(chat.Tools!.Tools, t => t.Name == "imagestudio__set_prompt");
             Assert.Contains(chat.Tools.Tools, t => t.Name == "imagestudio__get_state");
+            Assert.DoesNotContain(chat.Tools.Tools, t => t.Name == "imagestudio__list_gallery");
+            Assert.DoesNotContain(chat.Tools.Tools, t => t.Name == "imagestudio__list_presets");
+            Assert.DoesNotContain(chat.Tools.Tools, t => t.Name == "builtin__memory_list");
             var denied = chat.Tools.CallAsync(new ToolCall("1", "imagestudio__set_prompt", """{"prompt":"zmiana"}""")).GetAwaiter().GetResult();
             Assert.Contains("niedostępne", denied);
             Assert.Equal("oryginał", vm.GeneratePrompt);
@@ -309,6 +312,41 @@ public sealed class PromptEnhanceTests
             Assert.NotNull(dialogs.LastConversationFactory);
             vm.EditVideoPromptCommand.Execute(null);
             Assert.NotNull(dialogs.LastConversationFactory);
+        });
+    }
+
+    [Theory]
+    [InlineData("generate")]
+    [InlineData("edit")]
+    [InlineData("video")]
+    public void Editor_state_tool_returns_only_current_unsaved_fields(string kind)
+    {
+        Sta.Run(() =>
+        {
+            using var app = TestApp.Create();
+            app.Vm.InitializeAsync().GetAwaiter().GetResult();
+            app.Vm.Tools.AppControlEnabled = true;
+            app.Vm.Tools.UseTools = true;
+            app.Vm.GeneratePrompt = "tajny prompt generowania";
+            app.Vm.EditPrompt = "tajny prompt edycji";
+            app.Vm.VideoPrompt = "tajny prompt wideo";
+            switch (kind)
+            {
+                case "generate": app.Vm.EditGeneratePromptCommand.Execute(null); break;
+                case "edit": app.Vm.EditEditPromptCommand.Execute(null); break;
+                default: app.Vm.EditVideoPromptCommand.Execute(null); break;
+            }
+
+            var current = new PromptEdit("bieżący system", "bieżący szkic", NegativePrompt: "bez tekstu");
+            var chat = app.Dialogs.LastConversationFactory!(() => current, (_, _) => { });
+            var result = chat.Tools!.CallAsync(new ToolCall("1", "imagestudio__get_state", "{}")).GetAwaiter().GetResult();
+            using var json = JsonDocument.Parse(result);
+            Assert.Equal(kind, json.RootElement.GetProperty("editor").GetString());
+            Assert.Equal("bieżący szkic", json.RootElement.GetProperty("concept").GetString());
+            Assert.DoesNotContain("tajny prompt", result);
+            Assert.Null(chat.Tools.SystemNote);
+            var rejected = chat.Tools.CallAsync(new ToolCall("2", "imagestudio__list_gallery", "{}")).GetAwaiter().GetResult();
+            Assert.Contains("niedostępne", rejected);
         });
     }
 

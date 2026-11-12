@@ -89,10 +89,13 @@ public class FileChatSessionStore : IChatSessionStore
 
         try
         {
-            Directory.CreateDirectory(_dir);
-            File.WriteAllText(Path.Combine(_dir, session.Id + ".json"), JsonSerializer.Serialize(session, Options));
-            File.WriteAllText(Path.Combine(_dir, session.Id + ".meta.json"),
-                              JsonSerializer.Serialize(new ChatSessionInfo(session.Id, session.Title, session.UpdatedUtc), Options));
+            UserDataMutationGate.TryWrite(AppPaths.UserDataDir, Path.Combine(_dir, session.Id + ".json"), () =>
+            {
+                Directory.CreateDirectory(_dir);
+                File.WriteAllText(Path.Combine(_dir, session.Id + ".json"), JsonSerializer.Serialize(session, Options));
+                File.WriteAllText(Path.Combine(_dir, session.Id + ".meta.json"),
+                                  JsonSerializer.Serialize(new ChatSessionInfo(session.Id, session.Title, session.UpdatedUtc), Options));
+            });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -106,11 +109,14 @@ public class FileChatSessionStore : IChatSessionStore
 
         try
         {
-            foreach (var name in new[] { id + ".json", id + ".meta.json" })
+            UserDataMutationGate.TryWrite(AppPaths.UserDataDir, Path.Combine(_dir, id + ".json"), () =>
             {
-                var path = Path.Combine(_dir, name);
-                if (File.Exists(path)) File.Delete(path);
-            }
+                foreach (var name in new[] { id + ".json", id + ".meta.json" })
+                {
+                    var path = Path.Combine(_dir, name);
+                    if (File.Exists(path)) File.Delete(path);
+                }
+            });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

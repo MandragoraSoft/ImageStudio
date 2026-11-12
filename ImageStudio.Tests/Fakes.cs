@@ -164,9 +164,8 @@ internal class FakeProvider : IAiProvider
     public Func<string, string, string, PromptParts?>? Enhance { get; set; }
     public Func<string, string, string, string, PromptParts?>? EnhanceWithNegative { get; set; }
 
-    public void Dispose()
-    {
-    }
+    public Action? OnDispose { get; set; }
+    public void Dispose() => OnDispose?.Invoke();
 }
 
 // Dostawca ze strumieniem: wysyła zadane kawałki, a po każdym wywołuje AfterDelta (test podgląda stan w trakcie),
@@ -218,9 +217,14 @@ internal sealed class FakeDialogs : IDialogService
     public void ShowAbout() => AboutCount++;
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
+    public Func<SettingsResult, IReadOnlyList<ISettingsTab>, SettingsResult?>? OnShowSettings { get; set; }
     public IReadOnlyList<ISettingsTab>? LastSettingsTabs { get; private set; }
-    public SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs) =>
-        (LastSettingsTabs = tabs) is not null && SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
+    public SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs)
+    {
+        LastSettingsTabs = tabs;
+        if (OnShowSettings is { } show) return show(current, tabs);
+        return SettingsAnswer is { } answer ? answer(current) : throw new NotSupportedException();
+    }
     public Func<string, string, PresetDraft?>? SavePresetAnswer { get; set; }
     public PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null) =>
         SavePresetAnswer is { } answer ? answer(defaultName, prompt) : throw new NotSupportedException();
@@ -255,6 +259,13 @@ internal sealed class FakeDialogs : IDialogService
     public int ConfirmCount { get; private set; }
     public string? LastConfirmationText { get; private set; }
     public string? LastConfirmationTitle { get; private set; }
+    public string? LastErrorText { get; private set; }
+    public string? LastErrorTitle { get; private set; }
+    public void ShowError(string text, string title)
+    {
+        LastErrorText = text;
+        LastErrorTitle = title;
+    }
     public bool Confirm(string text, string title)
     {
         ConfirmCount++;
@@ -262,9 +273,16 @@ internal sealed class FakeDialogs : IDialogService
         LastConfirmationTitle = title;
         return ConfirmAnswer;
     }
+
     public Action<ModelBrowserViewModel>? OnShowModelBrowser { get; set; }
     public void ShowModelBrowser(ModelBrowserViewModel viewModel) =>
         (OnShowModelBrowser ?? throw new NotSupportedException()).Invoke(viewModel);
+}
+
+internal sealed class FakeApplicationLifetime : IApplicationLifetime
+{
+    public int ExitCount { get; private set; }
+    public void Exit() => ExitCount++;
 }
 
 // Obrazy testowe generowane w pamięci

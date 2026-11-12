@@ -5,12 +5,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using ImageStudio.Localization;
 using ImageStudio.ViewModels;
+using ImageStudio.Views;
 
 namespace ImageStudio;
 
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly TrayIconController _tray;
 
     // Zakładki w kolejności logicznej: pozycja to indeks ActiveTab/TabVisibility, niezależny od kolejności wyświetlania,
     // którą użytkownik zmienia przeciąganiem nagłówków (MainTabs.Items)
@@ -18,6 +20,8 @@ public partial class MainWindow : Window
     private bool _syncing;
     private TabItem? _dragItem;
     private Point _dragStart;
+    private bool _exitRequested;
+    private bool _sessionEnding;
 
     // ViewModel i zakładki (IMainTab, w tym wstrzyknięte) przychodzą z kontenera DI
     public MainWindow(MainViewModel viewModel, IEnumerable<IMainTab> tabs)
@@ -30,6 +34,8 @@ public partial class MainWindow : Window
         SelectActiveTab();
         ApplyTabVisibility(viewModel.TabVisibility);
         EnableTabReordering();
+        _tray = new TrayIconController(Dispatcher, ActivateFromTray, ExitApplication);
+        HideToTrayOnClose = viewModel.HideToTrayOnClose;
 
         // Zakładki bez modeli są ukrywane po załadowaniu katalogu dostawcy; ActiveTab zmienia się też spoza okna
         void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -39,6 +45,9 @@ public partial class MainWindow : Window
         }
 
         viewModel.PropertyChanged += OnViewModelChanged;
+        viewModel.PropertyChanged += OnSettingsChanged;
+        Closing += OnClosing;
+        Application.Current.SessionEnding += OnSessionEnding;
 
         // Tytuły zakładek są zwykłym tekstem (IMainTab.Title), więc po zmianie języka odświeżamy je ręcznie
         Loc.LanguageChanged += RefreshTabTitles;
@@ -46,6 +55,9 @@ public partial class MainWindow : Window
         {
             Loc.LanguageChanged -= RefreshTabTitles;
             viewModel.PropertyChanged -= OnViewModelChanged;
+            viewModel.PropertyChanged -= OnSettingsChanged;
+            Application.Current.SessionEnding -= OnSessionEnding;
+            _tray.Dispose();
         };
     }
 
@@ -64,7 +76,54 @@ public partial class MainWindow : Window
         });
     }
 
-    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+    private void Exit_Click(object sender, RoutedEventArgs e) => ExitApplication();
+
+    private bool HideToTrayOnClose { get; set; }
+
+    private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.HideToTrayOnClose))
+            HideToTrayOnClose = _viewModel.HideToTrayOnClose;
+    }
+
+    private void OnSessionEnding(object? sender, SessionEndingCancelEventArgs e) => _sessionEnding = true;
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (_exitRequested || _sessionEnding || !HideToTrayOnClose) return;
+
+        try
+        {
+            _tray.Visible = true;
+            e.Cancel = true;
+            Hide();
+        }
+        catch (Exception ex)
+        {
+            e.Cancel = true;
+            MessageBox.Show(Loc.T("tray.error", ex.Message), Loc.T("app.instance.title"),
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    internal void ActivateFromTray()
+    {
+        if (!IsVisible) Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        _tray.Visible = false;
+        ShowInTaskbar = true;
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Activate();
+    }
+
+    internal void ExitApplication()
+    {
+        _exitRequested = true;
+        try { _tray.Visible = false; }
+        finally { Close(); }
+    }
 
     // Wybór zakładki z interfejsu: ActiveTab to indeks logiczny. SelectionChanged bąbelkuje też z kontrolek w treści zakładek
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)

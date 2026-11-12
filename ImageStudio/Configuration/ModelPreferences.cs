@@ -53,7 +53,13 @@ public sealed class ModelPreferences
     public void Save()
     {
         var file = PathOverride ?? DefaultPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        File.WriteAllText(file, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        void Write()
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        var root = PathOverride is null ? AppPaths.UserDataDir : Path.GetDirectoryName(Path.GetFullPath(file))!;
+        UserDataMutationGate.TryWrite(root, file, Write);
     }
 }

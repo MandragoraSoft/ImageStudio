@@ -11,6 +11,7 @@ public sealed class OutgoingRequestRegistry
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Operation> _operations = [];
     private readonly Func<HttpMessageHandler>? _innerFactory;
+    private bool _stopping;
 
     public OutgoingRequestRegistry() { }
     public OutgoingRequestRegistry(Func<HttpMessageHandler> innerFactory) => _innerFactory = innerFactory;
@@ -41,15 +42,45 @@ public sealed class OutgoingRequestRegistry
         return operation?.Cancel() ?? false;
     }
 
+    public void CancelAll()
+    {
+        Operation[] operations;
+        lock (_gate) operations = _operations.Values.ToArray();
+        foreach (var operation in operations) operation.Cancel();
+    }
+
+    public void StopAndCancelAll()
+    {
+        Operation[] operations;
+        lock (_gate)
+        {
+            _stopping = true;
+            operations = _operations.Values.ToArray();
+        }
+        foreach (var operation in operations) operation.Cancel();
+    }
+
+    public async Task<bool> WaitForIdleAsync(TimeSpan timeout)
+    {
+        var until = DateTime.UtcNow + timeout;
+        while (ActiveRequests.Count > 0 && DateTime.UtcNow < until)
+            await Task.Delay(25).ConfigureAwait(false);
+        return ActiveRequests.Count == 0;
+    }
+
     internal Operation Register(HttpRequestMessage request, CancellationToken callerToken)
     {
         var method = request.Method.Method.ToUpperInvariant();
         if (method is not ("GET" or "POST" or "PUT" or "PATCH" or "DELETE" or "HEAD" or "OPTIONS" or "TRACE" or "CONNECT"))
             method = "HTTP";
         var host = request.RequestUri is { IsAbsoluteUri: true } uri ? uri.Host : "";
-        var operation = new Operation(this, new OutgoingRequestInfo(Guid.NewGuid(), method, host, DateTimeOffset.UtcNow), callerToken);
+        Operation operation;
         lock (_gate)
+        {
+            if (_stopping) throw new OperationCanceledException("Aplikacja kończy działanie.");
+            operation = new Operation(this, new OutgoingRequestInfo(Guid.NewGuid(), method, host, DateTimeOffset.UtcNow), callerToken);
             _operations.Add(operation.Info.Id, operation);
+        }
         Changed?.Invoke(this, EventArgs.Empty);
         return operation;
     }

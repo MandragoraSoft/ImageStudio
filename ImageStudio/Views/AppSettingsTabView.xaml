@@ -26,6 +26,10 @@
                         Click="BrowseArchive_Click" Style="{StaticResource SecondaryButton}"/>
             </Grid>
 
+            <TextBlock Text="{loc:T settings.window}" Style="{StaticResource SectionHeader}"/>
+            <CheckBox Content="{loc:T settings.hideToTray}" IsChecked="{Binding HideToTrayOnClose}"
+                      ToolTip="{loc:T settings.hideToTray.tip}"/>
+
             <TextBlock Text="{loc:T settings.chat}" Style="{StaticResource SectionHeader}"/>
             <CheckBox Content="{loc:T settings.streaming}" IsChecked="{Binding UseStreaming}"
                       ToolTip="{loc:T settings.streaming.tip}"/>
@@ -48,6 +52,30 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
+
+            <TextBlock Text="{loc:T settings.dataCleanup.title}" Style="{StaticResource SectionHeader}" Margin="0,14,0,4"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.description}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.settings}" IsChecked="{Binding ClearSettingsAndPrompts}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.settings.tip}" TextWrapping="Wrap" Margin="20,0,0,4"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.history}" IsChecked="{Binding ClearChatHistoryAndMemory}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.history.tip}" TextWrapping="Wrap" Margin="20,0,0,4"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.presets}" IsChecked="{Binding ClearPresets}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.presets.tip}" TextWrapping="Wrap" Margin="20,0,0,4"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.galleries}" IsChecked="{Binding ClearGalleryIndexes}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.galleries.tip}" TextWrapping="Wrap" Margin="20,0,0,4"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.mcp}" IsChecked="{Binding ClearMcpConfiguration}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.mcp.tip}" TextWrapping="Wrap" Margin="20,0,0,4"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.windows}" IsChecked="{Binding ClearWindowLayouts}"/>
+            <CheckBox Content="{loc:T settings.dataCleanup.category.credentials}" IsChecked="{Binding ClearProviderLoginsAndKeys}"/>
+            <TextBlock Text="{loc:T settings.dataCleanup.category.credentials.tip}" TextWrapping="Wrap" Margin="20,0,0,6"
+                       Style="{StaticResource MutedTextBlock}"/>
+            <Button Content="{loc:T settings.dataCleanup.button}" Command="{Binding ClearSelectedDataCommand}"
+                    Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,2,0,10"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

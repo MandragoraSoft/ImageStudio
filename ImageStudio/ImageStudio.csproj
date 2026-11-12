@@ -3,6 +3,8 @@
   <PropertyGroup>
     <!-- Debug: okno konsoli z logami (ILogger); Release: bez konsoli -->
     <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
     <StartupObject>ImageStudio.Program</StartupObject>
     <OutputType Condition="'$(Configuration)' == 'Debug'">Exe</OutputType>
     <RootNamespace>ImageStudio</RootNamespace>
@@ -16,6 +18,16 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Net.Http" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
   </ItemGroup>
 
   <ItemGroup>

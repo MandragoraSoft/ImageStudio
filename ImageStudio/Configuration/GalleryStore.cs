@@ -78,9 +78,13 @@ public static class GalleryStore
 
     public static void Save(IEnumerable<GalleryEntry> entries)
     {
-        Directory.CreateDirectory(AppPaths.UserDataDir);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(entries.Take(MaxEntries).ToList(),
-                                                             new JsonSerializerOptions { WriteIndented = true }));
+        var snapshot = entries.Take(MaxEntries).ToList();
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, FilePath, () =>
+        {
+            Directory.CreateDirectory(AppPaths.UserDataDir);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(snapshot,
+                                                                 new JsonSerializerOptions { WriteIndented = true }));
+        });
     }
 
     // Miniatura dekodowana w małym rozmiarze, żeby galeria nie trzymała pełnych obrazów w pamięci

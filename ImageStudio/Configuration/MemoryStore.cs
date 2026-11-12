@@ -26,7 +26,11 @@ public sealed class FileMemoryStore : IMemoryStore
 
     public void Save(IEnumerable<MemoryItem> items)
     {
-        Directory.CreateDirectory(AppPaths.UserDataDir);
-        File.WriteAllText(FilePath!, JsonSerializer.Serialize(items.ToList(), Options));
+        var snapshot = items.ToList();
+        UserDataMutationGate.TryWrite(AppPaths.UserDataDir, FilePath!, () =>
+        {
+            Directory.CreateDirectory(AppPaths.UserDataDir);
+            File.WriteAllText(FilePath!, JsonSerializer.Serialize(snapshot, Options));
+        });
     }
 }

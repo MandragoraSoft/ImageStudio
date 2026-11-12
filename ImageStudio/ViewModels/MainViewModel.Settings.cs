@@ -50,14 +50,14 @@ public sealed partial class MainViewModel
                                          _secrets.Load("mistral") ?? "", _secrets.Load("kilo") ?? "", _secrets.Load("opencodego") ?? "",
                                          _secrets.Load(ProviderRegistry.ChatGptSecret) ?? "",
                                          _storage.Active.Id, null, Limits.MaxTools, Limits.ListLimit, Limits.MaxListLimit,
-                                         _state.GalleryArchiveFolder, _state.PromptChatHistory);
+                                         _state.GalleryArchiveFolder, _state.PromptChatHistory, _settings.HideToTrayOnClose);
         Voice.RefreshDevices();
-        var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current),
+        var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current, ClearSelectedUserDataAsync),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
                                                      new StorageSettingsTab(current, _storage),
                                                      new McpSettingsTab(current),
                                                      new ProviderSettingsTab(current, LoadTextModelsAsync, SignInToChatGptAsync)]);
-        if (result is null) return;
+        if (result is null || _resetting) return;
 
         Voice.ApplyDevices(result.Microphone, result.Speaker);
         Limits.Set(result.McpMaxTools, result.McpListLimit, result.McpMaxListLimit);
@@ -80,9 +80,10 @@ public sealed partial class MainViewModel
 
         _settingsStore.Save(result.BaseUrl, result.MarketUrl, result.MaxSide, result.ApiKey, result.Theme,
                          result.ProviderId, result.OpenRouterKey, result.OpenAiBaseUrl, result.OpenAiKey, result.UseStreaming, result.Language,
-                         result.MistralKey, result.KiloKey, result.OpenCodeGoKey, result.ChatGptSession);
+                         result.MistralKey, result.KiloKey, result.OpenCodeGoKey, result.ChatGptSession, result.HideToTrayOnClose);
         var previous = _settings;
         _settings = _settingsStore.Load();
+        HideToTrayOnClose = _settings.HideToTrayOnClose;
         if (_settings.Theme != previous.Theme) _themes.Apply(result.Theme);
         Loc.Set(_settings.Language);
 
@@ -96,6 +97,63 @@ public sealed partial class MainViewModel
 
         // Nowe ustawienia (także inny provider) = nowa instancja providera
         await SwitchProviderAsync(_providers.Create(result.ProviderId, _settings));
+    }
+
+    private async Task ClearSelectedUserDataAsync(UserDataCleanupSelection selection)
+    {
+        if (_resetting || !selection.AnySelected) return;
+
+        var selected = new List<string>();
+        if (selection.SettingsAndPrompts) selected.Add(Loc.T("settings.dataCleanup.category.settings"));
+        if (selection.ChatHistoryAndMemory) selected.Add(Loc.T("settings.dataCleanup.category.history"));
+        if (selection.Presets) selected.Add(Loc.T("settings.dataCleanup.category.presets"));
+        if (selection.GalleryIndexes) selected.Add(Loc.T("settings.dataCleanup.category.galleries"));
+        if (selection.McpConfiguration) selected.Add(Loc.T("settings.dataCleanup.category.mcp"));
+        if (selection.WindowLayouts) selected.Add(Loc.T("settings.dataCleanup.category.windows"));
+        if (selection.ProviderLoginsAndKeys) selected.Add(Loc.T("settings.dataCleanup.category.credentials"));
+
+        var details = Loc.T("settings.dataCleanup.confirm.details");
+        if (selection.Presets)
+            details += Environment.NewLine + Loc.T("settings.dataCleanup.confirm.presets");
+        if (selection.McpConfiguration)
+            details += Environment.NewLine + Loc.T("settings.dataCleanup.confirm.mcp");
+        if (selection.ProviderLoginsAndKeys)
+            details += Environment.NewLine + Loc.T("settings.dataCleanup.confirm.credentials");
+
+        if (!_dialogs.Confirm(Loc.T("settings.dataCleanup.confirm", string.Join(Environment.NewLine, selected), details),
+                              Loc.T("settings.dataCleanup.confirm.title")))
+            return;
+
+        _resetting = true;
+        IsBusy = true;
+        var deletionStarted = false;
+        try
+        {
+            UserDataMutationGate.BlockWrites(_dataCleanup.RootPath, selection);
+            if (_ready) SaveStateCore();
+            _requests?.StopAndCancelAll();
+            Chat.StopCommand.Execute(null);
+            Voice.StopCurrentOperation();
+            await Tools.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            _provider.Dispose();
+            if (_requests is not null && !await _requests.WaitForIdleAsync(TimeSpan.FromSeconds(5)))
+                throw new TimeoutException(Loc.T("settings.dataCleanup.error.active"));
+
+            deletionStarted = true;
+            _dataCleanup.Clean(selection);
+        }
+        catch (Exception ex)
+        {
+            var message = deletionStarted
+                ? Loc.T("settings.dataCleanup.error", ex.Message)
+                : Loc.T("settings.dataCleanup.error.stopFailed", ex.Message);
+            _dialogs.ShowError(message,
+                               Loc.T("settings.dataCleanup.error.title"));
+        }
+        finally
+        {
+            _applicationLifetime.Exit();
+        }
     }
 
     // Nagrania i strażnik usuwania w zakładce Głos trzymają się folderu dźwięku aktywnej wtyczki (chmura = bez zmiany)
@@ -255,10 +313,10 @@ public sealed partial class MainViewModel
     // Wczytanie przełącza na zakładkę zestawu i ustawia wszystkie jego wartości
     private void ApplyPreset(Preset preset)
     {
-        _generateHistory = _editHistory = null;
         var isEdit = preset.Kind == "edit";
         if (isEdit)
         {
+            _editHistory = null;
             EditPrompt = preset.Prompt;
             EditSystemPrompt = preset.SystemPrompt;
             SelectedEditModel = EditModels.FirstOrDefault(m => m.Id == preset.Model) ?? SelectedEditModel;
@@ -266,6 +324,7 @@ public sealed partial class MainViewModel
         }
         else
         {
+            _generateHistory = null;
             GeneratePrompt = preset.Prompt;
             GenerateSystemPrompt = preset.SystemPrompt;
             SelectedModel = Models.FirstOrDefault(m => m.Id == preset.Model) ?? SelectedModel;

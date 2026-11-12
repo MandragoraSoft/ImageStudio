@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddImageStudioCore(this IServiceCollection services)
     {
         services.AddSingleton<IActivityTracker, ActivityTracker>();
+        services.TryAddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
         services.AddSingleton<OutgoingRequestRegistry>();
         services.AddTransient<OutgoingRequestHandler>();
         services.AddSingleton<ImageDownloadService>();
@@ -57,6 +58,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddImageStudioInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IUserStateStore, FileUserStateStore>();
+        services.AddSingleton<IUserDataCleanupService>(_ => new UserDataCleanupService(AppPaths.UserDataDir));
         services.AddSingleton<IGalleryStore, FileGalleryStore>();
         services.AddSingleton<IChatSessionStore, FileChatSessionStore>();
         services.AddSingleton<IPromptChatSessionStore, FilePromptChatSessionStore>();
