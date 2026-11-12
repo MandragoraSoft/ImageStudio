@@ -1,6 +1,6 @@
 # Wydawanie nowej wersji
 
-Wydanie robi pipeline `.github/workflows/release.yml` (GitHub Actions, `windows-latest`). Człowiek przygotowuje tylko opis wersji i podaje numer.
+Wydanie buduje pipeline `.github/workflows/release.yml` (GitHub Actions, `windows-latest`). Przygotuj opis wersji i podaj numer; mechaniczne kroki można wykonać jednym skryptem.
 
 ## Numer wersji
 
@@ -13,7 +13,25 @@ Semantyczny: `MAJOR.MINOR.PATCH`.
 
 Numer trafia do plików exe i instalatora; ręcznie nigdzie go nie wpisujesz.
 
-## Kroki
+## Automatyczny skrypt
+
+Przygotuj najpierw `docs/release-notes/<wersja>.md` zgodnie z sekcją niżej, a następnie uruchom na Windowsie z katalogu repozytorium:
+
+```powershell
+pwsh -NoProfile -File tools/Release.ps1 -Version 1.6.0
+```
+
+Skrypt sprawdza wersję i notatki, uwierzytelnienie `gh`, gałąź `main`, synchronizację z `origin/main`, istniejące tagi/wydania i zmiany w drzewie. Dopuszcza wyłącznie zmiany w pliku notatek tej wersji albo pojedynczy lokalny commit zawierający tylko te notatki. Uruchamia kontrolę tłumaczeń, build Release i wszystkie testy. Potem wyświetla notatki i prosi o potwierdzenie; po akceptacji zatwierdza same notatki (jeśli nie są jeszcze zatwierdzone), wypycha `main`, uruchamia pipeline, czeka na jego wynik i sprawdza, czy wydanie zawiera dokładnie trzy pliki.
+
+Skrypt nie tworzy automatycznie tekstu notatek — opis funkcji i ograniczeń musi zostać sprawdzony i zaakceptowany. Wymaga PowerShell 7, Git, .NET SDK 10, `gh` zalogowanego do `github.com`, gałęzi `main` i czystego drzewa roboczego poza plikiem notatek danej wersji. Nie publikuje, gdy wersja/tag już istnieje.
+
+Podgląd z pełnymi kontrolami i testami lokalnymi, bez commitu, push ani publikacji:
+
+```powershell
+pwsh -NoProfile -File tools/Release.ps1 -Version 1.6.0 -WhatIf
+```
+
+## Kroki ręczne
 
 1. **Napisz opis wersji** w `docs/release-notes/<wersja>.md` (po polsku, dla użytkownika): co nowego, poprawki, znane ograniczenia i krótka lista plików do pobrania. Wzór: `docs/release-notes/1.1.0.md`.
 2. **Zatwierdź i wypchnij na `main`** (razem ze zmianami, które wchodzą do wydania). Testy lokalnie: `dotnet test ImageStudio.Tests`.

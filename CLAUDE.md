@@ -22,7 +22,7 @@ dotnet publish ImageStudio -p:PublishProfile=SelfHosted  # publish\selfhosted\Im
 - Gdy aplikacja jest uruchomiona, jej pliki są zablokowane: buduj do osobnego katalogu (`-p:BaseOutputPath=<katalog>`) i nie zabijaj procesu użytkownika.
 - Wersje pakietów są centralne (`Directory.Packages.props`), a TFM, `UseWPF`, nullable i `PlatformTarget` w `Directory.Build.props`. W csproj dodawaj `PackageReference` bez `Version`. Nie ma lintera.
 - Profile publikacji ustawiają `PluginsInBundle`: dostawcy i zakładki wchodzą do exe zamiast do `providers\`/`tabs\`, a `appsettings.json` jest zasobem wbudowanym.
-- Wydanie: skill `release`, opis procesu w [docs/RELEASING.md](docs/RELEASING.md); pipeline `.github/workflows/release.yml` wymaga `docs/release-notes/<wersja>.md`.
+- Wydanie: skill `release`, opis procesu w [docs/RELEASING.md](docs/RELEASING.md), automatyzacja w `tools/Release.ps1`; pipeline `.github/workflows/release.yml` wymaga `docs/release-notes/<wersja>.md`.
 
 ## Zasady, które obowiązują zawsze
 
