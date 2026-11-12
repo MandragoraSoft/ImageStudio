@@ -38,6 +38,49 @@ public static partial class ApiErrors
     public static InvalidOperationException Failure(HttpStatusCode status, string responseBody) =>
         new($"HTTP {(int)status}: {Message(responseBody, status)}");
 
+    // Samo wskazanie parametru nie oznacza braku obsługi: może też oznaczać niepoprawny schemat.
+    public static bool RejectsResponseFormat(HttpStatusCode status, string responseBody)
+    {
+        if (status is not (HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)) return false;
+
+        string? code = null, param = null, message = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            var root = doc.RootElement;
+            var error = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var e) ? e : root;
+            if (error.ValueKind == JsonValueKind.Object)
+            {
+                code = StringField(error, "code");
+                param = StringField(error, "param");
+                message = StringField(error, "message");
+            }
+            else if (error.ValueKind == JsonValueKind.String)
+            {
+                message = error.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+            message = responseBody;
+        }
+        message ??= Message(responseBody, status);
+
+        if (code is "invalid_json_schema" or "invalid_value" or "invalid_api_key" or "model_not_found" or "rate_limit_exceeded") return false;
+        if (message.Contains("invalid schema", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("invalid json schema", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("malformed", StringComparison.OrdinalIgnoreCase)) return false;
+        var identifiesFormat = param == "response_format"
+            || (param is null && message.Contains("response_format", StringComparison.OrdinalIgnoreCase));
+        return identifiesFormat && (code == "unsupported_parameter" || RejectionPhrase().IsMatch(message));
+    }
+
+    [GeneratedRegex("not supported|unsupported|does not support|not allowed|not accepted|unknown parameter|unrecognized", RegexOptions.IgnoreCase)]
+    private static partial Regex RejectionPhrase();
+
+    private static string? StringField(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
     // Tekst błędu z odpowiedzi API. Formaty: {"error":{"message":..}} (OpenAI, OpenRouter, Kilo), {"error":".."},
     // {"message":".."}, {"detail":".."} albo lista {"detail":[{"msg":..}]} (Mistral), {"type":"error","error":{"message":..}} (OpenCode).
     // Gdy to nie JSON albo nic z tego nie pasuje, zwraca skrócony surowy tekst, a przy pustej odpowiedzi nazwę statusu

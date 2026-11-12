@@ -25,5 +25,5 @@ Wszystkie punkty są obowiązkowe; brak któregoś kończy się cichym błędem 
 2. **`ActivityAiProvider`**: jawne przekazanie metody z etykietą dla stopki. Dekorator nie dziedziczy domyślnych metod, więc bez tego wywołanie nie pokaże spinnera, a przy delegowaniu dostanie domyślną implementację zamiast prawdziwej.
 3. Implementacja w dostawcach, którzy tę funkcję mają. Uwaga: domyślne metody interfejsu są widoczne tylko przez typ `IAiProvider`, nie przez klasę dostawcy (testy rzutuj na `IAiProvider`).
 4. **`FakeProvider`** w `ImageStudio.Tests/Fakes.cs` (konfigurowalne odpowiedzi i zapamiętanie ostatniego wywołania) i testy ViewModelu.
-5. Żądania sieciowe idą przez wspólny kod, gdy format jest zgodny z OpenAI; formaty zależne od modelu (np. `response_format`) obsłuż ponawianiem z wartością z komunikatu błędu.
+5. Żądania sieciowe idą przez wspólny kod, gdy format jest zgodny z OpenAI; formaty odpowiedzi przebudowy wybieraj przez `PromptResponseMode`. Ponawianie obsługuje wspólny kod po rozpoznaniu statusu i jednoznacznego odrzucenia formatu (`ApiErrors.RejectsResponseFormat`).
 6. Dokumentacja w `docs/dev/providers.md`.

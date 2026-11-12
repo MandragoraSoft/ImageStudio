@@ -201,6 +201,10 @@ public enum NegativePromptOutcome { Unsupported, Unconfirmed, Rejected }
 public sealed record ImageOptions(int? Seed, string? NegativePrompt, string? Quality,
                                   Action<NegativePromptOutcome>? NegativeNotice = null);
 
+// Jak wymusić format odpowiedzi przebudowy promptu, od najściślejszego: ścisły JSON Schema, obiekt JSON
+// i sama instrukcja tekstowa (bez pola response_format)
+public enum PromptResponseMode { Instruction, JsonObject, JsonSchema }
+
 // Prompt rozdzielony: System = konfiguracja, Concept = treść, Negative = elementy niepożądane
 // Changes: jednozdaniowe podsumowanie, co model zmienił (opcjonalne)
 public sealed record PromptParts(string System, string Concept, string? Changes = null, string Negative = "");

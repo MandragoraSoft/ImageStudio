@@ -187,7 +187,7 @@ public sealed class ImageGenerationService : IDisposable
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
                                                 CancellationToken ct = default, string negative = "") =>
-        OpenAiCompat.EnhanceAsync(_http, "/v1/chat/completions", model, instruction, system, concept, parameters, history, jsonMode: false, ct, negative);
+        OpenAiCompat.EnhanceAsync(_http, "/v1/chat/completions", model, instruction, system, concept, parameters, history, PromptResponseMode.Instruction, ct, negative);
 
 
 

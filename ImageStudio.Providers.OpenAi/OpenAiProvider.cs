@@ -31,9 +31,13 @@ public sealed class OpenAiProvider : IAiProvider
     // Obrazy zwracane jako URL pobieramy bez klucza OpenAI
     private readonly HttpClient _files = new() { Timeout = TimeSpan.FromMinutes(2) };
 
+    // Ścisły JSON Schema tylko przy oficjalnym adresie OpenAI (patrz SupportsStrictSchema)
+    private readonly bool _officialApi;
+
     public OpenAiProvider(string baseUrl, string apiKey)
     {
         var root = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.Trim();
+        _officialApi = IsOfficial(root);
         _http = new HttpClient
         {
             BaseAddress = new Uri(root.TrimEnd('/') + "/"),
@@ -42,6 +46,15 @@ public sealed class OpenAiProvider : IAiProvider
         if (!string.IsNullOrWhiteSpace(apiKey))
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
+
+    // Adres oficjalnego API: tylko tu znamy obsługę ścisłego schematu (proxy i serwery zgodne z OpenAI tego nie gwarantują)
+    private static bool IsOfficial(string root) =>
+        Uri.TryCreate(root, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+        && uri.Host.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase);
+
+    // Jawna lista: sama data nazwy nie potwierdza możliwości innych modeli ani serwerów.
+    public static bool SupportsStrictSchema(string model) =>
+        model is "gpt-4o-mini" or "gpt-4o-mini-2024-07-18" or "gpt-4o-2024-08-06";
 
     public string Id => Identifier;
     public const string DefaultTextModelId = "gpt-4o-mini";
@@ -203,7 +216,9 @@ public sealed class OpenAiProvider : IAiProvider
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
                                                 CancellationToken ct = default, string negative = "") =>
-        OpenAiCompat.EnhanceAsync(_http, "v1/chat/completions", model, instruction, system, concept, parameters, history, jsonMode: true, ct, negative);
+        OpenAiCompat.EnhanceAsync(_http, "v1/chat/completions", model, instruction, system, concept, parameters, history,
+                                  _officialApi && SupportsStrictSchema(model) ? PromptResponseMode.JsonSchema : PromptResponseMode.JsonObject,
+                                  ct, negative);
 
     public void Dispose()
     {

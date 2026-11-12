@@ -71,7 +71,7 @@ public abstract class OpenAiChatProvider : IAiProvider
                                                 IReadOnlyDictionary<string, object> parameters,
                                                 IReadOnlyList<PromptRevision>? history = null,
                                                 CancellationToken ct = default, string negative = "") =>
-        OpenAiCompat.EnhanceAsync(Http, ChatPath, model, instruction, system, concept, parameters, history, jsonMode: true, ct, negative);
+        OpenAiCompat.EnhanceAsync(Http, ChatPath, model, instruction, system, concept, parameters, history, PromptResponseMode.JsonObject, ct, negative);
 
     public virtual void Dispose() => Http.Dispose();
 

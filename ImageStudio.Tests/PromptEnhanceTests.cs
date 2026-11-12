@@ -58,48 +58,203 @@ public sealed class PromptEnhanceTests
     }
 
     [Fact]
-    public async Task Enhance_requests_json_mode_and_returns_changes()
+    public async Task Enhance_in_json_object_mode_returns_changes()
     {
-        var handler = new StubHandler(HttpStatusCode.OK, Reply);
+        var handler = new SequenceHandler((HttpStatusCode.OK, Reply));
         using var http = Client(handler);
 
         var parts = await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
-                                                    new Dictionary<string, object>(), null, jsonMode: true, default);
+                                                    new Dictionary<string, object>(), null, PromptResponseMode.JsonObject, default);
 
         Assert.Equal("kot na dachu", parts.Concept);
         Assert.Equal("styl: foto", parts.System);
         Assert.Equal("tekst", parts.Negative);
         Assert.Equal("dodano dach", parts.Changes);
-        using var body = JsonDocument.Parse(handler.RequestBody!);
-        Assert.Equal("json_object", body.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+        Assert.Equal("json_object", FormatType(handler.Bodies.Single()));
     }
 
     [Fact]
-    public async Task Enhance_without_json_mode_sends_no_response_format()
+    public async Task Enhance_in_instruction_mode_sends_no_response_format()
     {
-        var handler = new StubHandler(HttpStatusCode.OK, Reply);
+        var handler = new SequenceHandler((HttpStatusCode.OK, Reply));
         using var http = Client(handler);
 
         await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
-                                        new Dictionary<string, object>(), null, jsonMode: false, default);
+                                        new Dictionary<string, object>(), null, PromptResponseMode.Instruction, default);
 
-        Assert.DoesNotContain("response_format", handler.RequestBody!);
+        Assert.DoesNotContain("response_format", handler.Bodies.Single());
     }
 
     [Fact]
-    public async Task Enhance_retries_without_response_format_when_endpoint_rejects_it()
+    public async Task Json_schema_mode_declares_strict_schema_with_all_properties_required()
     {
-        var handler = new RejectOnceHandler(Reply);
+        var handler = new SequenceHandler((HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+                                        new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default);
+
+        using var body = JsonDocument.Parse(handler.Bodies.Single());
+        var format = body.RootElement.GetProperty("response_format");
+        Assert.Equal("json_schema", format.GetProperty("type").GetString());
+        Assert.True(format.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+        var schema = format.GetProperty("json_schema").GetProperty("schema");
+        Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
+        var required = schema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).ToArray();
+        Assert.Equal(new[] { "system", "concept", "negative", "changes" }, required);
+        Assert.Equal(required.OrderBy(p => p), schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).OrderBy(p => p));
+    }
+
+    [Fact]
+    public async Task Rejected_json_schema_falls_back_to_json_object_then_plain_text_once_each()
+    {
+        var handler = new SequenceHandler((HttpStatusCode.BadRequest, Rejected), (HttpStatusCode.BadRequest, Rejected), (HttpStatusCode.OK, Reply));
         using var http = Client(handler);
 
         var parts = await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
-                                                    new Dictionary<string, object>(), null, jsonMode: true, default);
+                                                    new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default);
 
-        Assert.Equal(2, handler.Bodies.Count);
-        Assert.Contains("response_format", handler.Bodies[0]);
-        Assert.DoesNotContain("response_format", handler.Bodies[1]);
+        Assert.Equal(new[] { "json_schema", "json_object", "none" }, handler.Bodies.Select(FormatType));
         Assert.Equal("kot na dachu", parts.Concept);
     }
+
+    [Fact]
+    public async Task Rejected_json_object_falls_back_to_plain_text_when_error_is_plain_text()
+    {
+        var handler = new SequenceHandler((HttpStatusCode.BadRequest, "unsupported parameter: response_format"), (HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        var parts = await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+                                                    new Dictionary<string, object>(), null, PromptResponseMode.JsonObject, default);
+
+        Assert.Equal(new[] { "json_object", "none" }, handler.Bodies.Select(FormatType));
+        Assert.Equal("kot na dachu", parts.Concept);
+    }
+
+    [Fact]
+    public async Task Fallback_stops_after_each_mode_is_tried_once()
+    {
+        var handler = new SequenceHandler((HttpStatusCode.BadRequest, Rejected), (HttpStatusCode.BadRequest, Rejected), (HttpStatusCode.BadRequest, Rejected));
+        using var http = Client(handler);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default));
+
+        Assert.Equal(new[] { "json_schema", "json_object", "none" }, handler.Bodies.Select(FormatType));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, """{"error":{"message":"Invalid schema for response_format 'prompt_parts'","param":"response_format","code":"invalid_json_schema"}}""")]
+    [InlineData(HttpStatusCode.BadRequest, """{"error":{"message":"Invalid value for response_format","param":"response_format","code":"invalid_value"}}""")]
+    [InlineData(HttpStatusCode.BadRequest, """{"error":{"message":"Malformed response_format","param":"response_format"}}""")]
+    [InlineData(HttpStatusCode.BadRequest, """["bad request"]""")]
+    [InlineData(HttpStatusCode.Unauthorized, """{"error":{"message":"Incorrect API key provided; response_format is not used","code":"invalid_api_key"}}""")]
+    [InlineData(HttpStatusCode.TooManyRequests, "rate limit reached, response_format not supported")]
+    [InlineData(HttpStatusCode.InternalServerError, "response_format unsupported")]
+    public async Task Errors_other_than_explicit_format_rejection_are_not_retried(HttpStatusCode status, string error)
+    {
+        var handler = new SequenceHandler((status, error), (HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default));
+
+        Assert.Single(handler.Bodies);
+    }
+
+    [Fact]
+    public async Task Rejected_schema_format_can_fall_back_when_error_names_json_schema()
+    {
+        var handler = new SequenceHandler(
+            (HttpStatusCode.BadRequest, """{"error":{"message":"json_schema is not supported","param":"response_format"}}"""),
+            (HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        await OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default);
+
+        Assert.Equal(new[] { "json_schema", "json_object" }, handler.Bodies.Select(FormatType));
+    }
+
+    [Fact]
+    public async Task Invalid_mode_and_response_format_override_fail_before_request()
+    {
+        var handler = new SequenceHandler((HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => OpenAiCompat.EnhanceAsync(http, "/", "m", "i", "s", "c",
+            new Dictionary<string, object>(), null, (PromptResponseMode)99, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => OpenAiCompat.EnhanceAsync(http, "/", "m", "i", "s", "c",
+            new Dictionary<string, object> { ["response_format"] = new { type = "json_object" } }, null, PromptResponseMode.Instruction, default));
+        Assert.Empty(handler.Bodies);
+    }
+
+    [Fact]
+    public async Task Refusal_is_reported_without_retry()
+    {
+        const string refusal = """{"choices":[{"message":{"content":null,"refusal":"Nie mogę wykonać tej prośby."}}]}""";
+        var handler = new SequenceHandler((HttpStatusCode.OK, refusal));
+        using var http = Client(handler);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => OpenAiCompat.EnhanceAsync(http, "/", "m", "i", "s", "c",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default));
+        Assert.Equal("Nie mogę wykonać tej prośby.", error.Message);
+        Assert.Single(handler.Bodies);
+    }
+
+    [Fact]
+    public void Changes_must_be_text_when_present()
+    {
+        Assert.Throws<InvalidOperationException>(() => OpenAiCompat.ParseSplit("""{"system":"","concept":"c","negative":"","changes":5}"""));
+        Assert.Null(OpenAiCompat.ParseSplit("""{"system":"","concept":"c","negative":"","changes":null}""").Changes);
+        Assert.Null(OpenAiCompat.ParseSplit("""{"system":"","concept":"c","negative":""}""").Changes);
+    }
+
+    [Theory]
+    [InlineData("""{"system":"","concept":"c","negative":""}""")]
+    [InlineData("""{"system":"","concept":"c","negative":"","changes":null}""")]
+    [InlineData("""{"system":"","concept":"c","negative":"","changes":"","extra":true}""")]
+    [InlineData("""{"system":"","concept":"c","negative":"","changes":"","concept":"d"}""")]
+    public async Task Strict_response_is_validated_against_schema_even_on_success(string content)
+    {
+        var response = JsonSerializer.Serialize(new { choices = new[] { new { message = new { content } } } });
+        var handler = new SequenceHandler((HttpStatusCode.OK, response));
+        using var http = Client(handler);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => OpenAiCompat.EnhanceAsync(http, "/", "m", "i", "s", "c",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default));
+        Assert.Single(handler.Bodies);
+    }
+
+    [Fact]
+    public async Task Invalid_content_is_not_retried_with_another_mode()
+    {
+        const string empty = """{"choices":[{"message":{"content":"{\"system\":\"s\",\"concept\":\"\",\"negative\":\"\",\"changes\":\"\"}"}}]}""";
+        var handler = new SequenceHandler((HttpStatusCode.OK, empty), (HttpStatusCode.OK, Reply));
+        using var http = Client(handler);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => OpenAiCompat.EnhanceAsync(http, "/v1/chat/completions", "m", "i", "s", "kot",
+            new Dictionary<string, object>(), null, PromptResponseMode.JsonSchema, default));
+
+        Assert.Single(handler.Bodies);
+    }
+
+    [Theory]
+    [InlineData("gpt-4o-mini", true)]
+    [InlineData("gpt-4o-mini-2024-07-18", true)]
+    [InlineData("gpt-4o-mini-2024-07-17", false)]
+    [InlineData("gpt-4o-2024-08-06", true)]
+    [InlineData("gpt-4o-2024-05-13", false)]
+    [InlineData("gpt-4o-2025-01-01", false)]
+    [InlineData("gpt-4o", false)]
+    [InlineData("gpt-4.1", false)]
+    public void Strict_schema_is_limited_to_documented_openai_models(string model, bool expected) =>
+        Assert.Equal(expected, OpenAiProvider.SupportsStrictSchema(model));
+
+    private static string FormatType(string body) =>
+        JsonDocument.Parse(body).RootElement.TryGetProperty("response_format", out var format)
+            ? format.GetProperty("type").GetString()!
+            : "none";
 
     [Fact]
     public void Rebuild_passes_history_to_the_model_and_returns_it_extended()
@@ -180,16 +335,20 @@ public sealed class PromptEnhanceTests
         });
     }
 
-    private sealed class RejectOnceHandler(string okBody) : HttpMessageHandler
+    private const string Rejected = """{"error":{"message":"Unsupported parameter: response_format is not supported with this model","type":"invalid_request_error","param":"response_format","code":"unsupported_parameter"}}""";
+
+    // Kolejne odpowiedzi w kolejności wywołań (ostatnia się powtarza); zapisuje ciała żądań
+    private sealed class SequenceHandler(params (HttpStatusCode Status, string Body)[] responses) : HttpMessageHandler
     {
+        private int _next;
+
         public List<string> Bodies { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Bodies.Add(await request.Content!.ReadAsStringAsync(ct));
-            return Bodies.Count == 1
-                ? new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("unsupported parameter: response_format") }
-                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(okBody) };
+            var (status, body) = responses[Math.Min(_next++, responses.Length - 1)];
+            return new HttpResponseMessage(status) { Content = new StringContent(body) };
         }
     }
 }

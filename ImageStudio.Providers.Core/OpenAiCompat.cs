@@ -318,44 +318,82 @@ public static class OpenAiCompat
         return messages;
     }
 
-    // Wspólne dla providerów: przebudowa promptu z historią; jsonMode dodaje response_format (z ponowieniem bez niego,
-    // gdy endpoint go odrzuci). Wynik jest walidowany: koncept nie może być pusty
+    // Ścisły JSON Schema przebudowy (tryb JsonSchema). Wymagania OpenAI strict: wszystkie właściwości w required
+    // i additionalProperties false. "changes" jest tu wymagane, lokalnie (ParseSplit) pozostaje opcjonalne
+    private static readonly object PromptSchema = new
+    {
+        type = "object",
+        properties = new
+        {
+            system = new { type = "string" },
+            concept = new { type = "string" },
+            negative = new { type = "string" },
+            changes = new { type = "string" },
+        },
+        required = new[] { "system", "concept", "negative", "changes" },
+        additionalProperties = false,
+    };
+
+    // Format odpowiedzi w ciele żądania; null dla trybu instrukcji (bez pola)
+    private static object? ResponseFormat(PromptResponseMode mode) => mode switch
+    {
+        PromptResponseMode.JsonSchema => new { type = "json_schema", json_schema = new { name = "prompt_parts", strict = true, schema = PromptSchema } },
+        PromptResponseMode.JsonObject => new { type = "json_object" },
+        PromptResponseMode.Instruction => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
+    };
+
+    // Łagodniejszy tryb po odrzuceniu formatu; null, gdy nie ma już niższego trybu
+    private static PromptResponseMode? Fallback(PromptResponseMode mode) => mode switch
+    {
+        PromptResponseMode.JsonSchema => PromptResponseMode.JsonObject,
+        PromptResponseMode.JsonObject => PromptResponseMode.Instruction,
+        _ => null,
+    };
+
+    // Wspólne dla providerów: przebudowa promptu z historią w wybranym trybie odpowiedzi. Ponawiamy z łagodniejszym trybem
+    // tylko po jednoznacznym odrzuceniu formatu (ApiErrors.RejectsResponseFormat); każdy tryb co najwyżej raz, inne błędy
+    // trafiają wprost do wywołującego. Wynik zawsze przechodzi ParseSplit
     public static async Task<PromptParts> EnhanceAsync(HttpClient http, string path, string model, string instruction,
                                                        string system, string concept,
                                                        IReadOnlyDictionary<string, object> parameters,
-                                                       IReadOnlyList<PromptRevision>? history, bool jsonMode,
+                                                       IReadOnlyList<PromptRevision>? history, PromptResponseMode mode,
                                                        CancellationToken ct, string negative = "")
     {
-        var body = new Dictionary<string, object>
+        _ = ResponseFormat(mode);
+        if (parameters.ContainsKey("response_format"))
+            throw new ArgumentException("response_format", nameof(parameters));
+        var messages = BuildEnhanceMessages(instruction, system, concept, history, negative);
+        var current = mode;
+        while (true)
         {
-            ["model"] = model,
-            ["messages"] = BuildEnhanceMessages(instruction, system, concept, history, negative),
-        };
-        foreach (var (key, value) in parameters) body[key] = value;
-        if (jsonMode) body["response_format"] = new { type = "json_object" };
+            var body = new Dictionary<string, object> { ["model"] = model, ["messages"] = messages };
+            foreach (var (key, value) in parameters) body[key] = value;
+            if (ResponseFormat(current) is { } format) body["response_format"] = format;
 
-        var (ok, text) = await PostAsync(http, path, body, ct);
-        if (!ok && jsonMode && text.Contains("response_format", StringComparison.OrdinalIgnoreCase))
-        {
-            body.Remove("response_format");
-            (ok, text) = await PostAsync(http, path, body, ct);
+            using var response = await http.PostAsJsonAsync(path, body, ct);
+            var text = await response.Content.ReadAsStringAsync(ct);
+            if (response.IsSuccessStatusCode) return ParseSplit(ContentOf(text), current == PromptResponseMode.JsonSchema);
+
+            var lower = Fallback(current);
+            if (lower is null || !ApiErrors.RejectsResponseFormat(response.StatusCode, text))
+                throw ApiErrors.Failure(response.StatusCode, text);
+            current = lower.Value;
         }
-        if (!ok) throw new InvalidOperationException(text);
-
-        using var doc = JsonDocument.Parse(text);
-        var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message")
-            .GetProperty("content").GetString() ?? "";
-        return ParseSplit(content);
     }
 
-    private static async Task<(bool Ok, string Text)> PostAsync(HttpClient http, string path, object body, CancellationToken ct)
+    // Treść pierwszej odpowiedzi; odmowa modelu (refusal, np. przy ścisłym schemacie) jest zgłaszana wprost
+    private static string ContentOf(string text)
     {
-        using var response = await http.PostAsJsonAsync(path, body, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        return response.IsSuccessStatusCode ? (true, text) : (false, ApiErrors.Failure(response.StatusCode, text).Message);
+        using var doc = JsonDocument.Parse(text);
+        var message = doc.RootElement.GetProperty("choices")[0].GetProperty("message");
+        if (message.TryGetProperty("refusal", out var refusal) && refusal.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(refusal.GetString()))
+            throw new InvalidOperationException(refusal.GetString());
+        return message.GetProperty("content").GetString() ?? "";
     }
 
-    public static PromptParts ParseSplit(string content)
+    public static PromptParts ParseSplit(string content, bool strict = false)
     {
         try
         {
@@ -363,6 +401,13 @@ public static class OpenAiCompat
             var root = parsed.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("Odpowiedź modelu musi być obiektem JSON.");
+            if (strict)
+            {
+                var names = new HashSet<string>();
+                foreach (var property in root.EnumerateObject())
+                    if (property.Name is not ("system" or "concept" or "negative" or "changes") || !names.Add(property.Name))
+                        throw new InvalidOperationException("Odpowiedź modelu zawiera nieznane lub powtórzone pola.");
+            }
             string Required(string name) =>
                 root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
                     ? value.GetString()!.Trim()
@@ -372,9 +417,13 @@ public static class OpenAiCompat
             var negative = Required("negative");
             if (string.IsNullOrWhiteSpace(concept))
                 throw new InvalidOperationException("Model nie zwrócił promptu (concept).");
-            var changes = root.TryGetProperty("changes", out var ch) && ch.ValueKind == JsonValueKind.String
-                ? ch.GetString()!.Trim()
-                : null;
+            string? changes = null;
+            if (strict && (!root.TryGetProperty("changes", out var requiredChanges) || requiredChanges.ValueKind != JsonValueKind.String))
+                throw new InvalidOperationException("Odpowiedź modelu wymaga pola tekstowego „changes”.");
+            if (root.TryGetProperty("changes", out var ch) && ch.ValueKind != JsonValueKind.Null)
+                changes = ch.ValueKind == JsonValueKind.String
+                    ? ch.GetString()!.Trim()
+                    : throw new InvalidOperationException("Odpowiedź modelu wymaga pola tekstowego „changes”.");
             return new PromptParts(system, concept, string.IsNullOrWhiteSpace(changes) ? null : changes, negative);
         }
         catch (JsonException ex)
