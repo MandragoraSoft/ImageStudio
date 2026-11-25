@@ -52,7 +52,7 @@ Sekret klienta aplikacji desktopowej nie jest naprawdę tajny (Google wymaga go 
 3. „Zaloguj w przeglądarce”. Wybierz konto, przy ostrzeżeniu „Ta aplikacja nie została zweryfikowana” kliknij *Zaawansowane → Przejdź do ImageStudio*, zaakceptuj dostęp do plików utworzonych przez aplikację.
 4. Po powrocie status pokazuje „Zalogowano”. Zapisz Ustawienia.
 
-Nowe pliki są wysyłane w tle do folderu `ImageStudio` w Moim dysku. Błąd wysyłki pojawia się w statusie po ponownym otwarciu zakładki.
+Nowe pliki są wysyłane w tle do folderu `ImageStudio` w Moim dysku. Stan logowania i błąd wysyłki widać w zakładce Zapis na bieżąco; pliki zapisane przed zalogowaniem są wysyłane po zalogowaniu.
 
 ## Rozwiązywanie problemów
 

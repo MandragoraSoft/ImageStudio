@@ -1,5 +1,5 @@
 // Port klasy WebClient z MegaApiClient 1.10.5 (https://github.com/gpailler/MegaApiClient, plik WebClient_HttpClient.cs),
-// Copyright (c) Gilles Pailler, licencja MIT (https://github.com/gpailler/MegaApiClient/blob/v1.10.5/LICENSE).
+// Copyright (c) 2015 gpailler, licencja MIT (https://github.com/gpailler/MegaApiClient/blob/v1.10.5/LICENSE).
 // Zmiany: HttpClient na handlerze z kontekstu aplikacji (zamiast statycznego klienta), wywołania asynchroniczne
 // blokowane przez GetAwaiter().GetResult() (adapter woła je w Task.Run), bez dyrektyw #if per TFM.
 using System.IO;

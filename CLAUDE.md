@@ -60,13 +60,15 @@ Pliki w `docs/dev/` czytaj na żądanie, gdy zadanie dotyka danego obszaru (to z
 | Tłumaczenia PL/EN: `Loc`, `{loc:T}`, reguły, pułapki, co zostaje po polsku | [docs/dev/localization.md](docs/dev/localization.md) |
 | Testy: `TestApp`, atrapy, pułapki | [docs/dev/testing.md](docs/dev/testing.md) |
 | Narzędzia MCP aplikacji (`StudioApi`, `AppControlTools`) i CLI `ImageStudio.exe mcp` | [docs/dev/app-control-coverage.md](docs/dev/app-control-coverage.md) |
-| Magazyny chmurowe: konfiguracja dla użytkownika | [docs/storage-google-drive.md](docs/storage-google-drive.md), [docs/storage-onedrive.md](docs/storage-onedrive.md) |
+| Magazyny chmurowe: konfiguracja dla użytkownika | [docs/storage-google-drive.md](docs/storage-google-drive.md), [docs/storage-onedrive.md](docs/storage-onedrive.md), [docs/storage-mega.md](docs/storage-mega.md) |
+| Magazyn wyników, moduły chmury (OneDrive, Google Drive, MEGA), logowanie w zakładce Zapis | [docs/dev/architecture.md](docs/dev/architecture.md) |
 | Wydawanie wersji | [docs/RELEASING.md](docs/RELEASING.md) |
 
 ## Skille projektu (`.claude/skills/`)
 
 - **`new-main-tab`**: nowa zakładka okna głównego (`IMainTab`) albo okna Ustawień (`ISettingsTab`), z listą kontrolną (filtry modeli, `DataTemplate`, indeksy, testy).
 - **`new-provider`**: nowy dostawca AI albo nowa metoda w kontrakcie `IAiProvider`.
+- **`new-storage-module`**: nowy moduł magazynu wyników / chmury (projekt `ImageStudio.Storage.*`, odkrywany sam), z listą kontrolną (sekrety, logowanie, testy).
 - **`release`**: wydanie nowej wersji (notatki, numeracja, pipeline, naprawa). Polecenie `/wydanie [wersja]` uruchamia ten skill.
 
 Gdy zadanie pasuje do skilla, użyj go zamiast przepisywać procedurę z pamięci. Nowy obszar z własnymi regułami: dopisz plik do `docs/dev/` i wiersz do tabeli wyżej, a procedury, które się powtarzają, zamieniaj w skill; nie rozbudowuj tego pliku.
