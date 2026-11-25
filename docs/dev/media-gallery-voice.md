@@ -13,6 +13,12 @@ Kliknięcie miniatury tylko pokazuje wynik (opis jest w dymku: prompt, rodzaj, k
 - Folder archiwum jest w Ustawienia → Aplikacja (`UserState.GalleryArchiveFolder`, domyślnie `Obrazy\ImageStudio\Archiwum`).
 - Przeniesienie używa `File.Move` bez nadpisywania; wpis jest usuwany z galerii i zapisywany dopiero po udanym ruchu. Przy błędzie pozostaje w galerii, a nieudany zapis galerii próbuje cofnąć ruch pliku; jeśli także zapis naprawionej ścieżki zawiedzie, błąd jest jawnie pokazany.
 
+### Panel archiwum i znaczek magazynu
+
+- Menu Narzędzia → Zarządzaj archiwum: `ArchiveManagerWindow` z `ArchiveManagerViewModel` (obrazy i wideo, bez głosu i `transcript`). Przełącznik źródła: wpisy lokalne (`!IsInCloud`) albo w chmurze; zaznaczanie przez `ArchiveItem.IsSelected`.
+- „Przenieś do chmury” przenosi zaznaczone do aktywnej wtyczki (`MediaStorageHost.MoveAsync`): zapis w celu, zmiana `StorageId`/`FilePath`, na końcu kasowanie starej kopii (jej błąd nie cofa przeniesienia). Błąd jednego pliku nie przerywa reszty; po każdym wpisie galeria jest zapisywana, a wpis podmieniany w `Gallery` (`GalleryEntry` nie zgłasza zmian). Przy aktywnym magazynie lokalnym komenda jest wyłączona.
+- Miniatura ma znaczek dysku albo chmury wg `GalleryEntry.IsInCloud` (`StorageId` inny niż brak i `local`).
+
 ## Zakładka Głos (dźwięk)
 
 - Kontrakt `IAiProvider` ma domyślne metody dźwięku (`GetSpeechModelsAsync`, `GetSpeechVoicesAsync`, `SynthesizeAsync`, `GetTranscriptionModelsAsync`, `TranscribeAsync`; brak dźwięku = puste listy i `NotSupportedException`), a `ProviderCatalog` niesie `Speech`/`Transcription`.

@@ -35,6 +35,7 @@ Host i konfiguracja (`MediaStorageHost`, jedyny `IMediaStorage` widziany przez V
 
 - Deleguje operacje do `Active`. Wybór i ustawienia edytuje zakładka Zapis (`StorageSettingsTab`), trwały zapis to `UserState.StorageId` i `StorageConfig`.
 - `Owner(storageId)` wskazuje wtyczkę, która zapisała wpis. Brak identyfikatora (starsze wpisy) albo wtyczka usunięta z aplikacji daje `local`.
+- `MoveAsync(entry, target)` przenosi plik wpisu między wtyczkami (odczyt z `Owner`, zapis w celu, zmiana wpisu, kasowanie starej kopii). `ReadAsync`/`DeleteAsync` hosta znają tylko ścieżkę, więc idą do `Active`; operacje na istniejących wpisach zawsze przez `Owner`.
 - `Load` stosuje konfigurację i wznawia wszystkie wtyczki, nie tylko aktywną, bo kolejka poprzedniej też ma dojść.
 - `WithoutSecrets` usuwa z pliku stanu pola `IsSecret` i `Transient`.
 
