@@ -11,7 +11,7 @@ Semantyczny: `MAJOR.MINOR.PATCH`.
 - **MAJOR** (1.x → 2.0.0): zmiany łamiące (format danych użytkownika, układ plików).
 - Przyrostek, np. `1.2.0-beta.1`, tworzy **wydanie wstępne**: nie jest oznaczone jako „najnowsze”, więc zwykli użytkownicy go nie dostaną.
 
-Numer trafia do plików exe i instalatora; ręcznie nigdzie go nie wpisujesz.
+Numer trafia do plików exe i instalatora; ręcznie nigdzie go nie wpisujesz. Wartość w `Directory.Build.props` to tylko domyślna dla lokalnych buildów; pipeline podaje właściwą przez `-p:Version`.
 
 ## Notatki wydania
 
