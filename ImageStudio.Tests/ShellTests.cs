@@ -58,6 +58,7 @@ public sealed class ShellTests
             Assert.Same(vm.SaveImageAsCommand, Item("Zapisz jako...").Command);
             Assert.Same(vm.ClearResultCommand, Item("Wyczyść wynik").Command);
             Assert.Same(vm.OpenPresetsCommand, Item("Zestawy...").Command);
+            Assert.Same(vm.OpenArchiveManagerCommand, Item("Archiwum wyników...").Command);
             var help = Item("Pomoc");
             Assert.Same(vm.OpenAboutCommand, help.Command);
             help.Command.Execute(null);

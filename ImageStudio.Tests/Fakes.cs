@@ -215,6 +215,13 @@ internal sealed class FakeDialogs : IDialogService
     public void CopyImage(BitmapSource image) => throw new NotSupportedException();
     public int AboutCount { get; private set; }
     public void ShowAbout() => AboutCount++;
+    public int ArchiveManagerCount { get; private set; }
+    public ImageStudio.ViewModels.ArchiveManagerViewModel? LastArchiveManager { get; private set; }
+    public void ShowArchiveManager(ImageStudio.ViewModels.ArchiveManagerViewModel viewModel)
+    {
+        ArchiveManagerCount++;
+        LastArchiveManager = viewModel;
+    }
     // Wynik okna ustawień na podstawie bieżących wartości; null = anulowano
     public Func<SettingsResult, SettingsResult?>? SettingsAnswer { get; set; }
     public Func<SettingsResult, IReadOnlyList<ISettingsTab>, SettingsResult?>? OnShowSettings { get; set; }

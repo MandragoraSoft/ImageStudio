@@ -52,6 +52,8 @@ public interface IDialogService
 // Zakładki okna są wstrzykiwane (ISettingsTab); wynik składa się z wartości wszystkich zakładek
     SettingsResult? ShowSettings(SettingsResult current, IReadOnlyList<ISettingsTab> tabs);
     void ShowAbout();
+    // Panel archiwum: przenoszenie wyników między magazynem lokalnym a aktywną chmurą (modalne)
+    void ShowArchiveManager(ArchiveManagerViewModel viewModel);
     // prompt: podgląd w oknie; suggest (opcjonalny) proponuje nazwę i opis przez AI
     PresetDraft? ShowSavePreset(string defaultName, string prompt = "", Func<Task<PresetDraft>>? suggest = null);
 

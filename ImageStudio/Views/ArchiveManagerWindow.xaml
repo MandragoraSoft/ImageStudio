@@ -1,0 +1,64 @@
+<Window x:Class="ImageStudio.Views.ArchiveManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:ImageStudio.Localization;assembly=ImageStudio.Shared"
+        Style="{StaticResource WindowBase}"
+        Title="{loc:T archive.title}" Width="960" Height="640" MinWidth="560" MinHeight="380"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Źródło listy i zaznaczanie -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="{loc:T archive.selectAll}" Command="{Binding SelectAllCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"/>
+                <Button Content="{loc:T archive.clearSelection}" Command="{Binding ClearSelectionCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <RadioButton Content="{loc:T archive.source.local}" IsChecked="{Binding IsLocalSource}" Margin="0,0,16,0"/>
+                <RadioButton Content="{loc:T archive.source.cloud}" IsChecked="{Binding IsCloudSource}"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Miniatury z polem wyboru -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="170" Margin="0,0,8,8" Padding="6" CornerRadius="6"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="1">
+                            <StackPanel>
+                                <Image Source="{Binding Entry.Thumbnail}" Height="110" Stretch="Uniform"/>
+                                <CheckBox IsChecked="{Binding IsSelected}" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding Entry.KindLabel}" TextTrimming="CharacterEllipsis" MaxWidth="130"/>
+                                </CheckBox>
+                                <TextBlock Text="{Binding Entry.Model}" Style="{StaticResource MutedTextBlock}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Przeniesienie do aktywnej chmury, pasek statusu i zamknięcie -->
+        <DockPanel Grid.Row="2" Margin="0,10,0,0">
+            <Button DockPanel.Dock="Right" Content="{loc:T common.close}" IsCancel="True" MinWidth="100" Margin="8,0,0,0"/>
+            <Button Content="{Binding MoveToCloudLabel}" Command="{Binding MoveToCloudCommand}" Padding="12,6"/>
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="16,0,0,0"
+                       TextTrimming="CharacterEllipsis" Style="{StaticResource MutedTextBlock}"/>
+        </DockPanel>
+    </Grid>
+</Window>

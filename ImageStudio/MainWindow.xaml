@@ -56,6 +56,7 @@
             <MenuItem Header="{loc:T menu.tools}">
                 <MenuItem Header="{loc:T menu.settings}" Command="{Binding OpenSettingsCommand}"/>
                 <Separator/>
+                <MenuItem Header="{loc:T menu.archiveManager}" Command="{Binding OpenArchiveManagerCommand}"/>
                 <MenuItem Header="{loc:T menu.clearGallery}" Command="{Binding ClearGalleryCommand}"/>
             </MenuItem>
             <MenuItem Header="{loc:T menu.help}" Command="{Binding OpenAboutCommand}"/>
