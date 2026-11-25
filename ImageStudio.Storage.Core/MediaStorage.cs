@@ -106,6 +106,9 @@ public interface IMediaStoragePlugin : IMediaStorage
     bool CanRun(string key) => true;
     StorageStatus? Status => null;
     string? HelpKey => null;
+
+    // Wznawia zaległe operacje w tle (np. wysyłki z kolejki); wołane przy starcie i po logowaniu
+    void Resume() { }
 }
 
 // Wszystko, czego wtyczka potrzebuje od aplikacji, bez znajomości DI. Wtyczkę odkrytą przez refleksję aplikacja tworzy

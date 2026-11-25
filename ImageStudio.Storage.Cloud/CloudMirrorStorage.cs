@@ -1,5 +1,7 @@
 using System.IO;
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text.Json;
 using ImageStudio.Storage.Local;
 using ImageStudio.Networking;
 
@@ -23,6 +25,11 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     public abstract string Id { get; }
     public abstract string DisplayName { get; }
     public abstract string? HelpKey { get; }
+
+    // Operacja na chmurze czekająca w trwałej kolejce; Op: "upload" albo "delete"; Id odróżnia kolejne zapisy tej samej
+    // lokalizacji: zadanie starszego zapisu nie może usunąć z kolejki wpisu nowszego (inaczej nadpisanie pliku w trakcie
+    // wysyłki zostawiłoby w chmurze starą zawartość)
+    public sealed record PendingOperation(string Op, string Location, Guid Id);
 
     protected IStorageSecrets Secrets { get; }
     public LocalMediaStorage Cache { get; } = new();
@@ -68,7 +75,8 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     public bool CanRun(string key) => key switch { "signin" => !SignedIn, "signout" => SignedIn, _ => true };
 
     public StorageStatus? Status => _lastError is not null ? new("storage.status.error", _lastError)
-        : !SignedIn ? new("storage.status.signedOut")
+        : !SignedIn ? PendingOperations.Count is > 0 and var n ? new("storage.status.signedOutPending", n.ToString(CultureInfo.InvariantCulture))
+            : new("storage.status.signedOut")
         : AccountLabel is { } account ? new("storage.status.signedInAs", account) : new("storage.status.signedIn");
 
     public Task RunActionAsync(string key, CancellationToken ct = default) =>
@@ -79,29 +87,84 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     {
         _lastError = null;
         if (key == "signout") await SignOutAsync(ct);
-        else if (key == "signin") await SignInAsync(inputs, interaction, ct);
+        else if (key == "signin")
+        {
+            await SignInAsync(inputs, interaction, ct);
+            Resume();
+        }
     }
 
     public async Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
         var path = await Cache.WriteAsync(kind, fileName, data, ct);
-        var bytes = data.ToArray();
-        Background(Path.GetFileName(path), async () =>
-        {
-            if (await AccessTokenAsync(CancellationToken.None) is { } token)
-                await UploadAsync(token, Path.GetFileName(path), bytes, CancellationToken.None);
-        });
+        var op = new PendingOperation("upload", path, Guid.NewGuid());
+        Enqueue(op);
+        Schedule(op);
         return path;
     }
 
     public async Task DeleteAsync(string location, CancellationToken ct = default)
     {
         await Cache.DeleteAsync(location, ct);
-        Background(Path.GetFileName(location), async () =>
+        var op = new PendingOperation("delete", location, Guid.NewGuid());
+        Enqueue(op);
+        Schedule(op);
+    }
+
+    // Trwała kolejka (przeżywa wylogowanie i restart): wpis znika dopiero po udanej operacji; nowsza operacja na tej samej
+    // lokalizacji zastępuje starszą (usunięcie po zapisie = samo usunięcie)
+    // ponytail: kolejka jako JSON w IStorageSecrets (sekret storage-{Id}-pending, czyszczony z "Logowaniami i kluczami");
+    // osobny plik, gdy kolejka zacznie liczyć tysiące wpisów
+    private readonly object _queueGate = new();
+    private string QueueName => $"storage-{Id}-pending";
+
+    public IReadOnlyList<PendingOperation> PendingOperations { get { lock (_queueGate) return LoadQueue(); } }
+
+    private List<PendingOperation> LoadQueue()
+    {
+        try { return Secrets.Load(QueueName) is { } json ? JsonSerializer.Deserialize<List<PendingOperation>>(json) ?? [] : []; }
+        catch (JsonException) { return []; }
+    }
+
+    private void SaveQueue(List<PendingOperation> queue) => Secrets.Save(queue.Count == 0 ? "" : JsonSerializer.Serialize(queue), QueueName);
+
+    private void Enqueue(PendingOperation op)
+    {
+        lock (_queueGate)
         {
-            if (await AccessTokenAsync(CancellationToken.None) is { } token)
-                await DeleteRemoteAsync(token, Path.GetFileName(location), CancellationToken.None);
-        });
+            var queue = LoadQueue();
+            queue.RemoveAll(x => string.Equals(x.Location, op.Location, StringComparison.OrdinalIgnoreCase));
+            queue.Add(op);
+            SaveQueue(queue);
+        }
+    }
+
+    private void Dequeue(PendingOperation op)
+    {
+        lock (_queueGate)
+        {
+            var queue = LoadQueue();
+            if (queue.Remove(op)) SaveQueue(queue);
+        }
+    }
+
+    private bool IsQueued(PendingOperation op) { lock (_queueGate) return LoadQueue().Contains(op); }
+
+    private void Schedule(PendingOperation op) => Background(Path.GetFileName(op.Location), async () =>
+    {
+        if (!IsQueued(op)) return;                                                        // już wykonana (np. dwa wznowienia)
+        if (await AccessTokenAsync(CancellationToken.None) is not { } token) return;      // niezalogowany: czeka w kolejce
+        var name = Path.GetFileName(op.Location);
+        if (op.Op == "delete") await DeleteRemoteAsync(token, name, CancellationToken.None);
+        else if (File.Exists(op.Location)) await UploadAsync(token, name, await File.ReadAllBytesAsync(op.Location), CancellationToken.None);
+        Dequeue(op);                                                                      // brak pliku lokalnego: nie ma czego wysłać
+    });
+
+    // Wznowienie zaległych operacji (start aplikacji, po zalogowaniu); bez sesji nic nie planuje
+    public void Resume()
+    {
+        if (!SignedIn) return;
+        foreach (var op in PendingOperations) Schedule(op);
     }
 
     // Czeka na zakończenie wysyłek w tle (testy i zamykanie aplikacji)

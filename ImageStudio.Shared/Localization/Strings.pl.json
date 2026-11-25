@@ -530,6 +530,7 @@
   "storage.status.signedIn": "Zalogowano.",
   "storage.status.signedInAs": "Zalogowano jako {0}.",
   "storage.status.signedOut": "Niezalogowano: pliki zapisują się tylko lokalnie.",
+  "storage.status.signedOutPending": "Niezalogowano: pliki do wysłania ({0}) czekają na zalogowanie; do tego czasu są tylko lokalnie.",
   "storage.status.working": "Otwarto przeglądarkę. Dokończ logowanie w jej oknie (czekam do 5 minut)…",
   "tab.chat": "Czat",
   "tab.edit": "Edycja",

@@ -366,7 +366,7 @@ public sealed class OutgoingRequestIntegrationTests
     }
 
     [Fact]
-    public async Task Cloud_delete_waits_for_cancelled_upload_retry()
+    public async Task Cloud_delete_supersedes_a_cancelled_upload_retry()
     {
         var registry = new OutgoingRequestRegistry();
         var started = Signal();
@@ -393,7 +393,9 @@ public sealed class OutgoingRequestIntegrationTests
             Assert.True(registry.Cancel(Assert.Single(registry.ActiveRequests).Id));
             await storage.DeleteAsync(path);
             await storage.FlushAsync();
-            Assert.Equal(new[] { HttpMethod.Put, HttpMethod.Put, HttpMethod.Delete }, calls.ToArray());
+            // Usunięcie zastępuje oczekujące wysłanie w kolejce, więc przerwane (anulowane) wysłanie nie jest ponawiane
+            // po usunięciu pliku; stan końcowy w chmurze ten sam, żadne żądanie wysłania nie następuje po usunięciu
+            Assert.Equal(new[] { HttpMethod.Put, HttpMethod.Delete }, calls.ToArray());
             Assert.False(File.Exists(path));
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }

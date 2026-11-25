@@ -79,14 +79,17 @@ public sealed class CloudStorageTests : IDisposable
     public async Task Signed_out_storage_only_saves_locally()
     {
         var http = new StubHandler(_ => (HttpStatusCode.OK, "{}"));
-        var storage = Mirror(new OneDriveStorage(new MemorySecrets(), http));
+        var secrets = new MemorySecrets();
+        var storage = Mirror(new OneDriveStorage(secrets, http));
 
         var path = await storage.WriteAsync(MediaKind.Video, "v.mp4", new byte[] { 9 });
         await storage.FlushAsync();
 
         Assert.True(File.Exists(path));
         Assert.Empty(http.Calls);
-        Assert.Equal("storage.status.signedOut", storage.Status!.Key);
+        Assert.Equal("storage.status.signedOutPending", storage.Status!.Key);
+        Assert.Equal("1", storage.Status!.Detail);
+        Assert.True(secrets.Values.ContainsKey("storage-onedrive-pending"));
     }
 
     [Fact]

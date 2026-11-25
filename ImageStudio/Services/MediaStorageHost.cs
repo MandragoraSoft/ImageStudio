@@ -20,8 +20,13 @@ public sealed class MediaStorageHost : IMediaStorage
     public IReadOnlyList<IMediaStoragePlugin> Plugins { get; }
     public IMediaStoragePlugin Active { get; private set; }
 
-    // Nieznana wtyczka (usunięta z aplikacji) wraca do domyślnej
-    public void Load(UserState state) => Apply(state.StorageId, state.StorageConfig);
+    // Nieznana wtyczka (usunięta z aplikacji) wraca do domyślnej; wszystkie wtyczki (nie tylko aktywna) wznawiają
+    // zaległe wysyłki, bo kolejka poprzedniej też ma dojść
+    public void Load(UserState state)
+    {
+        Apply(state.StorageId, state.StorageConfig);
+        foreach (var plugin in Plugins) plugin.Resume();
+    }
 
     public void Apply(string? activeId, IReadOnlyDictionary<string, Dictionary<string, string>>? config)
     {

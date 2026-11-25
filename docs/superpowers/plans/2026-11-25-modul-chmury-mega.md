@@ -858,6 +858,8 @@ public sealed record PendingOperation(string Op, string Location, Guid Id);
 
 **Zmiana istniejącego testu (jedyna dozwolona):** `CloudStorageTests.Signed_out_storage_only_saves_locally`: oczekiwany status `("storage.status.signedOutPending", "1")` i `Assert.True(secrets.Values.ContainsKey("storage-onedrive-pending"))` (test musi dostać nazwaną zmienną `secrets`).
 
+**Druga dozwolona zmiana istniejącego testu (decyzja sesji głównej po STOP Haiku):** `OutgoingRequestIntegrationTests.Cloud_delete_waits_for_cancelled_upload_retry` zmienia nazwę na `Cloud_delete_supersedes_a_cancelled_upload_retry`, a oczekiwana sekwencja żądań na `[PUT, DELETE]` (zamiast `[PUT, PUT, DELETE]`) z komentarzem w teście: usunięcie zastępuje oczekujące wysłanie w kolejce, więc przerwane (anulowane) wysłanie nie jest ponawiane po usunięciu pliku; stan końcowy w chmurze ten sam, żadne żądanie wysłania nie następuje po usunięciu. Asercja `Assert.False(File.Exists(path))` zostaje.
+
 **Kryteria akceptacji:** całość zielona; `Check-Translations -Strict` = 0.
 
 **STOP:** gdy inne istniejące testy chmur (np. `GoogleDrive_parallel_uploads_share_one_folder`, `OutgoingRequestIntegrationTests` z `FlushAsync`) padają albo trwają wyraźnie dłużej; gdy `UserState` nie ma konstruktora bez parametrów.

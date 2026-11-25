@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using ImageStudio.Configuration;
+using ImageStudio.Services;
 using ImageStudio.Storage;
 using ImageStudio.Storage.Cloud;
 using ImageStudio.Storage.GoogleDrive;
@@ -34,6 +36,16 @@ public sealed class CloudMirrorBaseTests : IDisposable
 
         public ConcurrentDictionary<string, byte[]> Remote { get; } = new();
 
+        // Wysłane nazwy plików (w kolejności wysyłek)
+        public ConcurrentQueue<string> Uploads { get; } = new();
+
+        // Gdy ustawione, wysyłka czeka na tę bramkę (test nadpisania w trakcie wysyłki); UploadStarted sygnalizuje start
+        public TaskCompletionSource? UploadGate { get; set; }
+        public TaskCompletionSource UploadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Liczba kolejnych wysyłek, które kończą się błędem (zdalny serwer niedostępny)
+        public int FailUploads { get; set; }
+
         public override string Id => "test";
         public override string DisplayName => "Test";
         public override string? HelpKey => null;
@@ -55,10 +67,17 @@ public sealed class CloudMirrorBaseTests : IDisposable
             return Task.CompletedTask;
         }
 
-        protected override Task UploadAsync(string accessToken, string fileName, byte[] data, CancellationToken ct)
+        protected override async Task UploadAsync(string accessToken, string fileName, byte[] data, CancellationToken ct)
         {
+            UploadStarted.TrySetResult();
+            if (UploadGate is { } gate) await gate.Task;
+            if (FailUploads > 0)
+            {
+                FailUploads--;
+                throw new InvalidOperationException("Serwer niedostępny.");
+            }
+            Uploads.Enqueue(fileName);
             Remote[fileName] = data;
-            return Task.CompletedTask;
         }
 
         protected override Task DeleteRemoteAsync(string accessToken, string fileName, CancellationToken ct)
@@ -114,6 +133,157 @@ public sealed class CloudMirrorBaseTests : IDisposable
 
         Assert.Equal("storage.status.signedInAs", storage.Status!.Key);
         Assert.Equal("ania@example.com", storage.Status!.Detail);
+    }
+
+    [Fact]
+    public async Task File_saved_while_signed_out_is_uploaded_after_sign_in()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()));
+        var path = await storage.WriteAsync(MediaKind.Image, "b.png", new byte[] { 3 });
+        await storage.FlushAsync();
+
+        Assert.True(File.Exists(path));
+        Assert.Empty(storage.Remote);
+        Assert.Equal("storage.status.signedOutPending", storage.Status!.Key);
+        Assert.Equal("1", storage.Status!.Detail);
+
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        await storage.FlushAsync();
+
+        Assert.Equal(new byte[] { 3 }, storage.Remote["b.png"]);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Pending_uploads_survive_a_restart()
+    {
+        var secrets = new MemorySecrets();
+        var before = Mirror(new TestMirror(secrets));
+        await before.WriteAsync(MediaKind.Image, "c.png", new byte[] { 5 });
+        await before.FlushAsync();
+
+        // Nowa instancja na tych samych sekretach (po restarcie aplikacji)
+        var after = Mirror(new TestMirror(secrets));
+        Assert.Single(after.PendingOperations);
+        await after.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        await after.FlushAsync();
+
+        Assert.Equal(new byte[] { 5 }, after.Remote["c.png"]);
+        Assert.Empty(after.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Delete_while_signed_out_replaces_the_pending_upload_with_a_remote_delete()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()));
+        var path = await storage.WriteAsync(MediaKind.Image, "e.png", new byte[] { 1 });
+        await storage.DeleteAsync(path);
+        await storage.FlushAsync();
+
+        var op = Assert.Single(storage.PendingOperations);
+        Assert.Equal("delete", op.Op);
+
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        await storage.FlushAsync();
+
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Failed_upload_stays_pending_and_is_retried_on_resume()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()));
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        storage.FailUploads = 1;
+
+        await storage.WriteAsync(MediaKind.Image, "f.png", new byte[] { 2 });
+        await storage.FlushAsync();
+
+        Assert.Single(storage.PendingOperations);
+        Assert.Equal("storage.status.error", storage.Status!.Key);
+
+        storage.Resume();
+        await storage.FlushAsync();
+
+        Assert.Equal(new byte[] { 2 }, storage.Remote["f.png"]);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Pending_entry_of_a_missing_local_file_is_dropped()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()));
+        var path = await storage.WriteAsync(MediaKind.Image, "g.png", new byte[] { 4 });
+        File.Delete(path);
+
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        await storage.FlushAsync();
+
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Double_resume_uploads_once()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()));
+        await storage.WriteAsync(MediaKind.Image, "h.png", new byte[] { 6 });
+
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+        storage.Resume();
+        await storage.FlushAsync();
+
+        Assert.Single(storage.Uploads);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    [Fact]
+    public async Task Overwrite_while_an_upload_is_in_flight_still_uploads_the_latest_content()
+    {
+        var storage = Mirror(new TestMirror(new MemorySecrets()) { UploadGate = new TaskCompletionSource() });
+        await storage.RunActionAsync("signin", Email("ania@example.com"), StorageInteraction.None);
+
+        // Pierwsza wysyłka "a" startuje i blokuje się na bramce; drugi zapis tej samej nazwy trafia do kolejki
+        await storage.WriteAsync(MediaKind.Image, "x.png", new byte[] { (byte)'a' });
+        await storage.UploadStarted.Task;
+        await storage.WriteAsync(MediaKind.Image, "x.png", new byte[] { (byte)'b' });
+
+        storage.UploadGate!.TrySetResult();
+        await storage.FlushAsync();
+
+        Assert.Equal(new byte[] { (byte)'b' }, storage.Remote["x.png"]);
+        Assert.Empty(storage.PendingOperations);
+    }
+
+    private sealed class ResumeCounter(string id) : IMediaStoragePlugin
+    {
+        public int Resumed { get; private set; }
+
+        public string Id => id;
+        public string DisplayName => id;
+        public IReadOnlyList<StorageSetting> Settings => [];
+        public void Configure(IReadOnlyDictionary<string, string> values) { }
+        public void Resume() => Resumed++;
+
+        public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<byte[]> ReadAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task DeleteAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void Host_load_resumes_every_plugin()
+    {
+        var first = new ResumeCounter("first");
+        var second = new ResumeCounter("second");
+
+        new MediaStorageHost([first, second]).Load(new UserState());
+
+        Assert.Equal(1, first.Resumed);
+        Assert.Equal(1, second.Resumed);
     }
 
     [Fact]

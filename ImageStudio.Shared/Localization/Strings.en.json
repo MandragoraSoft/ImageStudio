@@ -530,6 +530,7 @@
   "storage.status.signedIn": "Signed in.",
   "storage.status.signedInAs": "Signed in as {0}.",
   "storage.status.signedOut": "Signed out: files are saved locally only.",
+  "storage.status.signedOutPending": "Signed out: files to upload ({0}) are waiting for sign-in; until then they are local only.",
   "storage.status.working": "Browser opened. Finish signing in there (waiting up to 5 minutes)…",
   "tab.chat": "Chat",
   "tab.edit": "Edit",
