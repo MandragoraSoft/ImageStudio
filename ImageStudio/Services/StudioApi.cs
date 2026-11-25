@@ -24,6 +24,9 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         return (path, storageId);
     }
 
+    // Plik wpisu obsługuje wtyczka, która go zapisała, nawet gdy aktywna jest już inna
+    private IMediaStorage StorageFor(GalleryEntry entry) => storage is MediaStorageHost host ? host.Owner(entry.StorageId) : storage;
+
     public ProviderCatalog? Catalog { get; set; }
 
     public async Task<ProviderCatalog> CatalogAsync(CancellationToken ct = default) =>
@@ -430,7 +433,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
         var entry = Find(id);
         if (entry.Kind == "transcript") throw new ArgumentException("Transkrypcja wskazuje cudzy plik dźwiękowy; usuń sam wpis (remove_gallery_entry).");
 
-        await storage.DeleteAsync(entry.FilePath, ct);
+        await StorageFor(entry).DeleteAsync(entry.FilePath, ct);
         library.Remove(id);
     }
 
@@ -448,7 +451,7 @@ public sealed class StudioApi(Func<IAiProvider> provider, IMediaStorage storage,
 
         var full = Path.GetFullPath(target);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-        await File.WriteAllBytesAsync(full, await storage.ReadAsync(entry.FilePath, ct), ct);
+        await File.WriteAllBytesAsync(full, await StorageFor(entry).ReadAsync(entry.FilePath, ct), ct);
         return full;
     }
 

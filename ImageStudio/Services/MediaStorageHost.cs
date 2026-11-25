@@ -35,6 +35,11 @@ public sealed class MediaStorageHost : IMediaStorage
         Active = Plugins.FirstOrDefault(p => p.Id == activeId) ?? Plugins[0];
     }
 
+    // Wtyczka, która zapisała plik (GalleryEntry.StorageId). Brak identyfikatora (starsze wpisy) i wtyczka usunięta
+    // z aplikacji = dysk lokalny: wtyczki chmurowe trzymają lustro w folderach lokalnych, więc ścieżka i tak jest lokalna
+    public IMediaStoragePlugin Owner(string? storageId) =>
+        Plugins.FirstOrDefault(p => p.Id == storageId) ?? Plugins.FirstOrDefault(p => p.Id == "local") ?? Plugins[0];
+
     // Konfiguracja do pliku stanu: bez pól haseł i pól nietrwałych (te zapisuje wtyczka w sekretach albo wcale)
     public Dictionary<string, Dictionary<string, string>> WithoutSecrets(IReadOnlyDictionary<string, Dictionary<string, string>> config) =>
         config.ToDictionary(p => p.Key, p =>
@@ -46,6 +51,7 @@ public sealed class MediaStorageHost : IMediaStorage
     public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         Active.WriteAsync(kind, fileName, data, ct);
 
+    // Operacje na istniejących wpisach idą przez Owner(entry.StorageId), patrz StudioApi
     public Task<byte[]> ReadAsync(string location, CancellationToken ct = default) => Active.ReadAsync(location, ct);
     public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => Active.ExistsAsync(location, ct);
     public Task DeleteAsync(string location, CancellationToken ct = default) => Active.DeleteAsync(location, ct);

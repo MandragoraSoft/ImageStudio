@@ -61,6 +61,33 @@ public sealed class StudioApiTests : IDisposable
         public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
+    // Zapamiętuje odczyty i usunięcia, żeby test widział, która wtyczka obsłużyła wpis
+    private sealed class RecordingStorage(string id) : IMediaStoragePlugin
+    {
+        public List<string> Read { get; } = [];
+        public List<string> Deleted { get; } = [];
+
+        public string Id => id;
+        public string DisplayName => id;
+        public IReadOnlyList<StorageSetting> Settings => [];
+        public void Configure(IReadOnlyDictionary<string, string> values) { }
+        public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<string> GetLocalPathAsync(string location, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<byte[]> ReadAsync(string location, CancellationToken ct = default)
+        {
+            Read.Add(location);
+            return Task.FromResult<byte[]>([1, 2]);
+        }
+
+        public Task DeleteAsync(string location, CancellationToken ct = default)
+        {
+            Deleted.Add(location);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class PlainStorage(IMediaStorage inner) : IMediaStorage
     {
         public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
@@ -199,6 +226,27 @@ public sealed class StudioApiTests : IDisposable
         Assert.Null(result.Entry.StorageId);
         Assert.StartsWith("backing:", result.Entry.FilePath);
         Assert.Equal(1, backing.Writes);
+    }
+
+    [Fact]
+    public async Task Delete_and_export_use_the_owner_not_the_active_plugin()
+    {
+        var cloud = new RecordingStorage("cloud");
+        var local = new RecordingStorage("local");
+        var host = new MediaStorageHost([local, cloud]); // aktywna jest local
+        var studio = new StudioApi(() => _provider, host, _library, _presets) { Catalog = Catalog() };
+        var entry = new GalleryEntry { Kind = "generate", FilePath = "cloud:a.png", StorageId = "cloud" };
+        _library.AddMedia(entry);
+
+        var target = Path.Combine(_dir, "eksport.png");
+        await studio.ExportAsync(entry.Id, target);
+        await studio.DeleteEntryAsync(entry.Id);
+
+        Assert.Equal(["cloud:a.png"], cloud.Read);
+        Assert.Equal(["cloud:a.png"], cloud.Deleted);
+        Assert.Empty(local.Read);
+        Assert.Empty(local.Deleted);
+        Assert.Equal(new byte[] { 1, 2 }, File.ReadAllBytes(target));
     }
 
     [Fact]
