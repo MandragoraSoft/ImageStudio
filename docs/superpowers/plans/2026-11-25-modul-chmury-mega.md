@@ -770,8 +770,10 @@ W diffie: wzorzec nazwy wspólny (`StorageSecrets.NamePattern`) dla strażnika i
 **`CloudMirrorStorage`:**
 
 ```csharp
-// Operacja na chmurze czekająca w trwałej kolejce; Op: "upload" albo "delete"
-public sealed record PendingOperation(string Op, string Location);
+// Operacja na chmurze czekająca w trwałej kolejce; Op: "upload" albo "delete"; Id odróżnia kolejne zapisy tej samej
+// lokalizacji: zadanie starszego zapisu nie może usunąć z kolejki wpisu nowszego (inaczej nadpisanie pliku w trakcie
+// wysyłki zostawiłoby w chmurze starą zawartość)
+public sealed record PendingOperation(string Op, string Location, Guid Id);
 
     // Trwała kolejka (przeżywa wylogowanie i restart): wpis znika dopiero po udanej operacji; nowsza operacja na tej samej
     // lokalizacji zastępuje starszą (usunięcie po zapisie = samo usunięcie)
@@ -829,8 +831,8 @@ public sealed record PendingOperation(string Op, string Location);
     }
 ```
 
-- `WriteAsync`: po `Cache.WriteAsync` → `var op = new PendingOperation("upload", path); Enqueue(op); Schedule(op); return path;` (bez kopiowania `data` do tablicy).
-- `DeleteAsync`: po `Cache.DeleteAsync` → `Enqueue(new("delete", location))` i `Schedule(...)` tej samej operacji.
+- `WriteAsync`: po `Cache.WriteAsync` → `var op = new PendingOperation("upload", path, Guid.NewGuid()); Enqueue(op); Schedule(op); return path;` (bez kopiowania `data` do tablicy).
+- `DeleteAsync`: po `Cache.DeleteAsync` → `var op = new PendingOperation("delete", location, Guid.NewGuid()); Enqueue(op); Schedule(op);`.
 - `RunActionAsync`: po udanym `SignInAsync` wywołać `Resume()`.
 - `Status`: dla niezalogowanego `PendingOperations.Count is > 0 and var n ? new("storage.status.signedOutPending", n.ToString(CultureInfo.InvariantCulture)) : new("storage.status.signedOut")`.
 - Wyjątek w zadaniu: jak dziś (`_lastError`); wpis zostaje i wróci przy następnym `Resume`.
@@ -851,6 +853,7 @@ public sealed record PendingOperation(string Op, string Location);
 - `Failed_upload_stays_pending_and_is_retried_on_resume`
 - `Pending_entry_of_a_missing_local_file_is_dropped`
 - `Double_resume_uploads_once`
+- `Overwrite_while_an_upload_is_in_flight_still_uploads_the_latest_content` (`TestMirror` z `UploadAsync` czekającym na `TaskCompletionSource`: pierwszy zapis `"a"` startuje wysyłkę i blokuje się, drugi zapis tej samej nazwy `"b"` trafia do kolejki, bramka się otwiera, po `FlushAsync()` ostatnia wysłana zawartość to `"b"`, a `PendingOperations` jest puste)
 - `Host_load_resumes_every_plugin` (atrapa `IMediaStoragePlugin` licząca `Resume`, `new MediaStorageHost([...]).Load(new UserState())`)
 
 **Zmiana istniejącego testu (jedyna dozwolona):** `CloudStorageTests.Signed_out_storage_only_saves_locally`: oczekiwany status `("storage.status.signedOutPending", "1")` i `Assert.True(secrets.Values.ContainsKey("storage-onedrive-pending"))` (test musi dostać nazwaną zmienną `secrets`).
