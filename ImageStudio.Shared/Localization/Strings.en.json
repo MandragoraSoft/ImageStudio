@@ -175,6 +175,8 @@
   "gallery.remove": "Remove from gallery",
   "gallery.removeFile": "Remove from gallery and disk...",
   "gallery.repeat": "Repeat",
+  "gallery.storage.cloud": "Saved to the cloud",
+  "gallery.storage.local": "Saved locally",
   "gallery.total": "Gallery: {0} · total ~${1:0.0000}",
   "gen.err.noEnhancer": "Choose an enhancement model in “AI enhancement settings”.",
   "gen.err.noImages": "Model {0} does not accept images. Choose a model with the image icon.",

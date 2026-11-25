@@ -45,6 +45,10 @@ public sealed class GalleryEntry
         _ => "Generowanie",
     };
 
+    // Plik zapisany w wtyczce chmurowej (brak StorageId albo "local" = dysk lokalny)
+    [JsonIgnore]
+    public bool IsInCloud => !string.IsNullOrEmpty(StorageId) && StorageId != "local";
+
     [JsonIgnore]
     public string CostLabel => CostUsd is null
         ? "koszt ?"

@@ -178,6 +178,32 @@
                                             <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="9" Foreground="White"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
+                                        <!-- Znaczek magazynu w lewym górnym rogu: dysk (lokalnie) albo chmura, wg StorageId wpisu -->
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="10" Width="20" Height="20"
+                                                Background="#99000000" ToolTip="{loc:T gallery.storage.local}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsInCloud}" Value="True">
+                                                            <Setter Property="ToolTip" Value="{loc:T gallery.storage.cloud}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="9" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="&#xE8B7;"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsInCloud}" Value="True">
+                                                                <Setter Property="Text" Value="&#xE753;"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
                                     </Grid>
                                 </Border>
                                 <TextBlock Text="{Binding CostLabel}" FontFamily="Consolas" Margin="0,4,0,0"/>

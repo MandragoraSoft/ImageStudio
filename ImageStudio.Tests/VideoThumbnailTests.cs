@@ -94,13 +94,16 @@ public sealed class VideoThumbnailTests
 
             var tiles = FindAll<StackPanel>(panel).Where(p => p.ContextMenu is not null).ToList();
             Assert.Equal(2, tiles.Count);
+            // Znaczek magazynu (dysk E8B7 / chmura E753, lewy górny róg) jest na każdym kafelku, pomijamy go tutaj
+            const string LocalGlyph = "", CloudGlyph = "";
             IEnumerable<string> VisibleGlyphs(StackPanel tile) =>
-                FindAll<TextBlock>(tile).Where(t => t.IsVisible && t.FontFamily.Source == "Segoe MDL2 Assets").Select(t => t.Text);
+                FindAll<TextBlock>(tile).Where(t => t.IsVisible && t.FontFamily.Source == "Segoe MDL2 Assets" && t.Text is not (LocalGlyph or CloudGlyph)).Select(t => t.Text);
 
             var video = tiles.Single(t => ((GalleryEntry)t.DataContext).IsVideo);
             var image = tiles.Single(t => !((GalleryEntry)t.DataContext).IsVideo);
             Assert.Equal(["", ""], VisibleGlyphs(video));  // ikona zastępcza i znaczek odtwarzania
             Assert.Empty(VisibleGlyphs(image));
+            Assert.All(tiles, t => Assert.Single(FindAll<TextBlock>(t).Where(x => x.IsVisible && x.Text == LocalGlyph)));
             window.Close();
         });
     }

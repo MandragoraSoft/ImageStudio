@@ -175,6 +175,8 @@
   "gallery.remove": "Usuń z galerii",
   "gallery.removeFile": "Usuń z galerii i z dysku...",
   "gallery.repeat": "Powtórz",
+  "gallery.storage.cloud": "Zapisany w chmurze",
+  "gallery.storage.local": "Zapisany lokalnie",
   "gallery.total": "Galeria: {0} · łącznie ~${1:0.0000}",
   "gen.err.noEnhancer": "Wybierz model ulepszania w „Ustawieniach ulepszania AI”.",
   "gen.err.noImages": "Model {0} nie przyjmuje obrazów. Wybierz model z ikoną obrazu.",

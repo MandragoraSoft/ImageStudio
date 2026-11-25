@@ -48,6 +48,33 @@ public sealed class MediaStorageHost : IMediaStorage
             return p.Value.Where(v => !secret.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value);
         });
 
+    private static readonly string[] MovableKinds = ["generate", "edit", "video"];
+
+    // Przenosi plik wpisu do innego magazynu: najpierw zapis w celu, dopiero potem zmiana wpisu i kasowanie starej kopii.
+    // Błąd kasowania starej kopii nie cofa przeniesienia (plik zostaje w poprzednim magazynie)
+    public async Task MoveAsync(GalleryEntry entry, IMediaStoragePlugin target, CancellationToken ct = default)
+    {
+        if (!MovableKinds.Contains(entry.Kind)) throw new ArgumentException($"Wpisu typu {entry.Kind} nie można przenieść.", nameof(entry));
+        var from = Owner(entry.StorageId);
+        if (target.Id == from.Id) throw new ArgumentException("Plik jest już w tym magazynie.", nameof(target));
+
+        var bytes = await from.ReadAsync(entry.FilePath, ct);
+        var kind = entry.Kind == "video" ? MediaKind.Video : MediaKind.Image;
+        var location = await target.WriteAsync(kind, Path.GetFileName(entry.FilePath), bytes, ct);
+
+        var oldLocation = entry.FilePath;
+        entry.FilePath = location;
+        entry.StorageId = target.Id;
+        try
+        {
+            await from.DeleteAsync(oldLocation, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // ponytail: stara kopia zostaje w poprzednim magazynie, bez ponawiania i bez logu
+        }
+    }
+
     public Task<string> WriteAsync(MediaKind kind, string fileName, ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
         Active.WriteAsync(kind, fileName, data, ct);
 
