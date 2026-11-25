@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
@@ -30,12 +32,14 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
     private readonly ObservableCollection<GalleryEntry> _gallery;
     private readonly MediaStorageHost _host;
     private readonly Action _save;
+    private readonly IDialogService _dialogs;
 
-    public ArchiveManagerViewModel(ObservableCollection<GalleryEntry> gallery, MediaStorageHost host, Action save)
+    public ArchiveManagerViewModel(ObservableCollection<GalleryEntry> gallery, MediaStorageHost host, Action save, IDialogService dialogs)
     {
         _gallery = gallery;
         _host = host;
         _save = save;
+        _dialogs = dialogs;
         Refresh();
     }
 
@@ -52,6 +56,19 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
 
     [ObservableProperty]
     private string _status = "";
+
+    // Wpis pokazany w podglądzie (klik w miniaturę) i jego obraz w pełnym rozmiarze; dla wideo i błędu odczytu miniatura albo brak
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CopyPreviewCommand))]
+    private ArchiveItem? _preview;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CopyPreviewCommand))]
+    private BitmapSource? _previewImage;
+
+    public string PreviewFileName => Preview is null ? "" : Path.GetFileName(Preview.Entry.FilePath);
+
+    partial void OnPreviewChanged(ArchiveItem? value) => OnPropertyChanged(nameof(PreviewFileName));
 
     public bool IsLocalSource
     {
@@ -170,6 +187,58 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
     private bool CanMoveToCloud() => Source == ArchiveSource.Local && SelectedCount > 0 && HasCloud && !IsMoving;
 
     // Przenoszenie po kolei: błąd jednego pliku nie przerywa reszty; po każdym udanym wpisie galeria i zapis są aktualne
+    // Odczyt z magazynu jest asynchroniczny; wynik trafia do podglądu tylko, gdy użytkownik nie kliknął w międzyczasie inny wpis
+    [RelayCommand]
+    private async Task PreviewItemAsync(ArchiveItem item)
+    {
+        Preview = item;
+        PreviewImage = null;
+        var entry = item.Entry;
+        BitmapSource? image = entry.Thumbnail;
+        if (!entry.IsVideo)
+        {
+            try
+            {
+                image = Decode(await _host.Owner(entry.StorageId).ReadAsync(entry.FilePath));
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Archiwum: nie wczytano podglądu {Path}", entry.FilePath);
+            }
+        }
+        if (Preview == item) PreviewImage = image;
+    }
+
+    private static BitmapImage Decode(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    private bool CanCopyPreview() => PreviewImage is not null && Preview is { Entry.IsVideo: false };
+
+    // Schowek może być zajęty przez inny program: błąd idzie do paska statusu, nie wywraca panelu
+    [RelayCommand(CanExecute = nameof(CanCopyPreview))]
+    private void CopyPreview()
+    {
+        try
+        {
+            _dialogs.CopyImage(PreviewImage!);
+            Status = Loc.T("archive.status.copied");
+        }
+        catch (Exception ex)
+        {
+            Status = Loc.T("gen.msg.copyFailed", ex.Message);
+            Log.LogError(ex, "Archiwum: nie skopiowano obrazu");
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanMoveToCloud))]
     private async Task MoveToCloudAsync()
     {

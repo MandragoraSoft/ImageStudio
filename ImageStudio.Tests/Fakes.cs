@@ -212,7 +212,8 @@ internal sealed class FakeDialogs : IDialogService
     public Exception? OpenError { get; set; }
     public void OpenFile(string path) => (OpenError is null ? Opened : throw OpenError).Add(path);
     public string? ChooseSaveFileAs(string suggestedFileName, string title, string filter) => SaveAsAnswer;
-    public void CopyImage(BitmapSource image) => throw new NotSupportedException();
+    public List<BitmapSource> Copied { get; } = [];
+    public void CopyImage(BitmapSource image) => Copied.Add(image);
     public int AboutCount { get; private set; }
     public void ShowAbout() => AboutCount++;
     public int ArchiveManagerCount { get; private set; }

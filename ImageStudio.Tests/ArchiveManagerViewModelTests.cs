@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using ImageStudio.Configuration;
 using ImageStudio.Localization;
 using ImageStudio.Services;
@@ -38,7 +41,7 @@ public sealed class ArchiveManagerViewModelTests
             Entry("transcript", null, "local/t.txt"),
             Entry("generate", null, "local/gone.png"), // brak pliku: nie pokazujemy w źródle lokalnym
         ]);
-        var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+        var vm = new ArchiveManagerViewModel(gallery, host, () => { }, new FakeDialogs());
 
         Assert.Equal(["local/a.png", "local/c.mp4"], vm.Items.Select(i => i.Entry.FilePath));
 
@@ -53,7 +56,7 @@ public sealed class ArchiveManagerViewModelTests
         local.Files["local/a.png"] = [1];
         local.Files["local/b.png"] = [2];
         var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png"), Entry("edit", null, "local/b.png")]);
-        var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+        var vm = new ArchiveManagerViewModel(gallery, host, () => { }, new FakeDialogs());
         Assert.False(vm.MoveToCloudCommand.CanExecute(null));
 
         vm.SelectAllCommand.Execute(null);
@@ -75,7 +78,7 @@ public sealed class ArchiveManagerViewModelTests
         var b = Entry("edit", null, "local/b.png");
         var gallery = new ObservableCollection<GalleryEntry>([a, b]);
         var saves = 0;
-        var vm = new ArchiveManagerViewModel(gallery, host, () => saves++);
+        var vm = new ArchiveManagerViewModel(gallery, host, () => saves++, new FakeDialogs());
         vm.SelectAllCommand.Execute(null);
 
         await vm.MoveToCloudCommand.ExecuteAsync(null);
@@ -100,7 +103,7 @@ public sealed class ArchiveManagerViewModelTests
         var missing = Entry("generate", null, "local/missing.png");
         var a = Entry("generate", null, "local/a.png");
         var gallery = new ObservableCollection<GalleryEntry>([missing, a]);
-        var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+        var vm = new ArchiveManagerViewModel(gallery, host, () => { }, new FakeDialogs());
         vm.SelectAllCommand.Execute(null);
         local.Files.Remove("local/missing.png"); // plik znika po wyświetleniu listy: odczyt się nie uda
 
@@ -120,7 +123,7 @@ public sealed class ArchiveManagerViewModelTests
         var (local, _, host) = Setup(cloudActive: false);
         local.Files["local/a.png"] = [1];
         var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png")]);
-        var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+        var vm = new ArchiveManagerViewModel(gallery, host, () => { }, new FakeDialogs());
         vm.SelectAllCommand.Execute(null);
 
         Assert.False(vm.MoveToCloudCommand.CanExecute(null));
@@ -160,7 +163,7 @@ public sealed class ArchiveManagerViewModelTests
             var (_, cloud, host) = SetupRealLocal(dir);
             var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, Path.Combine(dir, "a.png"))]);
 
-            var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+            var vm = new ArchiveManagerViewModel(gallery, host, () => { }, new FakeDialogs());
 
             Assert.Equal(
                 new[] { "a.png", "Orphan.PNG", "clip.mp4" }.Select(n => Path.Combine(dir, n)).Order(),
@@ -186,7 +189,7 @@ public sealed class ArchiveManagerViewModelTests
             var (_, cloud, host) = SetupRealLocal(dir);
             var gallery = new ObservableCollection<GalleryEntry>();
             var saves = 0;
-            var vm = new ArchiveManagerViewModel(gallery, host, () => saves++);
+            var vm = new ArchiveManagerViewModel(gallery, host, () => saves++, new FakeDialogs());
             vm.SelectAllCommand.Execute(null);
 
             await vm.MoveToCloudCommand.ExecuteAsync(null);
@@ -203,6 +206,73 @@ public sealed class ArchiveManagerViewModelTests
         {
             Directory.Delete(dir, true);
         }
+    }
+
+    // Jednopikselowy PNG (1x1) do podglądu
+    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+
+    [Fact]
+    public async Task Choosing_a_thumbnail_loads_its_full_image_into_the_preview()
+    {
+        var (local, _, host) = Setup();
+        local.Files["local/a.png"] = OnePixelPng;
+        var vm = new ArchiveManagerViewModel(new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png")]), host, () => { }, new FakeDialogs());
+
+        await vm.PreviewItemCommand.ExecuteAsync(vm.Items[0]);
+
+        Assert.Same(vm.Items[0], vm.Preview);
+        Assert.Equal("a.png", vm.PreviewFileName);
+        Assert.NotNull(vm.PreviewImage);
+        Assert.Equal(1, vm.PreviewImage!.PixelWidth);
+        Assert.True(vm.CopyPreviewCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Copy_hands_the_preview_image_to_the_dialog_service_and_reports_it()
+    {
+        var (local, _, host) = Setup();
+        local.Files["local/a.png"] = OnePixelPng;
+        var dialogs = new FakeDialogs();
+        var vm = new ArchiveManagerViewModel(new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png")]), host, () => { }, dialogs);
+        await vm.PreviewItemCommand.ExecuteAsync(vm.Items[0]);
+
+        vm.CopyPreviewCommand.Execute(null);
+
+        Assert.Same(vm.PreviewImage, Assert.Single(dialogs.Copied));
+        Assert.Equal(Loc.T("archive.status.copied"), vm.Status);
+    }
+
+    [Fact]
+    public async Task Video_preview_shows_its_thumbnail_but_cannot_be_copied()
+    {
+        var (local, _, host) = Setup();
+        local.Files["local/c.mp4"] = [2];
+        var video = Entry("video", null, "local/c.mp4");
+        video.Thumbnail = new System.Windows.Media.Imaging.WriteableBitmap(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null);
+        var dialogs = new FakeDialogs();
+        var vm = new ArchiveManagerViewModel(new ObservableCollection<GalleryEntry>([video]), host, () => { }, dialogs);
+
+        await vm.PreviewItemCommand.ExecuteAsync(vm.Items[0]);
+
+        Assert.NotNull(vm.PreviewImage);
+        Assert.False(vm.CopyPreviewCommand.CanExecute(null));
+        Assert.Empty(dialogs.Copied);
+    }
+
+    [Fact]
+    public async Task A_read_error_leaves_the_preview_empty_and_does_not_throw()
+    {
+        var (local, _, host) = Setup();
+        local.Files["local/a.png"] = OnePixelPng;
+        var vm = new ArchiveManagerViewModel(new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png")]), host, () => { }, new FakeDialogs());
+        local.Files.Remove("local/a.png"); // plik znika po wyświetleniu listy: odczyt się nie uda
+
+        await vm.PreviewItemCommand.ExecuteAsync(vm.Items[0]);
+
+        Assert.Same(vm.Items[0], vm.Preview);
+        Assert.Null(vm.PreviewImage);
+        Assert.False(vm.CopyPreviewCommand.CanExecute(null));
     }
 
     private static string NewTempDir()
@@ -233,7 +303,7 @@ public sealed class ArchiveManagerWindowTests
             using var app = TestApp.Create();
             var vm = new ImageStudio.ViewModels.ArchiveManagerViewModel(
                 new System.Collections.ObjectModel.ObservableCollection<ImageStudio.Configuration.GalleryEntry>(),
-                app.Get<ImageStudio.Services.MediaStorageHost>(), () => { });
+                app.Get<ImageStudio.Services.MediaStorageHost>(), () => { }, new FakeDialogs());
             var window = new ImageStudio.Views.ArchiveManagerWindow { DataContext = vm, ShowInTaskbar = false };
             window.Show();
             window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
@@ -242,5 +312,71 @@ public sealed class ArchiveManagerWindowTests
             Assert.Equal(Loc.T("archive.title"), window.Title);
             window.Close();
         });
+    }
+
+    // Motyw ciemny: napisy okna (radio, etykiety wyboru, tekst miniatur i podglądu) muszą być czytelne na tle, a nie czarne
+    [Fact]
+    public void Texts_in_the_window_are_readable_in_the_dark_theme()
+    {
+        WpfHost.Run(() =>
+        {
+            ThemeService.Apply("dark");
+            var dir = Path.Combine(Path.GetTempPath(), "imagestudio-archive-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                File.WriteAllBytes(Path.Combine(dir, "a.png"), [1]);
+                var local = new LocalMediaStorage { Roots = { [MediaKind.Image] = dir, [MediaKind.Video] = dir, [MediaKind.Audio] = dir } };
+                var host = new MediaStorageHost([local, new MemoryStoragePlugin("cloud")]);
+                var vm = new ImageStudio.ViewModels.ArchiveManagerViewModel(
+                    new System.Collections.ObjectModel.ObservableCollection<GalleryEntry>(), host, () => { }, new FakeDialogs());
+                var window = new ImageStudio.Views.ArchiveManagerWindow { DataContext = vm, ShowInTaskbar = false };
+                window.Show();
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+                var backgrounds = new[] { BrushColor("WindowBgBrush"), BrushColor("SurfaceAltBrush") };
+                var foregrounds = FindAll<RadioButton>(window).Select(r => r.Foreground)
+                    .Concat(FindAll<CheckBox>(window).Select(c => c.Foreground))
+                    .Concat(FindAll<TextBlock>(window).Select(t => t.Foreground))
+                    .ToList();
+                Assert.True(foregrounds.Count >= 6, $"za mało kontrolek z tekstem: {foregrounds.Count}");
+                foreach (var brush in foregrounds)
+                {
+                    var color = Assert.IsType<SolidColorBrush>(brush).Color;
+                    foreach (var background in backgrounds)
+                    {
+                        Assert.True(Contrast(color, background) >= 3.0, $"napis {color} na tle {background}: {Contrast(color, background):0.00}");
+                    }
+                }
+                window.Close();
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        });
+    }
+
+    private static Color BrushColor(string key) => ((SolidColorBrush)Application.Current.Resources[key]).Color;
+
+    private static IEnumerable<T> FindAll<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var nested in FindAll<T>(child)) yield return nested;
+        }
+    }
+
+    private static double Contrast(Color a, Color b)
+    {
+        static double Luminance(Color c)
+        {
+            static double Lin(byte v) { var s = v / 255.0; return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+            return 0.2126 * Lin(c.R) + 0.7152 * Lin(c.G) + 0.0722 * Lin(c.B);
+        }
+        var (hi, lo) = (Math.Max(Luminance(a), Luminance(b)), Math.Min(Luminance(a), Luminance(b)));
+        return (hi + 0.05) / (lo + 0.05);
     }
 }

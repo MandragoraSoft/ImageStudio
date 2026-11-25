@@ -266,6 +266,10 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
 
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+
         <!-- Foreground TabControl dziedziczy zawartość zakładek (bez niego etykiety są czarne na ciemnym tle) -->
         <Style TargetType="TabControl">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
