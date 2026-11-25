@@ -11,6 +11,8 @@ public sealed class MemoryStoragePlugin(string id) : IMediaStoragePlugin
     public string Folder { get; init; } = id;
     public bool FailWrites { get; set; }
     public bool FailDeletes { get; set; }
+    public bool LoseWrites { get; set; } // zwraca lokalizację, ale pliku nie zapisuje
+    public bool ShortWrites { get; set; } // zapisuje bez ostatniego bajtu
     public MediaKind? LastKind { get; private set; }
 
     public string Id { get; } = id;
@@ -23,7 +25,7 @@ public sealed class MemoryStoragePlugin(string id) : IMediaStoragePlugin
         if (FailWrites) throw new IOException("zapis nieudany");
         LastKind = kind;
         var location = $"{Folder}/{fileName}";
-        Files[location] = data.ToArray();
+        if (!LoseWrites) Files[location] = ShortWrites ? data.Slice(0, Math.Max(0, data.Length - 1)).ToArray() : data.ToArray();
         return Task.FromResult(location);
     }
 
@@ -122,6 +124,25 @@ public sealed class MediaStorageHostTests
 
         Assert.Equal("cloud", entry.StorageId);
         Assert.Contains("cloud/a.png", cloud.Files.Keys);
+    }
+
+    // Cel zwraca lokalizację, ale pliku nie ma albo ma inną długość: wyjątek, wpis i stara kopia bez zmian
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Target_that_does_not_keep_the_bytes_keeps_entry_and_old_copy(bool lose, bool shortWrite)
+    {
+        var local = new MemoryStoragePlugin("local");
+        var cloud = new MemoryStoragePlugin("cloud") { LoseWrites = lose, ShortWrites = shortWrite };
+        local.Files["local/a.png"] = [1, 2, 3];
+        var host = new MediaStorageHost([local, cloud]);
+        var entry = Entry("generate", "local", "local/a.png");
+
+        await Assert.ThrowsAsync<IOException>(() => host.MoveAsync(entry, cloud));
+
+        Assert.Equal("local", entry.StorageId);
+        Assert.Equal("local/a.png", entry.FilePath);
+        Assert.Equal([1, 2, 3], local.Files["local/a.png"]);
     }
 
     [Fact]

@@ -38,3 +38,15 @@ Zakres: galeria obrazów i wideo (`generate`, `edit`, `video`). Poza zakresem: g
 
 ## Kontrola głównej sesji po każdym etapie
 `dotnet build ImageStudio.slnx`, `dotnet test ImageStudio.Tests`, `pwsh tools/Check-Translations.ps1 -Strict`, przegląd diffu, commit.
+
+## Poprawki po pierwszym użyciu (2026-11-25)
+
+Błąd: lustro chmury leży domyślnie w tym samym folderze co dysk lokalny, więc zapis nadpisywał ten sam plik, a kasowanie „starej kopii” usuwało wynik (naprawione w `84ff17b`). Dodatkowo panel pokazywał puste źródło „Dysk lokalny”, bo listuje tylko wpisy galerii (maks. 200), a w folderze są też pliki spoza galerii.
+
+### Etap 6: bezpieczne przenoszenie
+- `MoveAsync`: po zapisie w celu sprawdź, że `target.ReadAsync(location)` zwraca tyle samo bajtów co źródło; inaczej `IOException`, wpis i stary plik bez zmian. Dopiero potem zmiana wpisu i kasowanie starej kopii (pomijane dla tej samej ścieżki). Testy: cel zwraca lokalizację, ale pliku nie ma / ma inną długość → wyjątek, stary plik zostaje.
+
+### Etap 7: widoczność plików z folderów lokalnych
+- `ArchiveManagerViewModel`: źródło „Dysk lokalny” pokazuje też pliki z folderów obrazów i wideo wtyczki `local` (`host.Owner("local").LocalFolder(kind)`, bez podfolderów), których nie ma w galerii (porównanie pełnej ścieżki bez rozróżniania wielkości liter): obrazy png/jpg/jpeg/webp/gif/bmp, wideo mp4/webm/mov/mkv. Dla każdego powstaje `GalleryEntry` (nowe `Id`, `Kind` generate/video, `StorageId` local, czas z `LastWriteTime`, miniatura z `GalleryStore.Thumbnail`), niezapisany w galerii.
+- Po udanym przeniesieniu taki wpis trafia do galerii (`Insert(0)` i przycięcie do `GalleryStore.MaxEntries` jak przy nowym wyniku), potem `save()`. Wpisy galerii bez istniejącego pliku nie są pokazywane w źródle lokalnym.
+- Testy na katalogu tymczasowym (atrapa wtyczki lokalnej z `LocalFolder` lub prawdziwy `LocalMediaStorage` z `Roots`): sieroty widoczne, pliki z galerii bez duplikatów, przeniesienie sieroty dodaje wpis do galerii.

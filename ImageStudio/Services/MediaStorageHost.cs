@@ -67,6 +67,9 @@ public sealed class MediaStorageHost : IMediaStorage
         var bytes = await from.ReadAsync(entry.FilePath, ct);
         var kind = entry.Kind == "video" ? MediaKind.Video : MediaKind.Image;
         var location = await target.WriteAsync(kind, Path.GetFileName(entry.FilePath), bytes, ct);
+        // Weryfikacja przed zmianą wpisu: cel musi mieć plik o tej samej długości, inaczej stara kopia zostaje nietknięta
+        if (!await target.ExistsAsync(location, ct) || (await target.ReadAsync(location, ct)).Length != bytes.Length)
+            throw new IOException($"Zapis w magazynie {target.Id} nie zachował pliku: {location}");
 
         var oldLocation = entry.FilePath;
         entry.FilePath = location;

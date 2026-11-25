@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using ImageStudio.Configuration;
 using ImageStudio.Localization;
 using ImageStudio.Services;
+using ImageStudio.Storage;
+using ImageStudio.Storage.Local;
 using ImageStudio.ViewModels;
 using ImageStudio.Views;
 
@@ -25,13 +27,16 @@ public sealed class ArchiveManagerViewModelTests
     [Fact]
     public void Lists_only_media_entries_of_the_chosen_source()
     {
-        var (_, _, host) = Setup();
+        var (local, _, host) = Setup();
+        local.Files["local/a.png"] = [1];
+        local.Files["local/c.mp4"] = [2];
         var gallery = new ObservableCollection<GalleryEntry>(
         [
             Entry("generate", null, "local/a.png"),
             Entry("edit", "cloud", "cloud/b.png"),
             Entry("video", "local", "local/c.mp4"),
             Entry("transcript", null, "local/t.txt"),
+            Entry("generate", null, "local/gone.png"), // brak pliku: nie pokazujemy w źródle lokalnym
         ]);
         var vm = new ArchiveManagerViewModel(gallery, host, () => { });
 
@@ -44,7 +49,9 @@ public sealed class ArchiveManagerViewModelTests
     [Fact]
     public void Selection_count_and_move_command_follow_the_checkboxes()
     {
-        var (_, _, host) = Setup();
+        var (local, _, host) = Setup();
+        local.Files["local/a.png"] = [1];
+        local.Files["local/b.png"] = [2];
         var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png"), Entry("edit", null, "local/b.png")]);
         var vm = new ArchiveManagerViewModel(gallery, host, () => { });
         Assert.False(vm.MoveToCloudCommand.CanExecute(null));
@@ -88,12 +95,14 @@ public sealed class ArchiveManagerViewModelTests
     public async Task A_failed_entry_stays_where_it_was_and_the_rest_still_moves()
     {
         var (local, _, host) = Setup();
-        local.Files["local/a.png"] = [1]; // "missing.png" nie istnieje: odczyt się nie uda
+        local.Files["local/a.png"] = [1];
+        local.Files["local/missing.png"] = [3];
         var missing = Entry("generate", null, "local/missing.png");
         var a = Entry("generate", null, "local/a.png");
         var gallery = new ObservableCollection<GalleryEntry>([missing, a]);
         var vm = new ArchiveManagerViewModel(gallery, host, () => { });
         vm.SelectAllCommand.Execute(null);
+        local.Files.Remove("local/missing.png"); // plik znika po wyświetleniu listy: odczyt się nie uda
 
         await vm.MoveToCloudCommand.ExecuteAsync(null);
 
@@ -108,7 +117,8 @@ public sealed class ArchiveManagerViewModelTests
     [Fact]
     public void Without_an_active_cloud_the_move_is_blocked_and_the_status_says_so()
     {
-        var (_, _, host) = Setup(cloudActive: false);
+        var (local, _, host) = Setup(cloudActive: false);
+        local.Files["local/a.png"] = [1];
         var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, "local/a.png")]);
         var vm = new ArchiveManagerViewModel(gallery, host, () => { });
         vm.SelectAllCommand.Execute(null);
@@ -121,13 +131,95 @@ public sealed class ArchiveManagerViewModelTests
     public void Open_archive_manager_command_shows_the_window_model_on_the_gallery()
     {
         using var app = TestApp.Create();
-        app.Vm.Gallery.Add(Entry("generate", null, "img/a.png"));
-        app.Vm.Gallery.Add(Entry("transcript", null, "img/t.txt"));
+        var img = app.Get<ImageStudio.Storage.Local.LocalMediaStorage>().Roots[ImageStudio.Storage.MediaKind.Image];
+        Directory.CreateDirectory(img);
+        var png = Path.Combine(img, "a.png");
+        File.WriteAllBytes(png, [1]);
+        app.Vm.Gallery.Add(Entry("generate", null, png));
+        app.Vm.Gallery.Add(Entry("transcript", null, Path.Combine(img, "t.txt")));
 
         app.Vm.OpenArchiveManagerCommand.Execute(null);
 
         Assert.Equal(1, app.Dialogs.ArchiveManagerCount);
         Assert.Single(app.Dialogs.LastArchiveManager!.Items);
+    }
+
+    // Folder obrazów i wideo na prawdziwym dysku (katalog tymczasowy): sieroty widoczne, wpisy galerii bez duplikatów
+    [Fact]
+    public void Local_folder_files_missing_from_the_gallery_are_listed_once()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            File.WriteAllBytes(Path.Combine(dir, "a.png"), [1]);
+            File.WriteAllBytes(Path.Combine(dir, "Orphan.PNG"), [2]);
+            File.WriteAllBytes(Path.Combine(dir, "clip.mp4"), [3]);
+            File.WriteAllBytes(Path.Combine(dir, "notes.txt"), [4]);
+            Directory.CreateDirectory(Path.Combine(dir, "sub"));
+            File.WriteAllBytes(Path.Combine(dir, "sub", "deep.png"), [5]);
+            var (_, cloud, host) = SetupRealLocal(dir);
+            var gallery = new ObservableCollection<GalleryEntry>([Entry("generate", null, Path.Combine(dir, "a.png"))]);
+
+            var vm = new ArchiveManagerViewModel(gallery, host, () => { });
+
+            Assert.Equal(
+                new[] { "a.png", "Orphan.PNG", "clip.mp4" }.Select(n => Path.Combine(dir, n)).Order(),
+                vm.Items.Select(i => i.Entry.FilePath).Order());
+            Assert.Equal("video", vm.Items.Single(i => i.Entry.FilePath.EndsWith("clip.mp4")).Entry.Kind);
+            Assert.Equal("local", vm.Items.Single(i => i.Entry.FilePath.EndsWith("Orphan.PNG")).Entry.StorageId);
+            Assert.Empty(cloud.Files);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task Moving_an_orphan_adds_it_to_the_gallery()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            var orphan = Path.Combine(dir, "o.png");
+            File.WriteAllBytes(orphan, [7, 7]);
+            var (_, cloud, host) = SetupRealLocal(dir);
+            var gallery = new ObservableCollection<GalleryEntry>();
+            var saves = 0;
+            var vm = new ArchiveManagerViewModel(gallery, host, () => saves++);
+            vm.SelectAllCommand.Execute(null);
+
+            await vm.MoveToCloudCommand.ExecuteAsync(null);
+
+            var moved = Assert.Single(gallery);
+            Assert.Equal("cloud", moved.StorageId);
+            Assert.Equal("cloud/o.png", moved.FilePath);
+            Assert.Equal([7, 7], cloud.Files["cloud/o.png"]);
+            Assert.False(File.Exists(orphan));
+            Assert.Equal(1, saves);
+            Assert.Empty(vm.Items);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    private static string NewTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "imagestudio-archive-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    // Dysk lokalny na katalogu tymczasowym (obrazy i wideo), chmura na atrapie
+    private static (LocalMediaStorage local, MemoryStoragePlugin cloud, MediaStorageHost host) SetupRealLocal(string dir)
+    {
+        var local = new LocalMediaStorage { Roots = { [MediaKind.Image] = dir, [MediaKind.Video] = dir, [MediaKind.Audio] = dir } };
+        var cloud = new MemoryStoragePlugin("cloud");
+        var host = new MediaStorageHost([local, cloud]);
+        host.Apply("cloud", null);
+        return (local, cloud, host);
     }
 }
 

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using ImageStudio.Configuration;
 using ImageStudio.Localization;
 using ImageStudio.Services;
+using ImageStudio.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace ImageStudio.ViewModels;
@@ -80,11 +81,21 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
 
     partial void OnIsMovingChanged(bool value) => MoveToCloudCommand.NotifyCanExecuteChanged();
 
+    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"];
+    private static readonly string[] VideoExtensions = [".mp4", ".webm", ".mov", ".mkv"];
+
     private void Refresh()
     {
         Items.Clear();
         var inCloud = Source == ArchiveSource.Cloud;
-        foreach (var entry in _gallery.Where(e => Kinds.Contains(e.Kind) && e.IsInCloud == inCloud))
+        var entries = _gallery.Where(e => Kinds.Contains(e.Kind) && e.IsInCloud == inCloud).ToList();
+        if (!inCloud)
+        {
+            // Dysk lokalny odpowiada od razu, więc czekanie na wynik nie blokuje UI; wpisy bez pliku nie są pokazywane
+            entries = entries.Where(e => _host.Owner(e.StorageId).ExistsAsync(e.FilePath).GetAwaiter().GetResult()).ToList();
+            entries.AddRange(LocalOrphans());
+        }
+        foreach (var entry in entries)
         {
             var item = new ArchiveItem(entry);
             item.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ArchiveItem.IsSelected)) UpdateSelection(); };
@@ -94,6 +105,48 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
         Status = Items.Count == 0 ? Loc.T("archive.empty")
                : !HasCloud ? Loc.T("archive.status.noCloud")
                : "";
+    }
+
+    // Pliki w folderach obrazów i wideo dysku lokalnego, których nie ma w galerii (bez podfolderów); ścieżka porównywana bez wielkości liter
+    private List<GalleryEntry> LocalOrphans()
+    {
+        var known = _gallery.Select(e => FullPath(e.FilePath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var found = new List<GalleryEntry>();
+        var local = _host.Owner("local");
+        AddOrphans(found, known, local.LocalFolder(MediaKind.Image), ImageExtensions, "generate");
+        AddOrphans(found, known, local.LocalFolder(MediaKind.Video), VideoExtensions, "video");
+        return found.OrderByDescending(e => e.CreatedUtc).ToList();
+    }
+
+    private static void AddOrphans(List<GalleryEntry> found, HashSet<string> known, string? folder, string[] extensions, string kind)
+    {
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+        try
+        {
+            foreach (var path in Directory.EnumerateFiles(folder))
+            {
+                if (!extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)) continue;
+                if (!known.Add(FullPath(path))) continue;
+                found.Add(new GalleryEntry
+                {
+                    Kind = kind,
+                    StorageId = "local",
+                    FilePath = path,
+                    CreatedUtc = File.GetLastWriteTimeUtc(path),
+                    Thumbnail = GalleryStore.Thumbnail(path),
+                });
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.LogWarning(ex, "Archiwum: nie odczytano folderu {Folder}", folder);
+        }
+    }
+
+    private static string FullPath(string path)
+    {
+        try { return Path.GetFullPath(path); }
+        catch (ArgumentException) { return path; }
     }
 
     private void UpdateSelection()
@@ -132,8 +185,14 @@ public sealed partial class ArchiveManagerViewModel : ObservableObject
                 try
                 {
                     await _host.MoveAsync(item.Entry, target);
+                    // Plik spoza galerii (sierota z folderu) dostaje wpis tak jak nowy wynik: na początku, z przycięciem do limitu
                     var index = _gallery.IndexOf(item.Entry);
                     if (index >= 0) _gallery[index] = item.Entry;
+                    else
+                    {
+                        _gallery.Insert(0, item.Entry);
+                        while (_gallery.Count > GalleryStore.MaxEntries) _gallery.RemoveAt(_gallery.Count - 1);
+                    }
                     _save();
                     Items.Remove(item);
                     moved++;
