@@ -222,6 +222,41 @@ public sealed class UserDataCleanupTests
     }
 
     [Fact]
+    public void Storage_plugin_secrets_are_found_by_name_pattern()
+    {
+        using var root = new IsolatedDataDirectory();
+        root.Write("secrets-storage-mega.bin");
+        root.Write("secrets-storage-mega-pending.bin");
+        root.Write("secrets-storagex.bin");
+        root.Write("secrets-storage-.bin");
+        root.Write("secrets-custom.bin");
+
+        new UserDataCleanupService(root.Path).Clean(new UserDataCleanupSelection(
+            SettingsAndPrompts: false, ChatHistoryAndMemory: false, Presets: false, GalleryIndexes: false,
+            McpConfiguration: false, WindowLayouts: false, ProviderLoginsAndKeys: true));
+
+        Assert.False(root.Exists("secrets-storage-mega.bin"));
+        Assert.False(root.Exists("secrets-storage-mega-pending.bin"));
+        Assert.True(root.Exists("secrets-storagex.bin"));
+        Assert.True(root.Exists("secrets-storage-.bin"));
+        Assert.True(root.Exists("secrets-custom.bin"));
+    }
+
+    [Fact]
+    public void Cleanup_blocks_writes_of_any_storage_secret()
+    {
+        using var root = new IsolatedDataDirectory();
+        root.Write("secrets-custom.bin");
+
+        new UserDataCleanupService(root.Path).Clean(new UserDataCleanupSelection(
+            SettingsAndPrompts: false, ChatHistoryAndMemory: false, Presets: false, GalleryIndexes: false,
+            McpConfiguration: false, WindowLayouts: false, ProviderLoginsAndKeys: true));
+
+        Assert.True(UserDataMutationGate.IsBlocked(root.Path, Path.Combine(root.Path, "secrets-storage-nowa.bin")));
+        Assert.False(UserDataMutationGate.IsBlocked(root.Path, Path.Combine(root.Path, "secrets-custom.bin")));
+    }
+
+    [Fact]
     public void Reparse_point_directory_is_not_traversed()
     {
         using var root = new IsolatedDataDirectory();

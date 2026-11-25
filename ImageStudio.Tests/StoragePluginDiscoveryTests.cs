@@ -82,4 +82,18 @@ public class StoragePluginDiscoveryTests
         Assert.Same(first, host.Plugins[0]);
         Assert.Same(first, host.Active);
     }
+
+    [Fact]
+    public void Storage_secrets_accept_only_storage_names()
+    {
+        var store = new MemorySecretStore();
+        var secrets = new StorageSecrets(store);
+
+        Assert.Throws<ArgumentException>(() => secrets.Save("x", "openai"));
+        Assert.Throws<ArgumentException>(() => secrets.Load("storage-Mega"));
+        Assert.Empty(store.Secrets);
+
+        secrets.Save("sesja", "storage-mega-pending");
+        Assert.Equal("sesja", secrets.Load("storage-mega-pending"));
+    }
 }

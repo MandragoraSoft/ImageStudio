@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ImageStudio.Localization;
+using ImageStudio.Services;
 using Microsoft.Win32.SafeHandles;
 
 namespace ImageStudio.Configuration;
@@ -70,6 +71,7 @@ public static class UserDataMutationGate
     {
         public HashSet<string> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> JsonDirectories { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool StorageSecrets { get; set; }
     }
 
     public static bool IsBlocked(string root, string path)
@@ -135,8 +137,11 @@ public static class UserDataMutationGate
         }
         if (selection.WindowLayouts) File("windows.json");
         if (selection.ProviderLoginsAndKeys)
+        {
             foreach (var name in UserDataCleanupService.ProviderSecretFileNames)
                 File(name);
+            blocked.StorageSecrets = true;
+        }
     }
 
     private static bool IsBlockedUnsafe(string root, string path)
@@ -144,6 +149,10 @@ public static class UserDataMutationGate
         if (!BlockedRoots.TryGetValue(root, out var blocked)) return false;
         if (blocked.Files.Contains(path)) return true;
         var directory = Path.GetDirectoryName(path);
+        if (blocked.StorageSecrets && directory is not null &&
+            string.Equals(directory, root, StringComparison.OrdinalIgnoreCase) &&
+            UserDataCleanupService.StorageSecretFileName.IsMatch(Path.GetFileName(path)))
+            return true;
         return directory is not null && blocked.JsonDirectories.Contains(directory) &&
                string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
     }
@@ -160,12 +169,13 @@ public sealed class UserDataCleanupService : IUserDataCleanupService
     [
         "secrets.bin", "secrets-openrouter.bin", "secrets-openai.bin", "secrets-mistral.bin",
         "secrets-kilo.bin", "secrets-opencodego.bin", "secrets-chatgpt.bin",
-        "secrets-storage-onedrive.bin", "secrets-storage-onedrive-client.bin",
-        "secrets-storage-onedrive-clientid.bin", "secrets-storage-googledrive.bin",
-        "secrets-storage-googledrive-client.bin", "secrets-storage-googledrive-clientid.bin",
     ];
 
     private static readonly Regex SessionFileName = new(@"^[a-fA-F0-9]{1,64}(?:\.meta)?\.json$", RegexOptions.CultureInvariant);
+
+    // Sekrety wtyczek magazynu (secrets-storage-<id>*.bin) po tym samym wzorcu, który przepuszcza StorageSecrets
+    internal static readonly Regex StorageSecretFileName =
+        new($"^secrets-{StorageSecrets.NamePattern}\\.bin$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private readonly string _root;
 
@@ -204,7 +214,10 @@ public sealed class UserDataCleanupService : IUserDataCleanupService
                 if (categories.HasFlag(UserDataCategory.WindowLayouts))
                     DeleteKnownFiles(["windows.json"], ref deleted, failures);
                 if (categories.HasFlag(UserDataCategory.ProviderLoginsAndKeys))
+                {
                     DeleteKnownFiles(ProviderSecretFileNames, ref deleted, failures);
+                    DeleteStorageSecrets(ref deleted, failures);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
@@ -235,6 +248,17 @@ public sealed class UserDataCleanupService : IUserDataCleanupService
     {
         foreach (var name in names)
             TryDelete(Path.Combine(_root, name), ref deleted, failures);
+    }
+
+    // Sekrety wtyczek magazynu (logowania, sesje, kolejki wysyłek) po wzorcu nazwy: nowa wtyczka nie wymaga zmian tutaj
+    private void DeleteStorageSecrets(ref int deleted, List<string> failures)
+    {
+        if (!Directory.Exists(_root)) return;
+        foreach (var file in Directory.EnumerateFiles(_root, "secrets-storage-*.bin", SearchOption.TopDirectoryOnly))
+        {
+            if (StorageSecretFileName.IsMatch(Path.GetFileName(file)))
+                TryDelete(file, ref deleted, failures);
+        }
     }
 
     private void DeleteSessionDirectory(string name, ref int deleted, List<string> failures)
