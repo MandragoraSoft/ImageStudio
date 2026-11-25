@@ -25,6 +25,7 @@
     <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" />
     <ProjectReference Include="..\ImageStudio.Storage.OneDrive\ImageStudio.Storage.OneDrive.csproj" />
     <ProjectReference Include="..\ImageStudio.Storage.GoogleDrive\ImageStudio.Storage.GoogleDrive.csproj" />
+    <ProjectReference Include="..\ImageStudio.Storage.Mega\ImageStudio.Storage.Mega.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.Core\ImageStudio.Tools.Core.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" />
     <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" />

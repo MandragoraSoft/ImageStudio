@@ -64,6 +64,7 @@
     <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Storage.OneDrive\ImageStudio.Storage.OneDrive.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Storage.GoogleDrive\ImageStudio.Storage.GoogleDrive.csproj" Private="$(PluginsInBundle)" />
+    <ProjectReference Include="..\ImageStudio.Storage.Mega\ImageStudio.Storage.Mega.csproj" Private="$(PluginsInBundle)" />
     <!-- Grupy narzędzi czatu (IChatToolGroup): jak dostawcy, trafiają do podfolderu tools\ -->
     <ProjectReference Include="..\ImageStudio.Tools.DateTime\ImageStudio.Tools.DateTime.csproj" Private="$(PluginsInBundle)" />
     <ProjectReference Include="..\ImageStudio.Tools.Memory\ImageStudio.Tools.Memory.csproj" Private="$(PluginsInBundle)" />

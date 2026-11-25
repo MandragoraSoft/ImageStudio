@@ -50,7 +50,7 @@ public class StoragePluginDiscoveryTests
     {
         using var app = TestApp.Create();
 
-        Assert.Equal(new[] { "local", "googledrive", "onedrive" }, app.Get<MediaStorageHost>().Plugins.Select(p => p.Id));
+        Assert.Equal(new[] { "local", "googledrive", "mega", "onedrive" }, app.Get<MediaStorageHost>().Plugins.Select(p => p.Id));
     }
 
     [Fact]
