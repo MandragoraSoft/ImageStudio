@@ -7,7 +7,8 @@ namespace ImageStudio.Tests;
 // Atrapa magazynu w pamięci: pliki po lokalizacji, opcjonalne błędy zapisu i kasowania
 public sealed class MemoryStoragePlugin(string id) : IMediaStoragePlugin
 {
-    public Dictionary<string, byte[]> Files { get; } = [];
+    public Dictionary<string, byte[]> Files { get; init; } = [];
+    public string Folder { get; init; } = id;
     public bool FailWrites { get; set; }
     public bool FailDeletes { get; set; }
     public MediaKind? LastKind { get; private set; }
@@ -21,7 +22,7 @@ public sealed class MemoryStoragePlugin(string id) : IMediaStoragePlugin
     {
         if (FailWrites) throw new IOException("zapis nieudany");
         LastKind = kind;
-        var location = $"{Id}/{fileName}";
+        var location = $"{Folder}/{fileName}";
         Files[location] = data.ToArray();
         return Task.FromResult(location);
     }
@@ -61,6 +62,22 @@ public sealed class MediaStorageHostTests
         Assert.Equal([1, 2, 3], cloud.Files["cloud/a.png"]);
         Assert.Equal(MediaKind.Image, cloud.LastKind);
         Assert.DoesNotContain("local/a.png", local.Files.Keys);
+    }
+
+    // Lustro chmury w tym samym folderze co dysk lokalny: zapis nadpisuje ten sam plik, więc kasowanie "starej kopii" zniszczyłoby wynik
+    [Fact]
+    public async Task Move_keeps_the_file_when_the_target_writes_to_the_same_location()
+    {
+        var shared = new Dictionary<string, byte[]> { ["pics/a.png"] = [1, 2, 3] };
+        var local = new MemoryStoragePlugin("local") { Files = shared, Folder = "pics" };
+        var cloud = new MemoryStoragePlugin("cloud") { Files = shared, Folder = "pics" };
+        var host = new MediaStorageHost([local, cloud]);
+        var entry = Entry("generate", "local", "pics/a.png");
+
+        await host.MoveAsync(entry, cloud);
+
+        Assert.Equal("cloud", entry.StorageId);
+        Assert.Equal([1, 2, 3], shared["pics/a.png"]);
     }
 
     [Fact]

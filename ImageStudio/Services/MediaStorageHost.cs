@@ -48,6 +48,12 @@ public sealed class MediaStorageHost : IMediaStorage
             return p.Value.Where(v => !secret.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value);
         });
 
+    private static bool SamePath(string a, string b)
+    {
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch (ArgumentException) { return a == b; }
+    }
+
     private static readonly string[] MovableKinds = ["generate", "edit", "video"];
 
     // Przenosi plik wpisu do innego magazynu: najpierw zapis w celu, dopiero potem zmiana wpisu i kasowanie starej kopii.
@@ -65,6 +71,8 @@ public sealed class MediaStorageHost : IMediaStorage
         var oldLocation = entry.FilePath;
         entry.FilePath = location;
         entry.StorageId = target.Id;
+        // Lustro chmury bywa w tym samym folderze co magazyn lokalny: zapis trafił na ten sam plik, więc nie kasujemy go
+        if (SamePath(oldLocation, location)) return;
         try
         {
             await from.DeleteAsync(oldLocation, ct);
