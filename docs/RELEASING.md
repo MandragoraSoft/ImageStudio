@@ -13,9 +13,17 @@ Semantyczny: `MAJOR.MINOR.PATCH`.
 
 Numer trafia do plików exe i instalatora; ręcznie nigdzie go nie wpisujesz.
 
+## Notatki wydania
+
+Plik `docs/release-notes/<wersja>.md`, po polsku, dla użytkownika. Wzór: `docs/release-notes/1.8.0.md`. `tools/Release.ps1` wymaga:
+
+- tytułu `# ImageStudio <wersja>` (opcjonalnie `: krótki opis`),
+- sekcji `## Nowe` lub `## Poprawki`, `## Znane ograniczenia` i `## Który plik pobrać`,
+- dokładnych nazw trzech plików z sekcji „Pliki w wydaniu”.
+
 ## Automatyczny skrypt
 
-Przygotuj najpierw `docs/release-notes/<wersja>.md` zgodnie z sekcją niżej, a następnie uruchom na Windowsie z katalogu repozytorium:
+Przygotuj najpierw notatki wydania, a następnie uruchom na Windowsie z katalogu repozytorium:
 
 ```powershell
 pwsh -NoProfile -File tools/Release.ps1 -Version 1.6.0
@@ -33,14 +41,14 @@ pwsh -NoProfile -File tools/Release.ps1 -Version 1.6.0 -WhatIf
 
 ## Kroki ręczne
 
-1. **Napisz opis wersji** w `docs/release-notes/<wersja>.md` (po polsku, dla użytkownika): co nowego, poprawki, znane ograniczenia i krótka lista plików do pobrania. Wzór: `docs/release-notes/1.1.0.md`.
+1. **Napisz notatki wydania** (sekcja „Notatki wydania” wyżej).
 2. **Zatwierdź i wypchnij na `main`** (razem ze zmianami, które wchodzą do wydania). Testy lokalnie: `dotnet test ImageStudio.Tests`.
 3. **Uruchom wydanie**, jedną z dróg:
    - polecenie: `gh workflow run release.yml --ref main -f version=1.2.0`,
    - albo w GitHubie: Actions → Release → Run workflow → pole „version”,
    - albo wypchnij własny tag: `git tag v1.2.0 && git push origin v1.2.0` (opis wersji musi być już w tym commicie).
 4. **Obserwuj przebieg**: `gh run watch`. Podsumowanie przebiegu zawiera link do wydania i listę plików.
-5. **Sprawdź wydanie**: https://github.com/prachwal/uberllm-proxy/releases/latest. Zainstaluj nowy `Setup.exe` na swoim komputerze nad poprzednią wersją i sprawdź, że ustawienia i dane zostały.
+5. **Sprawdź wydanie**: https://github.com/MandragoraSoft/ImageStudio/releases/latest. Zainstaluj nowy `Setup.exe` na swoim komputerze nad poprzednią wersją i sprawdź, że ustawienia i dane zostały.
 
 ## Co robi pipeline
 
@@ -67,7 +75,7 @@ Pliki nie są podpisane certyfikatem, więc Windows SmartScreen może pokazać o
 ## Gdy coś pójdzie źle
 
 - **Przebieg padł przed wydaniem** (testy, brak notatek): popraw i uruchom ponownie z tą samą wersją; nic nie powstało.
-- **Wydanie jest, ale ma błąd**: nie nadpisuj go. Wydaj kolejny PATCH. Złe wydanie możesz usunąć razem z tagiem: `gh release delete v1.2.0 --cleanup-tag`, a potem wydać tę samą wersję od nowa.
+- **Wydanie jest, ale ma błąd**: nie nadpisuj go. Wydaj kolejny PATCH. Usunięcie złego wydania z tagiem (`gh release delete v1.2.0 --cleanup-tag`) wymaga osobnej, jawnej zgody; numeru nie używaj ponownie.
 - **Poprawa samego opisu**: `gh release edit v1.2.0 --notes-file docs/release-notes/1.2.0.md` (po zmianie pliku w repozytorium).
 
 ## Co nie jest zautomatyzowane

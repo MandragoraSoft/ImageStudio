@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Projekt
 
-ImageStudio: aplikacja WPF (.NET 10, `net10.0-windows`, x64) do generowania i edycji obrazów, wideo, czatu oraz mowy (synteza i rozpoznawanie) z modelami AI. Kod, komentarze i UI są po polsku; trzymaj ten język. Repozytorium nazywa się `uberllm-proxy` z historycznych powodów. `NOTES.md` opisuje dawne proxy Node (`proxy.mjs`), którego już nie ma w repo, więc nie traktuj go jako opisu obecnego kodu.
+ImageStudio: aplikacja WPF (.NET 10, `net10.0-windows`, x64) do generowania i edycji obrazów, wideo, czatu oraz mowy (synteza i rozpoznawanie) z modelami AI. Kod, komentarze i UI są po polsku; trzymaj ten język.
 
 ## Komendy
 
@@ -26,21 +26,23 @@ dotnet publish ImageStudio -p:PublishProfile=SelfHosted  # publish\selfhosted\Im
 
 ## Zasady, które obowiązują zawsze
 
-- **DI:** jedyny composition root to `Composition/ServiceCollectionExtensions` (`AddImageStudioCore` i `AddImageStudioInfrastructure`). Dane użytkownika są za interfejsami z `Configuration/Stores.cs`; w ViewModelach nie wołaj statycznych `PresetStore`/`GalleryStore`/`SecretStore`/`AppSettings.Load` ani `ThemeService`.
+- **DI:** jedyny composition root to `Composition/ServiceCollectionExtensions` (`AddImageStudioCore` i `AddImageStudioInfrastructure`). Dane użytkownika są za interfejsami z `Configuration/Stores.cs`; w ViewModelach nie czytaj ani nie zapisuj danych przez statyczne `PresetStore`/`GalleryStore`/`SecretStore`/`AppSettings.Load` i nie zmieniaj motywu przez `ThemeService` (stałe i `GalleryStore.Thumbnail` są dozwolone).
 - **MVVM (CommunityToolkit.Mvvm):** `MainViewModel` jest `partial`, nowa funkcja głównego okna = nowy plik partial. ViewModele nie wołają `MessageBox` (użyj `IDialogService.Confirm`) ani `Application.Current`. Zmieniając `IDialogService`, zaktualizuj `FakeDialogs`.
 - **Dostawcy tylko przez `IAiProvider`.** Nowa metoda kontraktu: domyślna implementacja + jawne przekazanie w `ActivityAiProvider` + `FakeProvider` (skill `new-provider`). Domyślne metody interfejsu widać tylko przez typ interfejsu.
 - **Sieć poza `IAiProvider`** (pobranie obrazu z linku, narzędzia MCP) sama woła `Activity.Begin("...")` w `using`, żeby stopka pokazała spinner.
-- **Selektor modeli to zawsze `ModelPicker` z `HasFilters="True"`** i `ICollectionView` z filtrem z `MainViewModel`. `ComboBox` z obiektami używa `ItemTemplate`, nie `DisplayMemberPath` (własny szablon w `App.xaml` go ignoruje).
+- **Każdy klient HTTP** dostaje własny handler z `OutgoingRequestRegistry.CreateHandler` (lista żądań i anulowanie w stopce); `UserCanceledRequestException` to nie timeout.
+- **Wyniki (obraz, wideo, mowa)** zapisuj przez `IMediaStorage`, nie przez `File.*` w ViewModelach; lokalizacja w `GalleryEntry.FilePath` nie musi być ścieżką lokalną.
+- **Selektor modeli to `ModelPicker` z `HasFilters="True"`** i `ICollectionView` z filtrem z `MainViewModel` (jedyny wyjątek: domyślny model tekstowy w Ustawieniach dostawcy). `ComboBox` z obiektami używa `ItemTemplate`, nie `DisplayMemberPath` (własny szablon w `App.xaml` go ignoruje).
 - **Nowy kolor kontrolki** dodawaj do obu palet (`ThemeService`, `App.xaml`); kontrast pilnuje `ThemeContrastTests`.
 - **Nowe okno** musi mieć `Style="{StaticResource WindowBase}"` (zapamiętywanie rozmiaru).
 - **XAML między projektami** wymaga `;assembly=...` (np. `ImageStudio.Providers.Core`, `ImageStudio.Shared`); dostawcy i zakładki mają referencje `Private="$(PluginsInBundle)"`.
 - **Teksty dla użytkownika nie są wpisywane na sztywno:** klucz w obu słownikach (`ImageStudio.Shared/Localization/Strings.pl.json` i `.en.json`) + `{loc:T klucz}` w XAML albo `Loc.T("klucz")` w kodzie; zmiana języka działa bez restartu. Reguły i pułapki: [docs/dev/localization.md](docs/dev/localization.md).
 - **Klucze API** są szyfrowane przez `SecretStore` (DPAPI); nie zapisuj ich do plików ustawień ani logów.
-- **Testy:** nowy kod = testy w `ImageStudio.Tests` na `TestApp` z atrapami (bez sieci i UI); widoki WPF przez `WpfHost.Run`. Szczegóły i pułapki w [docs/dev/testing.md](docs/dev/testing.md).
+- **Testy:** nowy kod = testy w `ImageStudio.Tests` na `TestApp` z atrapami (bez sieci i UI); widoki WPF przez `WpfHost.Run`. Ta reguła ma pierwszeństwo przed ograniczaniem testów w pluginach (np. ponytail). Testów na żywo (płatnych i chmurowych) nie uruchamiaj bez wyraźnej zgody. Szczegóły: [docs/dev/testing.md](docs/dev/testing.md).
 
 ## Tok pracy z subagentami
 
-Przy nowych funkcjach i większych zmianach: (1) rozpoznanie kodu zleć subagentowi na modelu Haiku (tylko odczyt), (2) dopiero po raporcie zadawaj pytania, konkretne i oparte na kodzie, (3) plan implementacji pisze główna sesja w `docs/superpowers/plans/`, (4) implementację wykonują subagenci Haiku według planu, etap po etapie (nie równolegle w jednym katalogu roboczym), a główna sesja sprawdza build, testy i diff.
+Przy nowych funkcjach i większych zmianach: (1) rozpoznanie kodu zleć subagentowi na modelu Haiku (tylko odczyt), (2) dopiero po raporcie zadawaj pytania, konkretne i oparte na kodzie (tu jest miejsce na `superpowers:brainstorming`), (3) plan implementacji pisze główna sesja w `docs/superpowers/plans/`, (4) implementację wykonują subagenci Haiku według planu, etap po etapie (nie równolegle w jednym katalogu roboczym), a główna sesja sprawdza build, testy i diff. Przy rozbieżności (kolejność, model subagenta) ten tok ma pierwszeństwo przed skillami superpowers.
 
 ## Gdzie czytać dalej
 
@@ -57,13 +59,14 @@ Pliki w `docs/dev/` czytaj na żądanie, gdy zadanie dotyka danego obszaru (to z
 | Galeria obrazów i wideo, miniatury, zakładka Głos (mowa, mikrofon, galeria głosu) | [docs/dev/media-gallery-voice.md](docs/dev/media-gallery-voice.md) |
 | Tłumaczenia PL/EN: `Loc`, `{loc:T}`, reguły, pułapki, co zostaje po polsku | [docs/dev/localization.md](docs/dev/localization.md) |
 | Testy: `TestApp`, atrapy, pułapki | [docs/dev/testing.md](docs/dev/testing.md) |
+| Narzędzia MCP aplikacji (`StudioApi`, `AppControlTools`) i CLI `ImageStudio.exe mcp` | [docs/dev/app-control-coverage.md](docs/dev/app-control-coverage.md) |
+| Magazyny chmurowe: konfiguracja dla użytkownika | [docs/storage-google-drive.md](docs/storage-google-drive.md), [docs/storage-onedrive.md](docs/storage-onedrive.md) |
 | Wydawanie wersji | [docs/RELEASING.md](docs/RELEASING.md) |
-| Starszy opis architektury (może być nieaktualny) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Skille projektu (`.claude/skills/`)
 
 - **`new-main-tab`**: nowa zakładka okna głównego (`IMainTab`) albo okna Ustawień (`ISettingsTab`), z listą kontrolną (filtry modeli, `DataTemplate`, indeksy, testy).
 - **`new-provider`**: nowy dostawca AI albo nowa metoda w kontrakcie `IAiProvider`.
-- **`release`**: wydanie nowej wersji (notatki, numeracja, pipeline, naprawa).  Polecenie `/wydanie [wersja]` prowadzi przez cały proces krok po kroku.
+- **`release`**: wydanie nowej wersji (notatki, numeracja, pipeline, naprawa). Polecenie `/wydanie [wersja]` uruchamia ten skill.
 
 Gdy zadanie pasuje do skilla, użyj go zamiast przepisywać procedurę z pamięci. Nowy obszar z własnymi regułami: dopisz plik do `docs/dev/` i wiersz do tabeli wyżej, a procedury, które się powtarzają, zamieniaj w skill; nie rozbudowuj tego pliku.

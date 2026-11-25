@@ -1,6 +1,6 @@
 # ImageStudio — instrukcje projektu
 
-ImageStudio to aplikacja WPF dla Windows (`net10.0-windows`, x64) do pracy z modelami AI: obrazami, wideo, czatem i mową. Nazwa repozytorium jest historyczna; `NOTES.md` opisuje usunięte proxy Node, nie bieżącą aplikację.
+ImageStudio to aplikacja WPF dla Windows (`net10.0-windows`, x64) do pracy z modelami AI: obrazami, wideo, czatem i mową.
 
 ## Praca w repozytorium
 

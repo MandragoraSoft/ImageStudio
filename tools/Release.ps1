@@ -24,9 +24,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 
-$githubRepo = 'prachwal/uberllm-proxy'
+$githubRepo = 'MandragoraSoft/ImageStudio'
 $notesGitPath = "docs/release-notes/$Version.md"
-$commitTrailer = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
 $expectedAssets = @(
     "ImageStudio-$Version-Setup.exe"
     "ImageStudio-$Version-win-x64-samodzielna.exe"
@@ -90,7 +89,7 @@ try {
     }
 
     $originUrl = Invoke-ReleaseCommand -Command 'git' -Arguments @('remote', 'get-url', 'origin') -Capture
-    if ($originUrl.Trim() -notmatch '(?i)github\.com[:/]prachwal/uberllm-proxy(?:\.git)?$') {
+    if ($originUrl.Trim() -notmatch "(?i)github\.com[:/]$([regex]::Escape($githubRepo))(?:\.git)?$") {
         throw "origin nie wskazuje na https://github.com/$githubRepo (obecnie: $($originUrl.Trim()))."
     }
 
@@ -156,13 +155,11 @@ try {
             throw 'Wykryto lokalny commit z notatkami oraz dodatkowe niezapisane zmiany. Sprawdź je ręcznie przed wydaniem.'
         }
         $headMessage = Invoke-ReleaseCommand -Command 'git' -Arguments @('log', '-1', '--format=%s') -Capture
-        $headBody = Invoke-ReleaseCommand -Command 'git' -Arguments @('log', '-1', '--format=%B') -Capture
         $headFiles = Invoke-ReleaseCommand -Command 'git' -Arguments @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD') -Capture
         $expectedCommitTitles = @("Dodaj notatki wydania $Version", "Aktualizuj notatki wydania $Version")
         if ($headMessage.Trim() -notin $expectedCommitTitles -or
             $headFiles.Trim() -cne $notesGitPath -or
-            -not $notesInHead -or
-            -not $headBody.Contains($commitTrailer)) {
+            -not $notesInHead) {
             throw 'Jedyny lokalny commit przed wydaniem musi zawierać wyłącznie notatki dla tej wersji.'
         }
     }
@@ -223,7 +220,7 @@ try {
     if ($needsCommit) {
         Invoke-ReleaseCommand -Command 'git' -Arguments @('add', '--', $notesGitPath)
         $commitTitle = if ($notesInHead) { "Aktualizuj notatki wydania $Version" } else { "Dodaj notatki wydania $Version" }
-        Invoke-ReleaseCommand -Command 'git' -Arguments @('commit', '-m', $commitTitle, '-m', $commitTrailer)
+        Invoke-ReleaseCommand -Command 'git' -Arguments @('commit', '-m', $commitTitle)
     }
 
     $notesAfterCommit = [IO.File]::ReadAllText($notesPath, [Text.Encoding]::UTF8)

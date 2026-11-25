@@ -11,4 +11,4 @@ applyTo: 'ImageStudio.Tests/**'
 - `ICollectionView` i jego kolekcję zmieniaj na wątku, na którym powstały. Domyślne metody interfejsu dostawcy wywołuj przez `IAiProvider`.
 - `RelayCommand.Execute` nie sprawdza `CanExecute`: zabezpieczenia operacji testuj także przez bezpośrednie wykonanie komendy.
 - W testach lokalnego serwera pobieraj port przez `TestPorts.Free()`. Po czasowej zmianie języka przywróć `Loc` do polskiego.
-- Uruchamiaj najmniejszy zestaw obejmujący zmianę, np. `dotnet test ImageStudio.Tests --filter "FullyQualifiedName~NazwaKlasy"`. Gdy pliki aplikacji są zablokowane, użyj osobnego `-p:BaseOutputPath=<katalog>`.
+- Uruchamiaj najmniejszy zestaw obejmujący zmianę, np. `dotnet test ImageStudio.Tests --filter "FullyQualifiedName~NazwaKlasy"`.

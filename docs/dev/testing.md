@@ -11,7 +11,6 @@ Projekt `ImageStudio.Tests` testuje ViewModele na tym samym kontenerze co aplika
 - Domyślne metody interfejsu (`IAiProvider.ReloadAsync`, metody dźwięku) są widoczne tylko przez typ interfejsu: rzutuj dostawcę na `IAiProvider`.
 - `RelayCommand.Execute` nie sprawdza `CanExecute`: ochronę (np. przed kasowaniem cudzego pliku) testuj wywołaniem `Execute`, nie tylko `CanExecute`.
 - Testy z prawdziwym serwerem lokalnym biorą wolny port przez `TestPorts.Free()` (losowe porty bywały flaky).
-- Gdy aplikacja jest uruchomiona, `bin` jest zablokowany: buduj do osobnego katalogu (`-p:BaseOutputPath=<katalog>`).
 
 ## Testy na żywo (chmury)
 
@@ -19,6 +18,5 @@ Projekt `ImageStudio.Tests` testuje ViewModele na tym samym kontenerze co aplika
 
 ## Testy na żywo (płatne, domyślnie pomijane)
 
-- `CloudLiveTests`: `IMAGESTUDIO_LIVE_CLOUD=1` (konta chmurowe zalogowane w aplikacji).
 - `LiveGuiE2ETests`: `IMAGESTUDIO_LIVE_GUI=1` i `UBERLLM_API_KEY`. Cały przebieg na wątku UI (`WpfHost.RunAsync`) z prawdziwym `MainWindow`, prawdziwym dostawcą i modelem czatu obsługującym narzędzia: obraz załączony w czacie, model woła `imagestudio__edit_image`, wynik w galerii (kolor, proporcje 3:4), okno pokazuje rozmowę i galerię. Opcjonalnie `IMAGESTUDIO_E2E_CHAT` (domyślnie `anthropic/claude-haiku-5.5`), `IMAGESTUDIO_E2E_EDIT` (`venice/grok-imagine-edit`) i `IMAGESTUDIO_E2E_OUT` (katalog na zrzuty okna). Koszt jednego przebiegu to ok. 0,03 USD. Klucz z `SecretStore` można podać bez wypisywania: w PowerShellu odszyfruj `secrets.bin` (`ProtectedData`, `CurrentUser`) do `$env:UBERLLM_API_KEY`.
 - Galeria w oknie jest w zwiniętym `Expanderze`, więc w teście trzeba ją rozwinąć (`IsExpanded = true`), zanim `ListBox` pojawi się w drzewie wizualnym. Kolekcje i `ICollectionView` muszą powstać na wątku UI, więc test z oknem tworzy `TestApp` wewnątrz `WpfHost.RunAsync` i zwalnia go na zewnątrz.

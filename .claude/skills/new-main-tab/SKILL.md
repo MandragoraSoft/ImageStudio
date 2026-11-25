@@ -41,8 +41,6 @@ dotnet build ImageStudio.slnx -m:1
 dotnet test ImageStudio.Tests
 ```
 
-Gdy aplikacja jest uruchomiona, pliki są zablokowane: zbuduj do osobnego katalogu (`-p:BaseOutputPath=<katalog>`), nie zabijaj procesu użytkownika.
-
 # Nowa zakładka okna Ustawień
 
 1. ViewModel implementujący `ISettingsTab` (`Title`, `Order`, `Apply(SettingsResult)`), wzór: `ImageStudio/ViewModels/AudioSettingsTab.cs`.
