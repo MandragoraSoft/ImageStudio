@@ -1027,7 +1027,15 @@ W diffie: `-=` w `Dispose`; `using var storageTab` w `OpenSettingsAsync`; brak w
 
 **Warunek wejścia:** etap 0 = GO (albo GO-Z-ZASTRZEŻENIEM zaakceptowane przez użytkownika); etapy 1-6 wykonane.
 
-**Fakty z etapu 0:** _(sesja główna wpisuje tu: wersja paczki, sygnatury logowania/sesji/2FA/upload/download/delete, konstruktor WebClient/IWebClient, kod błędu 2FA, kod „brak pliku”)._
+**Fakty z etapu 0 (wpisane przez sesję główną; decyzja użytkownika: MegaApiClient + własny IWebClient + przypięcie Newtonsoft.Json):**
+
+- Paczka `MegaApiClient` **1.10.5** (2025-09-10), licencja MIT, tryb „passive maintenance”; kompiluje się w `net10.0-windows` (projekt próbny). Przechodnia zależność `Newtonsoft.Json 10.0.2` ma lukę GHSA-5crp-9r3c-p9vr (NU1903): przypiąć `Newtonsoft.Json 13.0.3` przez `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>` + `<PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />` w `Directory.Packages.props`.
+- Sygnatury (przestrzeń `CG.Web.MegaApiClient`): `new MegaApiClient(IWebClient)`; `Task<LogonSessionToken> LoginAsync(string email, string password, string mfaKey = null)`; `Task LoginAsync(LogonSessionToken)` (wznowienie sesji bez hasła); `Task LogoutAsync()`; `bool IsLoggedIn`; `Task<IEnumerable<INode>> GetNodesAsync()`; `Task<INode> CreateFolderAsync(string, INode parent)`; `Task<INode> UploadAsync(Stream, string name, INode parent, IProgress<double> progress = null, DateTime? modificationDate = null, CancellationToken? ct = null)`; `Task<Stream> DownloadAsync(INode, IProgress<double> progress = null, CancellationToken? ct = null)`; `Task DeleteAsync(INode, bool moveToTrash = true)`. `LogonSessionToken(string sessionId, byte[] masterKey)` z właściwościami `SessionId` i `MasterKey` (to klucz główny konta: tylko do `IStorageSecrets`).
+- 2FA: parametr `mfaKey` to kod; konto z 2FA bez kodu daje `ApiException` z `ApiResultCode.TwoFactorAuthenticationError` (-26), `HashcashRequired` = -27, `RequestFailedRetry` = -3 (publiczne `ApiResultCode`). Czy dokładnie -26 wraca przy logowaniu bez kodu: **zweryfikować w teście na żywo**, adapter mapuje -26 na `MegaMfaRequiredException`.
+- Człony `INode` (`Name`, `Type`/`NodeType`, `ParentId`, `Id`) i `Delete`/„brak węzła” **do potwierdzenia refleksją** w 7b (patrz zlecenie).
+- Transport: `IWebClient` jest publiczny (`int BufferSize {get;set;}`; `string PostRequestJson(Uri, string)`; `string PostRequestJson(Uri, string, string hashcash)`; `string PostRequestRaw(Uri, Stream)`; `Stream PostRequestRawAsStream(Uri, Stream)`; `Stream GetRequestRaw(Uri)`), a `WebClient` NIE przyjmuje `HttpMessageHandler` (statyczny `HttpClient` w środku). Dlatego **własny `HttpClientWebClient : IWebClient`** w projekcie wtyczki = port klasy `WebClient` (MIT, 167 linii; kopia źródła v1.10.5 do porównania: `C:\Users\przem\AppData\Local\Temp\claude\4e332fc39a96dd89\c4164a36-aa4a-41dc-8e2d-14de9855ac82\scratchpad\megasrc\WebClient_HttpClient.cs`, oryginał `https://raw.githubusercontent.com/gpailler/MegaApiClient/v1.10.5/MegaApiClient/WebClient_HttpClient.cs`). Zachowanie do przeniesienia 1:1: POST `application/json` (JSON) i `application/octet-stream` (surowe), nagłówek `X-Hashcash` gdy podany, odpowiedź HTTP 500 z `ReasonPhrase == "Server Too Busy"` zwraca strumień z tekstem `((long)ApiResultCode.RequestFailedRetry)`, odpowiedź HTTP 402 z nagłówkiem `X-Hashcash` zwraca strumień z tekstem `[{(long)ApiResultCode.HashcashRequired}, '{wartość}']` (to właśnie obsługa hashcash z wydania 1.10.5: bez niej logowanie kończy się 402), pozostałe błędy `EnsureSuccessStatusCode`. Zmiany względem oryginału: `HttpClient` z handlera kontekstu (`new HttpClient(handler, disposeHandler: true) { Timeout = timeout }`), `.Result` → `.GetAwaiter().GetResult()` (wywołania i tak idą w `Task.Run` adaptera, a handler aplikacji obsługuje tylko ścieżkę asynchroniczną), bez dyrektyw `#if` per TFM, `ToBytes()` (wewnętrzne w bibliotece) → `Encoding.UTF8.GetBytes`, nagłówek User-Agent jak w oryginale (`GenerateUserAgent`), komentarz z atrybucją MIT na górze pliku. Jeśli którykolwiek potrzebny typ jest `internal` → STOP.
+
+**Podział etapu 7 (decyzja sesji głównej):** **7a** wtyczka bez zależności NuGet (projekt, `IMegaClient`, `MegaStorage`, adapter-atrapa, tłumaczenia, testy na atrapie, rejestracja w csproj/slnx, lista w teście odkrywania); **7b** biblioteka i transport (`Directory.Packages.props` z przypięciem, `HttpClientWebClient` + testy, prawdziwy `MegaApiClientAdapter`, test na żywo). Zlecenia 7a i 7b poniżej zastępują zlecenie „całość”.
 
 **Pliki:**
 
@@ -1215,7 +1223,60 @@ public sealed class MegaStorage : CloudMirrorStorage
 
 **STOP:** etap 0 ≠ GO bez decyzji użytkownika; API biblioteki inne niż w „Faktach z etapu 0”; brak `MegaApiClient.dll` w wyjściu; potrzeba zmiany kodu aplikacji poza listą; nie da się podpiąć handlera z kontekstu.
 
-### ZLECENIE DLA HAIKU (etap 7)
+### ZLECENIE DLA HAIKU (etap 7a)
+
+```
+Wykonaj CZĘŚĆ 7a ETAPU 7 z c:\Users\przem\source\ImageStudio\docs\superpowers\plans\2026-11-25-modul-chmury-mega.md
+(przeczytaj "Kontrakty", "Przepływ logowania", "Reguły dla każdego wykonawcy" i cały "Etap 7" razem z "Fakty z etapu 0" i "Podział etapu 7").
+ZAKRES 7a (tylko to): projekt ImageStudio.Storage.Mega (csproj z jedyną referencją do Storage.Cloud, BEZ PackageReference MegaApiClient);
+IMegaClient.cs i MegaStorage.cs przepisane z planu (dopasuj modyfikatory dostępu członków do faktycznych członków CloudMirrorStorage: SignedIn,
+AccessTokenAsync, SignInAsync, SignOutAsync, AccountLabel, AuthSettings, SignInLabelKey, SignInWorkingKey; jeśli nazwa lub sygnatura się różni, użyj faktycznej z kodu);
+MegaApiClientAdapter.cs jako ATRAPA: `internal sealed class MegaApiClientAdapter : IMegaClient` z konstruktorem (HttpMessageHandler handler, TimeSpan timeout), który nic nie robi i nie rzuca,
+a wszystkie metody rzucają NotSupportedException("Adapter MEGA powstaje w etapie 7b");
+wpis w ImageStudio.slnx (folder /Storage/), ProjectReference w ImageStudio/ImageStudio.csproj (Private="$(PluginsInBundle)") i w ImageStudio.Tests/ImageStudio.Tests.csproj (bez Private);
+klucze tłumaczeń z tabeli planu do obu słowników, potem `pwsh tools/Check-Translations.ps1 -Fix`;
+nowy ImageStudio.Tests/MegaStorageTests.cs z 9 testami z planu (atrapa FakeMegaClient, FakeInteraction, MemorySecrets jak w CloudMirrorBaseTests: są internal);
+w ImageStudio.Tests/StoragePluginDiscoveryTests.cs zmień oczekiwaną listę Id na ["local","googledrive","mega","onedrive"].
+NIE rób w 7a: Directory.Packages.props, CloudLiveTests.cs, HttpClientWebClient, żadnej zależności NuGet. NIE zmieniaj ServiceCollectionExtensions, UserDataCleanup, MediaStorageHost, StorageSettingsTab ani niczego w ImageStudio/Composition|Configuration|Services|ViewModels:
+wtyczka ma się odkryć sama; gdyby to było konieczne, STOP i zgłoś.
+Hasło nie może trafić do sekretów, logów ani komunikatów (test Sign_in_with_email_and_password_stores_only_the_email_and_session to sprawdza).
+Weryfikacja: `dotnet build ImageStudio.slnx -m:1`; `Test-Path ImageStudio/bin/Debug/net10.0-windows/storage/ImageStudio.Storage.Mega.dll`;
+`dotnet test ImageStudio.Tests --filter "FullyQualifiedName~MegaStorageTests|FullyQualifiedName~StoragePluginDiscoveryTests|FullyQualifiedName~CloudMirrorBaseTests|FullyQualifiedName~CloudStorageTests"`;
+`dotnet test ImageStudio.Tests`; `pwsh tools/Check-Translations.ps1 -Strict`; `git diff --stat` (brak zmian w ImageStudio/Composition|Configuration|Services|ViewModels).
+Jeśli aplikacja ImageStudio jest uruchomiona i pliki są zablokowane, buduj i testuj z `-p:BaseOutputPath=C:\Temp\is-build\` i nie zabijaj procesu.
+Nie commituj. Raport: pliki, wyniki komend (liczby testów), odstępstwa.
+```
+
+### ZLECENIE DLA HAIKU (etap 7b)
+
+```
+Wykonaj CZĘŚĆ 7b ETAPU 7 z c:\Users\przem\source\ImageStudio\docs\superpowers\plans\2026-11-25-modul-chmury-mega.md
+(przeczytaj "Reguły dla każdego wykonawcy", cały "Etap 7" z "Fakty z etapu 0"; część 7a jest zrobiona i zacommitowana).
+ZAKRES 7b (tylko to):
+1. Directory.Packages.props: <PackageVersion Include="MegaApiClient" Version="1.10.5" />, <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" /> oraz <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+   (przypięcie przechodniej zależności bez luki NU1903); w ImageStudio.Storage.Mega.csproj dodaj <PackageReference Include="MegaApiClient" /> (bez Version).
+2. Zanim napiszesz adapter, wypisz refleksją (mały projekt/konsola w katalogu scratchpad, NIE w repo) publiczne człony: CG.Web.MegaApiClient.INode, NodeType, MegaApiClient.LogonSessionToken, ApiException, ApiResultCode, Options
+   oraz widoczność typów potrzebnych w porcie transportu (IWebClient, ApiResultCode: muszą być public). Wynik w raporcie. Jeśli IWebClient albo ApiResultCode jest internal albo sygnatury różnią się od "Faktów z etapu 0": STOP.
+3. Nowy ImageStudio.Storage.Mega/HttpClientWebClient.cs: `public sealed class HttpClientWebClient : IWebClient`, port klasy WebClient wg akapitu "Transport" w "Faktach z etapu 0"
+   (kopia źródła jest w ścieżce podanej w planie; to MIT: zostaw komentarz atrybucji na górze pliku). Konstruktor (HttpMessageHandler handler, TimeSpan timeout).
+4. Prawdziwy MegaApiClientAdapter.cs (zastąp atrapę) wg punktów planu: klient `new MegaApiClient(new HttpClientWebClient(handler, timeout))`, SemaphoreSlim wokół wywołań, sesja jako JSON własnego DTO (SessionId, MasterKey),
+   wznowienie `LoginAsync(LogonSessionToken)` gdy sesja się zmienia, folder aplikacji tworzony przy pierwszym użyciu (z blokadą), Upload zastępuje plik o tej nazwie, Download zwraca null gdy brak, Delete trwale (moveToTrash: false) i bez błędu, gdy pliku brak,
+   ApiException z ApiResultCode.TwoFactorAuthenticationError -> MegaMfaRequiredException; hasło nie jest polem, nie trafia do komunikatów ani logów.
+5. Nowy ImageStudio.Tests/HttpClientWebClientTests.cs (bez sieci, atrapa HttpMessageHandler): Post_json_sends_content_type_and_hashcash_header; Payment_required_with_hashcash_header_is_returned_as_the_api_error_array;
+   Server_too_busy_is_returned_as_the_retry_code; Requests_go_through_the_supplied_handler.
+6. W ImageStudio.Tests/CloudLiveTests.cs dopisz tylko test Mega z planu (LiveCloudFact); nie zmieniaj reszty pliku.
+NIE zmieniaj niczego w ImageStudio/Composition|Configuration|Services|ViewModels. Hasła nie loguj.
+Weryfikacja: `dotnet build ImageStudio.slnx -m:1` (w logu NIE ma być NU1903); `dotnet list ImageStudio.Storage.Mega package --include-transitive --vulnerable`;
+`Test-Path ImageStudio/bin/Debug/net10.0-windows/MegaApiClient.dll`; `(Get-Item ImageStudio/bin/Debug/net10.0-windows/Newtonsoft.Json.dll).VersionInfo.FileVersion` (13.x);
+`Test-Path ImageStudio/bin/Debug/net10.0-windows/storage/ImageStudio.Storage.Mega.dll`;
+`dotnet test ImageStudio.Tests --filter "FullyQualifiedName~HttpClientWebClientTests|FullyQualifiedName~MegaStorageTests|FullyQualifiedName~StoragePluginDiscoveryTests"`; `dotnet test ImageStudio.Tests`;
+`pwsh tools/Check-Translations.ps1 -Strict`; `dotnet publish ImageStudio -p:PublishProfile=Portable -o C:\Temp\is-pub` (ścieżkę w bashu podaj w cudzysłowie lub użyj PowerShell).
+Jeśli aplikacja ImageStudio jest uruchomiona i pliki są zablokowane, buduj i testuj z `-p:BaseOutputPath=C:\Temp\is-build\` i nie zabijaj procesu.
+Stań przy warunku STOP (typ internal, brak MegaApiClient.dll w wyjściu, NU1903 po przypięciu, potrzeba zmiany kodu aplikacji). Nie commituj.
+Raport: wynik refleksji (człony INode/NodeType/Options), pliki, wyniki komend, odstępstwa, niepewności co do API.
+```
+
+### (zastąpione podziałem 7a/7b, nie używać) ZLECENIE DLA HAIKU (etap 7, całość)
 
 ```
 Wykonaj ETAP 7 z c:\Users\przem\source\ImageStudio\docs\superpowers\plans\2026-11-25-modul-chmury-mega.md
