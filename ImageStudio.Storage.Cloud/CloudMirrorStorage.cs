@@ -34,6 +34,11 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     protected IStorageSecrets Secrets { get; }
     public LocalMediaStorage Cache { get; } = new();
 
+    // Zmiana stanu (Status, kolejka) dla otwartego okna Ustawień; wołane poza blokadami
+    public event EventHandler? StatusChanged;
+    protected void OnStatusChanged() => StatusChanged?.Invoke(this, EventArgs.Empty);
+    private void SetError(string? message) { _lastError = message; OnStatusChanged(); }
+
     // Zamiana w testach: nie otwiera prawdziwej przeglądarki (czyta ją logowanie OAuth w OAuthCloudStorage)
     public Action<string>? BrowserOverride { get; set; }
 
@@ -85,12 +90,19 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
     public async Task RunActionAsync(string key, IReadOnlyDictionary<string, string> inputs, IStorageInteraction interaction,
                                      CancellationToken ct = default)
     {
-        _lastError = null;
-        if (key == "signout") await SignOutAsync(ct);
-        else if (key == "signin")
+        SetError(null);
+        try
         {
-            await SignInAsync(inputs, interaction, ct);
-            Resume();
+            if (key == "signout") await SignOutAsync(ct);
+            else if (key == "signin")
+            {
+                await SignInAsync(inputs, interaction, ct);
+                Resume();
+            }
+        }
+        finally
+        {
+            OnStatusChanged();
         }
     }
 
@@ -137,15 +149,19 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
             queue.Add(op);
             SaveQueue(queue);
         }
+        OnStatusChanged();
     }
 
     private void Dequeue(PendingOperation op)
     {
+        bool removed;
         lock (_queueGate)
         {
             var queue = LoadQueue();
-            if (queue.Remove(op)) SaveQueue(queue);
+            removed = queue.Remove(op);
+            if (removed) SaveQueue(queue);
         }
+        if (removed) OnStatusChanged();
     }
 
     private bool IsQueued(PendingOperation op) { lock (_queueGate) return LoadQueue().Contains(op); }
@@ -205,16 +221,16 @@ public abstract class CloudMirrorStorage : IMediaStoragePlugin
                 catch (UserCanceledRequestException ex)
                 {
                     // Anulowanie dotyczy jednego HTTP, nie zapisanego lokalnie zadania synchronizacji.
-                    _lastError = ex.Message;
+                    SetError(ex.Message);
                     await Task.Delay(delay);
                     delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 30_000));
                 }
             }
-            _lastError = null;
+            SetError(null);
         }
         catch (Exception ex)
         {
-            _lastError = ex.Message;
+            SetError(ex.Message);
         }
     }
 

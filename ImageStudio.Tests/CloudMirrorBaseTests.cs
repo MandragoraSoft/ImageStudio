@@ -17,7 +17,7 @@ public sealed class CloudMirrorBaseTests : IDisposable
         try { Directory.Delete(_dir, true); } catch (IOException) { }
     }
 
-    private sealed class MemorySecrets : IStorageSecrets
+    internal sealed class MemorySecrets : IStorageSecrets
     {
         public Dictionary<string, string> Values { get; } = [];
         public string? Load(string name) => Values.GetValueOrDefault(name);
@@ -30,7 +30,7 @@ public sealed class CloudMirrorBaseTests : IDisposable
     }
 
     // Wtyczka z logowaniem poświadczeniami (jak MEGA): sesją jest e-mail zapisany w sekrecie
-    private sealed class TestMirror(IStorageSecrets secrets) : CloudMirrorStorage(secrets)
+    internal sealed class TestMirror(IStorageSecrets secrets) : CloudMirrorStorage(secrets)
     {
         private const string SessionName = "storage-test";
 

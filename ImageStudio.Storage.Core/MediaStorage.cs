@@ -109,6 +109,9 @@ public interface IMediaStoragePlugin : IMediaStorage
 
     // Wznawia zaległe operacje w tle (np. wysyłki z kolejki); wołane przy starcie i po logowaniu
     void Resume() { }
+
+    // Zmiana Status (logowanie, kolejka, błąd wysyłki w tle); może przyjść z wątku tła
+    event EventHandler? StatusChanged { add { } remove { } }
 }
 
 // Wszystko, czego wtyczka potrzebuje od aplikacji, bez znajomości DI. Wtyczkę odkrytą przez refleksję aplikacja tworzy

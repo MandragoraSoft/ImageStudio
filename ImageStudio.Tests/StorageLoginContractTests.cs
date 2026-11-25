@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Media;
 using ImageStudio.Localization;
 using ImageStudio.Services;
@@ -32,6 +33,14 @@ public sealed class StorageLoginContractTests
         public string? LastCode { get; private set; }
         public bool Fail { get; set; }
         public bool AskForCode { get; set; }
+
+        // Liczba aktywnych subskrybentów zdarzenia Status (dodanie +1, zdjęcie -1)
+        public int Subscribers { get; private set; }
+        public event EventHandler? StatusChanged
+        {
+            add => Subscribers++;
+            remove => Subscribers--;
+        }
 
         public void Configure(IReadOnlyDictionary<string, string> values) => LastConfigure = values;
 
@@ -195,6 +204,76 @@ public sealed class StorageLoginContractTests
         await asInterface.RunActionAsync("signin", new Dictionary<string, string> { ["email"] = "x" }, StorageInteraction.None);
 
         Assert.Equal("signin", plugin.CalledKey);
+    }
+
+    [Fact]
+    public async Task Open_tab_shows_a_background_upload_error_without_reopening()
+    {
+        using var app = TestApp.Create();
+        var dir = Path.Combine(Path.GetTempPath(), "is-login-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var storage = new CloudMirrorBaseTests.TestMirror(new CloudMirrorBaseTests.MemorySecrets());
+            foreach (var kind in Enum.GetValues<MediaKind>()) storage.Cache.Roots[kind] = Path.Combine(dir, kind.ToString());
+            await storage.RunActionAsync("signin", new Dictionary<string, string> { ["email"] = "ania@example.com" }, StorageInteraction.None);
+            storage.FailUploads = 1;
+            var option = await CreateOptionAsync(storage);
+
+            await storage.WriteAsync(MediaKind.Image, "c.png", new byte[] { 5 });
+            await storage.FlushAsync();
+
+            await WaitUntilAsync(() => option.ErrorText != "");
+            Assert.Contains("Serwer niedostępny.", option.ErrorText);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task Sign_in_elsewhere_refreshes_the_status_and_buttons()
+    {
+        using var app = TestApp.Create();
+        var storage = new CloudMirrorBaseTests.TestMirror(new CloudMirrorBaseTests.MemorySecrets());
+        var option = await CreateOptionAsync(storage);
+        Assert.True(option.Actions[0].Command.CanExecute(null));
+
+        await storage.RunActionAsync("signin", new Dictionary<string, string> { ["email"] = "ania@example.com" }, StorageInteraction.None);
+
+        Assert.Equal(Loc.T("storage.status.signedInAs", "ania@example.com"), option.StatusText);
+        Assert.False(option.Actions[0].Command.CanExecute(null));
+    }
+
+    [Fact]
+    public void Disposed_tab_stops_listening_to_plugins()
+    {
+        using var app = TestApp.Create();
+        var plugin = new FakeLoginPlugin();
+        var tab = new StorageSettingsTab(Current(), new MediaStorageHost([plugin]));
+        Assert.Equal(1, plugin.Subscribers);
+
+        tab.Dispose();
+
+        Assert.Equal(0, plugin.Subscribers);
+    }
+
+    [Fact]
+    public async Task Settings_dialog_releases_the_storage_tab()
+    {
+        var plugin = new FakeLoginPlugin();
+        using var app = TestApp.Create(services => services.AddSingleton<IMediaStoragePlugin>(plugin));
+        var subscribedWhileOpen = -1;
+        app.Get<FakeDialogs>().OnShowSettings = (_, _) =>
+        {
+            subscribedWhileOpen = plugin.Subscribers;
+            return null;
+        };
+
+        await app.Vm.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, subscribedWhileOpen);
+        Assert.Equal(0, plugin.Subscribers);
     }
 
     [Fact]

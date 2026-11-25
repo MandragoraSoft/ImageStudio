@@ -31,7 +31,7 @@ public sealed class StorageActionItem(string label, IAsyncRelayCommand command)
 
 // Wtyczka magazynu z polami do edycji (pozycja listy wyboru). Przyciski działają jak przy logowaniu ChatGPT:
 // niedostępne w złym stanie (Zaloguj po zalogowaniu, Wyloguj bez sesji) i w trakcie logowania, z przyciskiem Anuluj
-public sealed partial class StorageOption : ObservableObject, IStorageInteraction
+public sealed partial class StorageOption : ObservableObject, IStorageInteraction, IDisposable
 {
     private readonly IMediaStoragePlugin _plugin;
     private readonly SynchronizationContext? _ui = SynchronizationContext.Current;
@@ -50,7 +50,13 @@ public sealed partial class StorageOption : ObservableObject, IStorageInteractio
         CancelCommand = new RelayCommand(() => _cts?.Cancel());
         SubmitPromptCommand = new RelayCommand(() => _prompt?.TrySetResult(PromptValue.Trim()));
         Refresh();
+        _plugin.StatusChanged += OnPluginStatusChanged;
     }
+
+    public void Dispose() => _plugin.StatusChanged -= OnPluginStatusChanged;
+
+    // Wysyłka w tle zmienia stan wtyczki: odświeżenie na wątku okna; w trakcie akcji stan ustawia RunAsync
+    private void OnPluginStatusChanged(object? sender, EventArgs e) => OnUi(() => { if (!IsBusy) Refresh(); });
 
     public string Id { get; }
     public string Name { get; }
@@ -164,7 +170,7 @@ public sealed partial class StorageOption : ObservableObject, IStorageInteractio
 }
 
 // Zakładka "Zapis": wtyczka magazynu wyników (lista jak przy dostawcy AI) i jej ustawienia, np. foldery zapisu plików
-public sealed partial class StorageSettingsTab : ObservableObject, ISettingsTab
+public sealed partial class StorageSettingsTab : ObservableObject, ISettingsTab, IDisposable
 {
     public string Title => Loc.T("settings.tab.storage");
     public int Order => 7;
@@ -185,4 +191,9 @@ public sealed partial class StorageSettingsTab : ObservableObject, ISettingsTab
         StorageId = Selected?.Id ?? result.StorageId,
         StorageConfig = Options.ToDictionary(o => o.Id, o => o.Fields.Where(f => !f.IsTransient).ToDictionary(f => f.Key, f => f.Value)),
     };
+
+    public void Dispose()
+    {
+        foreach (var option in Options) option.Dispose();
+    }
 }

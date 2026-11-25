@@ -52,9 +52,10 @@ public sealed partial class MainViewModel
                                          _storage.Active.Id, null, Limits.MaxTools, Limits.ListLimit, Limits.MaxListLimit,
                                          _state.GalleryArchiveFolder, _state.PromptChatHistory, _settings.HideToTrayOnClose);
         Voice.RefreshDevices();
+        using var storageTab = new StorageSettingsTab(current, _storage);
         var result = _dialogs.ShowSettings(current, [new AppSettingsTab(current, ClearSelectedUserDataAsync),
                                                      new AudioSettingsTab(current, Voice.Microphones.ToList(), Voice.Speakers.ToList()),
-                                                     new StorageSettingsTab(current, _storage),
+                                                     storageTab,
                                                      new McpSettingsTab(current),
                                                      new ProviderSettingsTab(current, LoadTextModelsAsync, SignInToChatGptAsync)]);
         if (result is null || _resetting) return;
