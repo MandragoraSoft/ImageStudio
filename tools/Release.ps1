@@ -259,7 +259,8 @@ try {
         $run = $runs |
             Where-Object {
                 $_.headSha -ceq $commitSha -and
-                [DateTimeOffset]::Parse($_.createdAt).UtcDateTime -ge $dispatchTime.UtcDateTime.AddSeconds(-5)
+                # ConvertFrom-Json w PowerShell 7 zwraca już DateTime; Parse z bieżącą kulturą wywracał się na polskim systemie
+                ([DateTimeOffset]$_.createdAt).UtcDateTime -ge $dispatchTime.UtcDateTime.AddSeconds(-5)
             } |
             Sort-Object -Property createdAt -Descending |
             Select-Object -First 1
