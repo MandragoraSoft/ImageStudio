@@ -3,6 +3,7 @@ using System.Text;
 using ImageStudio.Storage;
 using ImageStudio.Storage.Cloud;
 using ImageStudio.Storage.GoogleDrive;
+using ImageStudio.Storage.Mega;
 using ImageStudio.Storage.OneDrive;
 
 namespace ImageStudio.Tests;
@@ -128,4 +129,7 @@ public sealed class CloudLiveTests : IDisposable
 
     [LiveCloudFact]
     public Task GoogleDrive_create_read_update_delete_with_sample_files() => CrudAsync(new GoogleDriveStorage(new UserSecrets()));
+
+    [LiveCloudFact]
+    public Task Mega_create_read_update_delete_with_sample_files() => CrudAsync(new MegaStorage(new StoragePluginContext(new UserSecrets(), () => new HttpClientHandler(), TimeSpan.FromMinutes(10))));
 }

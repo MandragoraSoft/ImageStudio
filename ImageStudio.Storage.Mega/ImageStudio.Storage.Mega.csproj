@@ -4,4 +4,8 @@
     <ProjectReference Include="..\ImageStudio.Storage.Cloud\ImageStudio.Storage.Cloud.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MegaApiClient" />
+  </ItemGroup>
+
 </Project>
