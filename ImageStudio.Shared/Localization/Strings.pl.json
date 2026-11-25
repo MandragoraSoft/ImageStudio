@@ -525,6 +525,7 @@
   "storage.note.saved": "Zapisany w sekretach aplikacji (szyfrowany DPAPI).",
   "storage.onedrive.help": "Pliki trafiają do folderu Aplikacje\\<nazwa aplikacji> na OneDrive (kopia lokalna zostaje). Zarejestruj aplikację w Microsoft Entra (Azure): typ \"Klient publiczny / aplikacja komputerowa\", adres przekierowania http://localhost, uprawnienie Files.ReadWrite.AppFolder. Wklej jej Client ID i zaloguj się. Gdy pole Client ID (lub sekretu) jest puste, użyta zostanie zmienna z pliku .env: AZURE_APP_CLIENT_ID. Nowe pliki są wysyłane w tle; błąd wysyłki zobaczysz tu po ponownym otwarciu Ustawień.",
   "storage.plugin": "Miejsce zapisu",
+  "storage.prompt.submit": "Potwierdź",
   "storage.status.error": "Błąd: {0}",
   "storage.status.signedIn": "Zalogowano.",
   "storage.status.signedInAs": "Zalogowano jako {0}.",

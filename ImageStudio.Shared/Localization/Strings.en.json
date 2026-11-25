@@ -525,6 +525,7 @@
   "storage.note.saved": "Saved in the app secrets (DPAPI encrypted).",
   "storage.onedrive.help": "Files go to the Apps\\<app name> folder on OneDrive (the local copy stays). Register an app in Microsoft Entra (Azure): \"Public client / desktop app\" type, redirect URI http://localhost, permission Files.ReadWrite.AppFolder. Paste its Client ID and sign in. When the Client ID (or secret) field is empty, the variable from the .env file is used: AZURE_APP_CLIENT_ID. New files are uploaded in the background; an upload error shows here after reopening Settings.",
   "storage.plugin": "Storage location",
+  "storage.prompt.submit": "Confirm",
   "storage.status.error": "Error: {0}",
   "storage.status.signedIn": "Signed in.",
   "storage.status.signedInAs": "Signed in as {0}.",

@@ -58,6 +58,19 @@
             <Button Content="{loc:T storage.cancel}" Command="{Binding Selected.CancelCommand}" Margin="0,8,0,0" Padding="12,4"
                     HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}"
                     Visibility="{Binding Selected.IsBusy, Converter={StaticResource BoolToVisible}}"/>
+            <StackPanel Margin="0,8,0,0" Visibility="{Binding Selected.IsPrompting, Converter={StaticResource BoolToVisible}}">
+                <TextBlock Text="{Binding Selected.PromptMessage}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Selected.PromptLabel}" Style="{StaticResource SectionHeader}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding Selected.PromptValue, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Column="1" Content="{loc:T storage.prompt.submit}" Command="{Binding Selected.SubmitPromptCommand}"
+                            Margin="6,0,0,0" Padding="12,2" Style="{StaticResource SecondaryButton}"/>
+                </Grid>
+            </StackPanel>
             <TextBlock Text="{Binding Selected.StatusText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
             <TextBlock Text="{Binding Selected.ErrorText}" TextWrapping="Wrap" Foreground="OrangeRed" Margin="0,6,0,0"/>
             <TextBlock Text="{Binding Selected.HelpText}" Style="{StaticResource MutedTextBlock}" TextWrapping="Wrap" Margin="0,8,0,0"/>

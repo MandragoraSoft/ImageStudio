@@ -20,16 +20,49 @@ public interface IMediaStorage
     Task<string> GetLocalPathAsync(string location, CancellationToken ct = default);
 }
 
+// Rodzaj pola w zakładce Zapis: Text i Email to zwykłe pole tekstowe, Folder dodaje przycisk wyboru folderu,
+// Password ma ukryte znaki, Code to krótki kod jednorazowy (np. 2FA)
+public enum StorageFieldKind { Text, Folder, Email, Password, Code }
+
 // Jedno pole konfiguracji wtyczki. LabelKey to klucz tłumaczenia (brak klucza = wyświetlony tekst klucza);
 // IsFolder dodaje do pola przycisk wyboru folderu; IsSecret: wartość trafia do IStorageSecrets, nigdy do pliku
 // ustawień (wtyczka zapisuje ją w Configure); Masked: pole z ukrytymi znakami (hasło), gdy fałsz, pole jest jawne
 // (np. Client ID, który chcesz zobaczyć, ale nie trzymać w zwykłym pliku)
 // Note: krótka informacja pod polem (np. skąd pochodzi wartość)
+// Kind: rodzaj pola (null = wynika ze starych flag IsFolder/Masked); Transient: wartość tylko dla akcji (np. hasło do
+// logowania): nie trafia do Configure, do pliku ustawień ani do sekretów, okno czyści ją po udanej akcji
 public sealed record StorageSetting(string Key, string LabelKey, string Value, bool IsFolder = false, bool IsSecret = false,
-                                    bool Masked = false, StorageStatus? Note = null);
+                                    bool Masked = false, StorageStatus? Note = null,
+                                    StorageFieldKind? Kind = null, bool Transient = false)
+{
+    public StorageFieldKind EffectiveKind => Kind ?? (IsFolder ? StorageFieldKind.Folder : Masked ? StorageFieldKind.Password : StorageFieldKind.Text);
+}
 
-// Przycisk w zakładce wtyczki (np. "Zaloguj"); wywołanie to RunActionAsync(Key)
-public sealed record StorageAction(string Key, string LabelKey);
+// Przycisk w zakładce wtyczki (np. "Zaloguj"); wywołanie to RunActionAsync(Key); WorkingKey: klucz tekstu pokazywanego
+// w trakcie akcji (null = storage.status.working)
+public sealed record StorageAction(string Key, string LabelKey, string? WorkingKey = null);
+
+// Prośba wtyczki o dodatkową wartość w trakcie akcji (np. kod 2FA); Message: opis nad polem
+public sealed record StoragePrompt(string Key, string LabelKey, StorageFieldKind Kind = StorageFieldKind.Code, StorageStatus? Message = null);
+
+// Rozmowa z użytkownikiem w trakcie akcji (zakładka Zapis pokazuje pole i przycisk Potwierdź)
+public interface IStorageInteraction
+{
+    // Wartość wpisana przez użytkownika; anulowanie (ct albo przycisk Anuluj) kończy się OperationCanceledException
+    Task<string?> AskAsync(StoragePrompt prompt, CancellationToken ct);
+}
+
+// Brak rozmówcy: akcja wołana bez okna (stara ścieżka RunActionAsync(key))
+public static class StorageInteraction
+{
+    public static IStorageInteraction None { get; } = new NoInteraction();
+
+    private sealed class NoInteraction : IStorageInteraction
+    {
+        public Task<string?> AskAsync(StoragePrompt prompt, CancellationToken ct) =>
+            throw new InvalidOperationException("Ta operacja wymaga danych od użytkownika (Ustawienia, zakładka Zapis).");
+    }
+}
 
 // Stan do pokazania pod polami: klucz tłumaczenia z opcjonalnym parametrem {0}
 public sealed record StorageStatus(string Key, string? Detail = null);
@@ -62,6 +95,10 @@ public interface IMediaStoragePlugin : IMediaStorage
     // Przyciski (np. logowanie), ich obsługa (poprzedzona Configure z bieżącymi wartościami pól), stan i opis pod polami
     IReadOnlyList<StorageAction> Actions => [];
     Task RunActionAsync(string key, CancellationToken ct = default) => Task.CompletedTask;
+
+    // Akcja z wartościami pól nietrwałych (Transient) i możliwością zapytania użytkownika; domyślnie stara ścieżka
+    Task RunActionAsync(string key, IReadOnlyDictionary<string, string> inputs, IStorageInteraction interaction,
+                        CancellationToken ct = default) => RunActionAsync(key, ct);
 
     // Czy przycisk jest teraz dostępny (np. "Zaloguj" tylko dla niezalogowanego)
     bool CanRun(string key) => true;

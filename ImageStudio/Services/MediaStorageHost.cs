@@ -26,11 +26,11 @@ public sealed class MediaStorageHost : IMediaStorage
         Active = Plugins.FirstOrDefault(p => p.Id == activeId) ?? Plugins[0];
     }
 
-    // Konfiguracja do pliku stanu: bez pól haseł (te zapisuje wtyczka w sekretach)
+    // Konfiguracja do pliku stanu: bez pól haseł i pól nietrwałych (te zapisuje wtyczka w sekretach albo wcale)
     public Dictionary<string, Dictionary<string, string>> WithoutSecrets(IReadOnlyDictionary<string, Dictionary<string, string>> config) =>
         config.ToDictionary(p => p.Key, p =>
         {
-            var secret = Plugins.FirstOrDefault(x => x.Id == p.Key)?.Settings.Where(s => s.IsSecret).Select(s => s.Key).ToHashSet() ?? [];
+            var secret = Plugins.FirstOrDefault(x => x.Id == p.Key)?.Settings.Where(s => s.IsSecret || s.Transient).Select(s => s.Key).ToHashSet() ?? [];
             return p.Value.Where(v => !secret.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value);
         });
 
