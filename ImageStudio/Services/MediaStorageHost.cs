@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ImageStudio.Configuration;
 using ImageStudio.Storage;
 
@@ -7,9 +8,12 @@ namespace ImageStudio.Services;
 // (UserState.StorageId, StorageConfig) zmienia zakładka Zapis w Ustawieniach. Zapis stanu na dysk robi MainViewModel
 public sealed class MediaStorageHost : IMediaStorage
 {
+    // Id trafia do nazw sekretów i plików (storage-<id>): tylko małe litery i cyfry; duplikat traci pierwszeństwo
+    private static readonly Regex ValidId = new("^[a-z0-9]+$", RegexOptions.CultureInvariant);
+
     public MediaStorageHost(IEnumerable<IMediaStoragePlugin> plugins)
     {
-        Plugins = plugins.ToList();
+        Plugins = plugins.Where(p => ValidId.IsMatch(p.Id)).DistinctBy(p => p.Id).ToList();
         Active = Plugins[0]; // pierwsza zarejestrowana wtyczka jest domyślna
     }
 

@@ -228,7 +228,7 @@ public sealed class OutgoingRequestIntegrationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => models);
 
         started = Signal();
-        var cloud = container.GetRequiredService<OneDriveStorage>();
+        var cloud = container.GetServices<IMediaStoragePlugin>().OfType<OneDriveStorage>().Single();
         var read = cloud.ReadRemoteAsync("a.png");
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(registry.Cancel(Assert.Single(registry.ActiveRequests).Id));

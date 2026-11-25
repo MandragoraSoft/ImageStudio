@@ -12,8 +12,8 @@ public sealed class OneDriveStorage : OAuthCloudStorage
     public OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
         : base(secrets, handler, environment) { }
 
-    public OneDriveStorage(IStorageSecrets secrets, HttpMessageHandler handler, TimeSpan timeout)
-        : base(secrets, handler, null, timeout) { }
+    public OneDriveStorage(StoragePluginContext context)
+        : base(context.Secrets, context.CreateHttpHandler(), null, context.HttpTimeout) { }
     public const string GraphRoot = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/";
 
     public override string Id => "onedrive";

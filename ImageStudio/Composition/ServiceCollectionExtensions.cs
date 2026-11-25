@@ -1,9 +1,7 @@
 using ImageStudio.Configuration;
 using ImageStudio.Services;
 using ImageStudio.Storage;
-using ImageStudio.Storage.GoogleDrive;
 using ImageStudio.Storage.Local;
-using ImageStudio.Storage.OneDrive;
 using ImageStudio.Tabs.Chat;
 using ImageStudio.Tabs.Edit;
 using ImageStudio.Tabs.Generate;
@@ -35,10 +33,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<LocalMediaStorage>();
         services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<LocalMediaStorage>());
         services.AddSingleton<IStorageSecrets, StorageSecrets>();
-        services.AddSingleton(sp => new OneDriveStorage(sp.GetRequiredService<IStorageSecrets>(), sp.GetRequiredService<OutgoingRequestRegistry>().CreateHandler(), TimeSpan.FromMinutes(10)));
-        services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<OneDriveStorage>());
-        services.AddSingleton(sp => new GoogleDriveStorage(sp.GetRequiredService<IStorageSecrets>(), sp.GetRequiredService<OutgoingRequestRegistry>().CreateHandler(), TimeSpan.FromMinutes(10)));
-        services.AddSingleton<IMediaStoragePlugin>(sp => sp.GetRequiredService<GoogleDriveStorage>());
+        services.AddSingleton(sp => new StoragePluginContext(sp.GetRequiredService<IStorageSecrets>(),
+            () => sp.GetRequiredService<OutgoingRequestRegistry>().CreateHandler(), TimeSpan.FromMinutes(10)));
+        // Wtyczki chmurowe odkrywane z bibliotek ImageStudio.Storage.* (nowy moduł = projekt + ProjectReference)
+        foreach (var type in StoragePluginDiscovery.FindTypes(typeof(ServiceCollectionExtensions).Assembly))
+            services.AddSingleton(typeof(IMediaStoragePlugin), sp => StoragePluginDiscovery.Create(type, sp.GetRequiredService<StoragePluginContext>()));
         services.AddSingleton<MediaStorageHost>();
         services.TryAddSingleton(new McpOptions());
 

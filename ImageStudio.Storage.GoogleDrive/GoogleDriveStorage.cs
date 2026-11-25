@@ -14,8 +14,8 @@ public sealed class GoogleDriveStorage : OAuthCloudStorage
     public GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandler? handler = null, Func<string, string?>? environment = null)
         : base(secrets, handler, environment) { }
 
-    public GoogleDriveStorage(IStorageSecrets secrets, HttpMessageHandler handler, TimeSpan timeout)
-        : base(secrets, handler, null, timeout) { }
+    public GoogleDriveStorage(StoragePluginContext context)
+        : base(context.Secrets, context.CreateHttpHandler(), null, context.HttpTimeout) { }
     public const string FolderName = "ImageStudio";
     private const string Api = "https://www.googleapis.com/drive/v3/files";
 

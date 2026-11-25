@@ -98,6 +98,18 @@
     </ItemGroup>
   </Target>
 
+  <!-- Lista bibliotek magazynu (te same co storage\) jako [assembly: AssemblyMetadata("ImageStudio.StoragePlugin", nazwa)]:
+       z niej StoragePluginDiscovery odkrywa wtyczki. GetReferencedAssemblies() ich nie zna (kompilator pomija
+       biblioteki, których typów kod nie używa), a metadane działają też w exe jednoplikowym i w testach -->
+  <Target Name="AddStoragePluginMetadata" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="CollectPluginDlls">
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ImageStudio.StoragePlugin</_Parameter1>
+        <_Parameter2>%(StorageDll.Filename)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
   <Target Name="CopyPluginDlls" AfterTargets="Build" Condition="'$(PluginsInBundle)' != 'true'" DependsOnTargets="CollectPluginDlls">
     <Copy SourceFiles="@(ProviderFile)" DestinationFolder="$(OutDir)providers" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(TabFile)" DestinationFolder="$(OutDir)tabs" SkipUnchangedFiles="true" />

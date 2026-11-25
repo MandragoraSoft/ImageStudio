@@ -1,3 +1,5 @@
+using System.Net.Http;
+
 namespace ImageStudio.Storage;
 
 public enum MediaKind { Image, Video, Audio }
@@ -105,3 +107,8 @@ public interface IMediaStoragePlugin : IMediaStorage
     StorageStatus? Status => null;
     string? HelpKey => null;
 }
+
+// Wszystko, czego wtyczka potrzebuje od aplikacji, bez znajomości DI. Wtyczkę odkrytą przez refleksję aplikacja tworzy
+// konstruktorem (StoragePluginContext): sekrety (DPAPI, nazwy "storage-<id>..."), nowy handler HTTP (rejestr żądań
+// aplikacji: lista w stopce, anulowanie) i limit czasu pojedynczego żądania
+public sealed record StoragePluginContext(IStorageSecrets Secrets, Func<HttpMessageHandler> CreateHttpHandler, TimeSpan HttpTimeout);
